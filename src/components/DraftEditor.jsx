@@ -4,12 +4,13 @@ import { useI18n } from '../i18n'
 import PhotoUploader from './PhotoUploader'
 import WorkerFields, { GROUP_CATEGORIES, emptyProfile, groupOf, profileFromRow, profileToPayload, validateProfile } from './WorkerFields'
 import { removeDraftPhoto, uploadDraftPhoto } from '../lib/drafts'
+import { PROVINCES } from '../provinces'
 
 const input = 'mt-1 w-full rounded-xl bg-white/10 px-3 py-2.5 text-base outline-none ring-1 ring-white/10 focus:ring-line'
 const ERR = {
   PLAN_INACTIVE: 'แพ็กเกจสังกัดยังไม่เปิด/หมดอายุ', TOO_MANY_DRAFTS: 'มีแบบร่างค้างเกิน 40 รายการ', TOO_MANY_PHOTOS: 'รูปได้สูงสุด 5 ภาพ',
   LOCKED: 'แบบร่างนี้แก้ไม่ได้ในสถานะปัจจุบัน', NO_PHOTO: 'ต้องมีรูปอย่างน้อย 1 ภาพ', MIXED_GROUPS: 'เลือกหมวดชงเหล้า/ENT ปนกับหมอนวด/สปาไม่ได้',
-  CONTACT_IN_PROFILE: 'ห้ามใส่เบอร์โทร ไอดี หรือลิงก์ในชื่อ/แนะนำตัว/ที่อยู่',
+  CONTACT_IN_PROFILE: 'ห้ามใส่เบอร์โทร ไอดี หรือลิงก์ในชื่อ/แนะนำตัว/ที่อยู่', BAD_PROVINCE: 'จังหวัดไม่ถูกต้อง', BAD_AGE_METHOD: 'เลือกวิธีตรวจอายุ', CONSENT_REQUIRED: 'ต้องระบุว่าได้รับความยินยอมแล้ว', BAD_AGE: 'อายุต้อง 20 ปีขึ้นไป',
 }
 const errText = (m = '') => ERR[Object.keys(ERR).find((k) => m.includes(k))] ?? 'บันทึกไม่สำเร็จ'
 
@@ -29,6 +30,7 @@ export default function DraftEditor({ draft, mode, onClose, onSaved }) {
   const [adding, setAdding] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
+  const [pub, setPub] = useState({ province: draft?.province ?? '', method: '', consent: '', ok: false })   // admin: publish now
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
   const total = photos.length - removed.length + local.length
 
@@ -39,6 +41,11 @@ export default function DraftEditor({ draft, mode, onClose, onSaved }) {
     const bad = validateProfile(prof, grp, { needLocation: false })
     if (bad) return setError({ errGender: 'กรุณาเลือกเพศ', errAge: 'อายุต้อง 20 ปีขึ้นไป', errPrice: 'กรอกราคาอย่างน้อย 1 ช่อง', errServiceMode: 'เลือกรูปแบบการให้บริการ' }[bad] ?? 'ข้อมูลไม่ครบ')
     if (total < 1) return setError('ต้องมีรูปอย่างน้อย 1 ภาพ')
+    if (andThen === 'publish') {
+      if (!pub.province) return setError('กรุณาเลือกจังหวัดของน้อง')
+      if (!pub.method) return setError('กรุณาเลือกวิธีที่ตรวจอายุแล้ว')
+      if (!pub.ok || pub.consent.trim().length < 3) return setError('ต้องยืนยันว่าได้รับความยินยอมจากน้องแล้ว และระบุช่องทางที่ได้รับ')
+    }
     setBusy(true)
     try {
       const payload = {
@@ -51,7 +58,7 @@ export default function DraftEditor({ draft, mode, onClose, onSaved }) {
       if (e1) throw e1
       for (const pid of removed) await removeDraftPhoto(pid)
       for (const pic of local) await uploadDraftPhoto(id, pic)
-      await onSaved(id, andThen)
+      await onSaved(id, andThen, pub)
     } catch (e) {
       console.error(e)
       setError(errText(e.message ?? String(e)))
@@ -127,12 +134,40 @@ export default function DraftEditor({ draft, mode, onClose, onSaved }) {
       </div>
       <label className="block text-sm">หมายเหตุถึงแอดมิน (ไม่บังคับ)<textarea rows={2} maxLength={300} value={form.note} onChange={set('note')} className={input} /></label>
 
+      {mode === 'admin' && !draft?.managed && (
+        <section className="space-y-2 rounded-2xl bg-green-500/10 p-3 ring-1 ring-green-400/30">
+          <h3 className="text-sm font-bold text-green-200">เปิดโปรไฟล์ทันที (ลูกค้าเห็นได้ แต่จอง/แชตไม่ได้จนกว่าน้องกดยืนยัน)</h3>
+          <label className="block text-sm">จังหวัดที่น้องรับงาน
+            <select value={pub.province} onChange={(e) => setPub((x) => ({ ...x, province: e.target.value }))} className={input}>
+              <option value="" className="text-black">เลือกจังหวัด</option>
+              {PROVINCES.map((p) => <option key={p} value={p} className="text-black">{p}</option>)}
+            </select>
+            <span className="text-[11px] text-neutral-400">แสดงเป็น "จังหวัดที่ตั้งเอง" จนกว่าน้องจะยืนยันพิกัดด้วย GPS</span>
+          </label>
+          <label className="block text-sm">ตรวจอายุแล้วด้วยวิธี
+            <select value={pub.method} onChange={(e) => setPub((x) => ({ ...x, method: e.target.value }))} className={input}>
+              <option value="" className="text-black">เลือกวิธี</option>
+              {[['photo', 'ดูจากรูป'], ['video_call', 'วิดีโอคอล'], ['in_person', 'พบตัวจริง'], ['id_card', 'ตรวจบัตรประชาชน']].map(([k, label]) => <option key={k} value={k} className="text-black">{label}</option>)}
+            </select>
+          </label>
+          <label className="block text-sm">ได้รับความยินยอมจากน้องทางช่องทางไหน
+            <input maxLength={200} value={pub.consent} onChange={(e) => setPub((x) => ({ ...x, consent: e.target.value }))} placeholder="เช่น วิดีโอคอล 29 ต.ค. / แชต LINE" className={input} />
+          </label>
+          <label className="flex items-start gap-2 text-xs text-neutral-200">
+            <input type="checkbox" checked={pub.ok} onChange={(e) => setPub((x) => ({ ...x, ok: e.target.checked }))} className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>ข้าพเจ้า (แอดมิน) ยืนยันว่าได้รับความยินยอมจากเจ้าของรูปและข้อมูลแล้ว และตรวจอายุแล้ว ระบบบันทึกชื่อและเวลา โปรไฟล์จะซ่อนเองถ้าน้องไม่กดรับภายใน 14 วัน</span>
+          </label>
+        </section>
+      )}
+      {draft?.managed && <p className="rounded-xl bg-green-500/10 p-3 text-xs text-green-200">โปรไฟล์นี้เปิดแสดงอยู่แล้ว การแก้ไขที่บันทึกจะอัปเดตโปรไฟล์ที่แสดงอยู่ทันที (จนกว่าน้องจะกดรับ)</p>}
       {error && <p className="rounded-lg bg-red-500/10 p-2 text-sm text-red-300">{error}</p>}
       <div className="grid gap-2">
-        <button disabled={busy} onClick={() => save(mode === 'agency' ? 'submit' : 'link')} className="rounded-xl bg-line py-3 font-bold text-black active:scale-95 disabled:opacity-50">
-          {busy ? 'กำลังบันทึก…' : mode === 'agency' ? 'บันทึกและส่งให้แอดมินตรวจ' : 'บันทึกและออกลิงก์ให้น้อง'}
-        </button>
-        <button disabled={busy} onClick={() => save(null)} className="rounded-xl bg-white/10 py-2.5 font-semibold active:scale-95 disabled:opacity-50">บันทึกเป็นร่างไว้ก่อน</button>
+        {mode === 'agency' ? (
+          <button disabled={busy} onClick={() => save('submit')} className="rounded-xl bg-line py-3 font-bold text-black active:scale-95 disabled:opacity-50">{busy ? 'กำลังบันทึก…' : 'บันทึกและส่งให้แอดมินตรวจ'}</button>
+        ) : !draft?.managed && (
+          <button disabled={busy} onClick={() => save('publish')} className="rounded-xl bg-line py-3 font-bold text-black active:scale-95 disabled:opacity-50">{busy ? 'กำลังบันทึก…' : '🟢 เปิดโปรไฟล์ทันที + ออกลิงก์ให้น้อง'}</button>
+        )}
+        <button disabled={busy} onClick={() => save(null)} className="rounded-xl bg-white/10 py-2.5 font-semibold active:scale-95 disabled:opacity-50">{draft?.managed ? 'บันทึกการแก้ไข' : 'บันทึกเป็นร่างไว้ก่อน'}</button>
         <button disabled={busy} onClick={onClose} className="rounded-xl bg-white/5 py-2 text-sm active:scale-95">ยกเลิก</button>
       </div>
     </Shell>

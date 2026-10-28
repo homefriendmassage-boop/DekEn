@@ -127,6 +127,7 @@ export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlo
             {w.province && !w.loc_verified && <p className="mt-1 text-[11px] text-amber-200/80">{t('locSelfNote')}</p>}
           </div>
           {!w.canView && <p className="rounded-xl bg-amber-400/10 p-3 text-xs text-amber-200">{t('blurredNote')}</p>}
+          {w.claimed === false && <p className="rounded-xl bg-amber-400/10 p-3 text-xs text-amber-200">⏳ {t('unclaimedNote')}</p>}
 
           {facts.length > 0 && (
             <dl className="grid grid-cols-2 gap-2">
@@ -171,7 +172,7 @@ export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlo
           {isMe ? (
             <p className="rounded-xl bg-white/10 py-2.5 text-center text-sm font-semibold text-neutral-300">{t('ownProfile')}</p>
           ) : (
-            <div className="grid gap-2">
+            w.claimed === false ? null : <div className="grid gap-2">
               <button onClick={onAsk} className="rounded-xl bg-pink-500 py-3 font-bold text-white active:scale-95">💬 {t('chatDirect')}</button>
               {w.canView ? (
                 <button onClick={onBook} disabled={!w.is_online}

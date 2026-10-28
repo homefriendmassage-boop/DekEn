@@ -359,3 +359,12 @@ Run `supabase/migration_035.sql` once, after migration_034. **Redeploy the Edge 
 - `job_arrived()` = the "ถึงแล้ว" button. `jobs_notify` trigger -> Edge Function: new → provider; accepted / declined / expired / arrived / completed / worker_cancelled → customer; customer cancel / missed → provider. Buttons open `?job=<id>`.
 - Customer-facing prices = cash price + platform fee (500) everywhere (cards, details); the booking sheet shows the Wallet top right and the three rows: wage (incl. fee), platform fee from the Wallet, remainder paid in cash.
 - `workers.claimed / claim_deadline`: a profile that is not claimed cannot be booked (`UNCLAIMED`).
+
+## migration_036 — profiles an admin publishes for a girl (visible at once, bookable after she confirms)
+
+Run `supabase/migration_036.sql` once, after migration_035.
+
+- Admin tab "➕ แบบร่างให้น้อง": the form now has "🟢 เปิดโปรไฟล์ทันที + ออกลิงก์ให้น้อง" (province, how the age was verified, who consented and through which channel, plus the admin's attestation — name and time are recorded in `application_drafts`). `admin_publish_draft()` creates a placeholder account (`auth.users` + `users`, `line_user_id = 'managed:<id>'`) that owns a `workers` row with `claimed = false` and `claim_deadline = now() + 14 days`.
+- Customers see the profile with the badge "รอยืนยันตัวตน"; `create_booking` and `open_thread` refuse it (`UNCLAIMED`); the card and details hide the book / chat buttons.
+- `worker_listed()` hides an unclaimed profile after its deadline; re-issuing the link adds 14 days. Editing the draft (text and photos) keeps the live profile in sync until it is claimed; cancelling the draft deletes the profile.
+- The girl opens the link with her own LINE: `claim_draft` moves the profile to her account (`workers.user_id` is re-keyed; all foreign keys to `workers(user_id)` were switched to ON UPDATE CASCADE), deletes the placeholder, sets her GPS location, her booking contact and (optionally) the agency, and leaves her offline until she switches "Online" on.

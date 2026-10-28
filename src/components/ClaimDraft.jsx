@@ -78,8 +78,8 @@ export default function ClaimDraft({ token, onClose, onDone }) {
   if (!d) return shell(<p className="py-10 text-center text-neutral-500">{t('loading')}</p>)
   if (sent) {
     return shell(<>
-      <h2 className="text-lg font-bold">✅ {t('claimSentTitle')}</h2>
-      <p className="text-sm text-neutral-300">{t('claimSentBody')}</p>
+      <h2 className="text-lg font-bold">✅ {t(d.managed ? 'claimSentManagedTitle' : 'claimSentTitle')}</h2>
+      <p className="text-sm text-neutral-300">{t(d.managed ? 'claimSentManagedBody' : 'claimSentBody')}</p>
       <button onClick={onDone} className="w-full rounded-xl bg-line py-3 font-bold text-black active:scale-95">{t('claimGo')}</button>
     </>)
   }
@@ -107,7 +107,7 @@ export default function ClaimDraft({ token, onClose, onDone }) {
 
   return shell(<>
     <h2 className="text-lg font-bold">{t('claimTitle')}</h2>
-    <p className="text-sm text-neutral-400">{d.source === 'agency' ? t('claimIntroAgency', { name: d.agency_name ?? '' }) : t('claimIntroAdmin')}</p>
+    <p className="text-sm text-neutral-400">{d.managed ? t('claimIntroManaged') : d.source === 'agency' ? t('claimIntroAgency', { name: d.agency_name ?? '' }) : t('claimIntroAdmin')}</p>
 
     {d.source === 'agency' && (
       <div className="flex items-center gap-3 rounded-2xl bg-amber-400/10 p-3 ring-1 ring-amber-400/30">
@@ -171,9 +171,9 @@ export default function ClaimDraft({ token, onClose, onDone }) {
       </fieldset>
     )}
 
-    {(!d.phone || !d.line_id) && (
+    {(d.managed || !d.phone || !d.line_id) && (
       <div className="space-y-2 rounded-2xl bg-white/5 p-3">
-        <p className="text-xs text-neutral-400">{t('contactHint')}</p>
+        <p className="text-xs text-neutral-400">{d.managed ? t('bcHint') : t('contactHint')}</p>
         <label className="block text-sm">{t('fPhone')}<input type="tel" inputMode="tel" maxLength={20} value={phone} onChange={(e) => setPhone(e.target.value)} className={input} /></label>
         <label className="block text-sm">{t('fLineId')}<input maxLength={40} value={lineId} onChange={(e) => setLineId(e.target.value)} className={input} /></label>
       </div>

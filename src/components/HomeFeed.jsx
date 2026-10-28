@@ -132,6 +132,7 @@ function WorkerCard({ worker: w, onUnlock, onDetail, isMe }) {
           </div>
         </div>
         {w.distance_km != null && <p className="text-[11px] font-semibold text-amber-300 sm:text-xs">📍 {t('kmAway', { n: w.distance_km })}</p>}
+        {w.claimed === false && <div><span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-[10px] font-semibold text-amber-300">⏳ {t('unclaimedBadge')}</span></div>}
         {w.province && <div><LocBadge verified={!!w.loc_verified} /></div>}
         {w.province && (
           <p className="truncate text-[11px] text-neutral-400 sm:text-xs">

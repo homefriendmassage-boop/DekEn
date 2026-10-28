@@ -44,12 +44,15 @@ export default function DraftsPanel({ mode, toast }) {
     await run(() => supabase.rpc('admin_draft_review', { p_id: d.id, p_approve: false, p_reason: rejecting.reason }), 'ตีกลับแล้ว')
     setRejecting(null)
   }
-  const cancel = (d) => window.confirm(`ยกเลิกแบบร่างของ "${d.display_name}"?`) && run(() => supabase.rpc('draft_cancel', { p_id: d.id }), 'ยกเลิกแล้ว')
+  const cancel = (d) => window.confirm(d.managed ? `ถอดโปรไฟล์ "${d.display_name}" ออกจากระบบและยกเลิกแบบร่าง?` : `ยกเลิกแบบร่างของ "${d.display_name}"?`) && run(() => supabase.rpc('draft_cancel', { p_id: d.id }), 'ยกเลิกแล้ว')
 
-  async function onSaved(id, andThen) {
+  async function onSaved(id, andThen, pub) {
     setEditing(null)
     if (andThen === 'submit') await run(() => supabase.rpc('draft_submit', { p_id: id }), 'ส่งให้แอดมินตรวจแล้ว')
-    else if (andThen === 'link') { const tok = await run(() => supabase.rpc('draft_issue_link', { p_id: id })); if (tok) copy(tok) }
+    else if (andThen === 'publish') {
+      const tok = await run(() => supabase.rpc('admin_publish_draft', { p_id: id, p_province: pub.province, p_age_method: pub.method, p_consent_note: pub.consent }), 'เปิดโปรไฟล์แล้ว (ลูกค้าเห็นแต่จองไม่ได้จนกว่าน้องกดรับ)')
+      if (tok) copy(tok)
+    } else if (andThen === 'link') { const tok = await run(() => supabase.rpc('draft_issue_link', { p_id: id })); if (tok) copy(tok) }
     else { toast('บันทึกร่างแล้ว'); await load() }
   }
 
@@ -100,6 +103,7 @@ export default function DraftsPanel({ mode, toast }) {
                     </div>
                     <p className="text-[11px] text-neutral-400">{d.categories.map(catName).join(' · ')}{d.price ? ` · เริ่มต้น ${money(d.price)}` : ''}</p>
                     {mode === 'admin' && <p className="text-[11px] text-neutral-500">{d.source === 'agency' ? `โมเดลลิ่ง ${d.agency_name ?? ''}` : `แอดมิน ${d.creator_name ?? ''}`} · {ago(d.updated_at)}</p>}
+                    {d.managed && <p className="text-[11px] font-semibold text-green-300">🟢 โปรไฟล์เปิดแสดงอยู่ · รอน้องยืนยัน{d.claim_deadline ? ` (ซ่อนเองถ้าไม่กดรับภายใน ${fmtDateTime(d.claim_deadline)})` : ''}</p>}
                     {d.link_expires_at && d.link_active && <p className="text-[11px] text-green-300">ลิงก์หมดอายุ {fmtDateTime(d.link_expires_at)}</p>}
                     {d.reject_reason && d.status === 'rejected' && <p className="text-[11px] text-red-300">เหตุผลที่ตีกลับ: {d.reject_reason}</p>}
                   </div>
@@ -114,6 +118,7 @@ export default function DraftsPanel({ mode, toast }) {
                     {d.about && <p className="whitespace-pre-wrap break-words text-neutral-300">{d.about}</p>}
                     <p>ราคา: {(d.price_options ?? []).map((o) => `${o.label} ${money(o.price)}`).join(' · ')} (เริ่มต้น: {d.start_rate})</p>
                     {(d.district || d.nearby) && <p>📍 {[d.district, d.nearby].filter(Boolean).join(' · ')}</p>}
+                    {d.managed_user_id && d.age_verified_method && <p className="text-green-300">ตรวจอายุ: {d.age_verified_method} · ความยินยอม: {d.consent_note}</p>}
                     {(d.phone || d.line_id) && <p>ติดต่อ: {[d.phone, d.line_id].filter(Boolean).join(' · ')}</p>}
                     {d.note && <p className="text-neutral-400">หมายเหตุ: {d.note}</p>}
                   </div>
