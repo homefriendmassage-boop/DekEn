@@ -7,6 +7,7 @@ import { useI18n } from '../i18n'
 const ERROR_KEYS = {
   INSUFFICIENT_BALANCE: 'errInsufficient',
   WORKER_UNAVAILABLE: 'errUnavailable',
+  LOCKED: 'errLocked',
 }
 const errorKey = (msg = '') =>
   Object.entries(ERROR_KEYS).find(([k]) => msg.includes(k))?.[1] ?? 'errGeneric'

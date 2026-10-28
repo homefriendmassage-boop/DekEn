@@ -1,18 +1,32 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import { signIn } from './lib/auth'
+import { CATEGORIES, canViewWorker, tierOf } from './config'
+import { useI18n } from './i18n'
+import Header from './components/Header'
+import Landing from './components/Landing'
+import CategoryPicker from './components/CategoryPicker'
 import HomeFeed from './components/HomeFeed'
 import BookingModal from './components/BookingModal'
-import { useI18n } from './i18n'
+import MembershipModal from './components/MembershipModal'
+import WorkerApply from './components/WorkerApply'
+import WorkerDashboard from './components/WorkerDashboard'
 
-// Shown only in mock mode when the workers table is empty, so the UI is testable
-// before you run supabase/seed.sql. Booking these will fail (fake ids) by design.
-const DEMO_WORKERS = [
-  { user_id: 'demo-1', display_name: 'Mild', service_types: ['massage'], price: 2000, is_online: true, is_boosted: true, profile_image: 'https://picsum.photos/seed/w1/600/800' },
-  { user_id: 'demo-2', display_name: 'Ploy', service_types: ['singer', 'mc'], price: 3500, is_online: true, is_boosted: false, profile_image: 'https://picsum.photos/seed/w2/600/800' },
-  { user_id: 'demo-3', display_name: 'Fah', service_types: ['massage', 'spa'], price: 1800, is_online: false, is_boosted: false, profile_image: 'https://picsum.photos/seed/w3/600/800' },
-  { user_id: 'demo-4', display_name: 'Nook', service_types: ['dancer'], price: 2500, is_online: true, is_boosted: true, profile_image: 'https://picsum.photos/seed/w4/600/800' },
-]
+// Mock mode only, when the workers table is empty: lets you click through the UI
+// before running seed SQL. Rank within a category = order in this list.
+const DEMO_WORKERS = CATEGORIES.flatMap((category, ci) =>
+  Array.from({ length: category === 'ent' ? 12 : 4 }, (_, i) => ({
+    user_id: `demo-${category}-${i}`,
+    display_name: `Demo ${ci * 10 + i + 1}`,
+    category,
+    price: 1500 + i * 250,
+    profile_image: `https://picsum.photos/seed/${category}${i}/600/800`,
+    is_online: i % 4 !== 3,
+    is_boosted: i === 0,
+    rank: i + 1,
+    demo: true,
+  })),
+)
 
 // A plain reload would reuse the stale ?code=/&state= in the URL and the broken
 // cached LIFF token. Wipe both and restart from the clean app URL.
@@ -24,15 +38,21 @@ function resetAndRetry() {
 }
 
 export default function App() {
-  const { t } = useI18n()
+  const { t, catName } = useI18n()
   const [phase, setPhase] = useState('loading') // loading | ready | error
   const [error, setError] = useState(null)
   const [session, setSession] = useState(null)  // { profile, isMock, refCode }
   const [me, setMe] = useState(null)            // row from public.users
+
+  const [view, setView] = useState('landing')   // landing | categories | feed | worker
+  const [category, setCategory] = useState(null)
   const [workers, setWorkers] = useState([])
-  const [selected, setSelected] = useState(null) // worker being booked
+  const [signedUrls, setSignedUrls] = useState({})     // original_path -> signed URL
+  const [feedLoading, setFeedLoading] = useState(false)
+  const [selected, setSelected] = useState(null)       // worker being booked
+  const [showMembership, setShowMembership] = useState(false)
   const [toast, setToast] = useState(null)
-  const [previewVip, setPreviewVip] = useState(false) // mock-mode UI toggle only
+  const [previewTier, setPreviewTier] = useState(null) // mock-mode UI override (null = real)
 
   const showToast = (msg) => {
     setToast(msg)
@@ -48,17 +68,7 @@ export default function App() {
     return data
   }, [])
 
-  const loadWorkers = useCallback(async (isMock) => {
-    const { data, error } = await supabase
-      .from('workers')
-      .select('*')
-      .order('is_boosted', { ascending: false }) // boosted first
-      .order('is_online', { ascending: false })  // then online
-    if (error) throw error
-    setWorkers(isMock && data.length === 0 ? DEMO_WORKERS : data)
-  }, [])
-
-  // ---- Boot: login -> profile row -> workers ----
+  // ---- Boot: login -> profile row ----
   useEffect(() => {
     let cancelled = false
     ;(async () => {
@@ -66,7 +76,7 @@ export default function App() {
         const s = await signIn()
         if (cancelled) return
         setSession(s)
-        await Promise.all([loadMe(), loadWorkers(s.isMock)])
+        await loadMe()
         if (!cancelled) setPhase('ready')
       } catch (e) {
         console.error(e)
@@ -74,20 +84,59 @@ export default function App() {
       }
     })()
     return () => { cancelled = true }
-  }, [loadMe, loadWorkers])
+  }, [loadMe])
 
-  // ---- Realtime: wallet top-ups / VIP changes / worker status appear instantly ----
+  // ---- Realtime: wallet top-ups / membership changes appear instantly ----
   useEffect(() => {
     if (!me?.id) return
     const ch = supabase
-      .channel('live')
+      .channel('me')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users', filter: `id=eq.${me.id}` },
         (p) => setMe(p.new))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'workers' },
-        () => loadWorkers(session?.isMock))
       .subscribe()
     return () => { supabase.removeChannel(ch) }
-  }, [me?.id, session?.isMock, loadWorkers])
+  }, [me?.id])
+
+  const tier = session?.isMock && previewTier !== null ? previewTier : tierOf(me)
+
+  // ---- Feed: the server decides what we may see (list_workers); then we fetch
+  //      signed URLs for the full photos of the workers we are allowed to view. ----
+  const loadFeed = useCallback(async (cat) => {
+    setFeedLoading(true)
+    setWorkers([])
+    try {
+      const { data, error } = await supabase.rpc('list_workers', { p_category: cat })
+      if (error) throw error
+      let rows = data ?? []
+      if (rows.length === 0 && session?.isMock) rows = DEMO_WORKERS.filter((w) => w.category === cat)
+
+      const paths = rows.filter((w) => w.can_view && w.original_path).map((w) => w.original_path)
+      const signed = {}
+      if (paths.length) {
+        const { data: urls } = await supabase.storage.from('worker-originals').createSignedUrls(paths, 3600)
+        urls?.forEach((u) => { if (u.signedUrl) signed[u.path] = u.signedUrl })
+      }
+      setSignedUrls(signed)
+      setWorkers(rows)
+    } catch (e) {
+      console.error(e)
+      showToast(t('errGeneric'))
+    }
+    setFeedLoading(false)
+  }, [session?.isMock]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function openCategory(cat) {
+    setCategory(cat)
+    setView('feed')
+    loadFeed(cat)
+  }
+
+  // Real rows carry can_view from the DB; demo rows use the UI-side copy of the rule.
+  const feedRows = workers.map((w) => {
+    const canView = w.can_view ?? canViewWorker(w.category, w.rank, tier)
+    const full = canView && w.original_path ? signedUrls[w.original_path] : null
+    return { ...w, canView, image: full ?? w.profile_image }
+  })
 
   if (phase === 'loading') {
     return (
@@ -107,29 +156,72 @@ export default function App() {
     )
   }
 
-  const isVip = Boolean(me?.is_vip) || (session.isMock && previewVip)
+  const headerProps = {
+    displayName: session.profile.displayName,
+    tier,
+    expiresAt: me?.vip_expires_at,
+    walletBalance: me?.wallet_balance ?? 0,
+    onTierClick: () => setShowMembership(true),
+  }
 
   return (
     <div className="mx-auto min-h-screen w-full max-w-3xl pb-[env(safe-area-inset-bottom)]">
       {/* Dev bar: only rendered in mock mode */}
       {session.isMock && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 bg-amber-400 px-3 py-1.5 text-xs font-medium text-black">
-          <span>MOCK LOGIN · {session.profile.displayName}</span>
-          <span>ref: {session.refCode ?? '—'}</span>
+          <span>MOCK · ref: {session.refCode ?? '—'}</span>
           <label className="ml-auto flex items-center gap-1">
-            <input type="checkbox" checked={previewVip} onChange={(e) => setPreviewVip(e.target.checked)} />
-            Preview as VIP
+            tier (UI preview)
+            <select value={previewTier ?? ''} onChange={(e) => setPreviewTier(e.target.value === '' ? null : Number(e.target.value))}>
+              <option value="">real</option>
+              {[0, 1, 2, 3].map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
           </label>
         </div>
       )}
 
-      <HomeFeed
-        workers={workers}
-        isVip={isVip}
-        walletBalance={me?.wallet_balance ?? 0}
-        displayName={session.profile.displayName}
-        onBook={setSelected}
-      />
+      {view === 'landing' && (
+        <Landing
+          displayName={session.profile.displayName}
+          role={me?.role}
+          onCustomer={() => setView('categories')}
+          onWorker={() => setView('worker')}
+        />
+      )}
+
+      {view === 'categories' && (
+        <>
+          <Header {...headerProps} title={t('categories')} onBack={() => setView('landing')} />
+          <CategoryPicker tier={tier} onPick={openCategory} onLocked={() => setShowMembership(true)} />
+        </>
+      )}
+
+      {view === 'feed' && (
+        <>
+          <Header {...headerProps} title={catName(category)} onBack={() => setView('categories')} />
+          <HomeFeed
+            workers={feedRows}
+            category={category}
+            tier={tier}
+            loading={feedLoading}
+            onBook={setSelected}
+            onUnlock={() => setShowMembership(true)}
+          />
+        </>
+      )}
+
+      {view === 'worker' && (
+        <>
+          <Header
+            displayName={session.profile.displayName}
+            title={me?.role === 'worker' ? t('workerDash') : t('applyTitle')}
+            onBack={() => setView('landing')}
+          />
+          {me?.role === 'worker'
+            ? <WorkerDashboard userId={me.id} />
+            : <WorkerApply userId={me.id} defaultName={session.profile.displayName} />}
+        </>
+      )}
 
       {selected && (
         <BookingModal
@@ -144,6 +236,8 @@ export default function App() {
           }}
         />
       )}
+
+      {showMembership && <MembershipModal tier={tier} onClose={() => setShowMembership(false)} />}
 
       {toast && (
         <div className="fixed inset-x-4 bottom-6 z-[60] mx-auto max-w-sm rounded-xl bg-line px-4 py-3 text-center text-sm font-semibold text-black shadow-lg">

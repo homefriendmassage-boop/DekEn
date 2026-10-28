@@ -6,6 +6,8 @@ fee from an in-app wallet; the service fee is paid in cash to the worker.
 ```
 supabase/schema.sql              Tables, triggers, RLS, column grants   (Part 1)
 supabase/seed.sql                Dev-only demo workers
+supabase/migration_002.sql       Categories, membership tiers, photo storage, worker apps (run after schema.sql)
+supabase/seed2.sql               Dev-only: 21 more demo workers (tests the top-10 free limit)
 supabase/functions/line-auth/    Edge Function: LIFF ID token -> Supabase session
 src/lib/auth.js                  LIFF init, ?ref capture, mock login    (Part 2)
 src/App.jsx                      App shell, data loading, realtime      (Part 2)
@@ -61,7 +63,39 @@ src/components/BookingModal.jsx  Deposit explainer + Confirm Booking    (Part 3)
   using the service role (not built yet).
 - **VIP blur is cosmetic.** The image URL is still downloadable. Serve blurred thumbnails to
   non-VIPs for real protection.
-- **Not implemented (needs product decisions):** refunds on cancel/decline, wallet transaction
-  ledger, worker-side job inbox, partner commission reporting, payment/top-up flow.
+- **Not implemented (needs product decisions):** wallet top-up / membership payment, wallet transaction
+  ledger, notifying providers via LINE push, partner commission reporting.
 - Restrict CORS in `line-auth` to your Pages origin, and ensure your use case complies with LINE's
   Official Account / LIFF terms of service and Thai law for the services offered.
+
+## Categories, membership, providers (migration_002)
+
+Run `supabase/migration_002.sql` once after `schema.sql` (and optionally `seed2.sql`).
+
+| Plan | Sees |
+|---|---|
+| Free | Bartender + ENT, only the top 10 of each category |
+| VIP 100 | Bartender + ENT, everyone |
+| VIP 200 | + Masseuse |
+| VIP 300 | Everything (incl. ENT Plus, VIP Spa) |
+
+Each plan lasts 30 days. Payment is manual for now; activate / extend from the SQL Editor:
+
+```sql
+select public.set_membership('<user id>', 1, 30);   -- tier 1/2/3, days
+```
+
+Providers: the user taps **Apply** in the app, which creates a row in `worker_applications`; you approve it:
+
+```sql
+select id, display_name, category, contact from public.worker_applications where status = 'pending';
+select public.approve_worker('<application id>');
+```
+
+Photos: the provider drops a circle over their face; the browser mosaics that area for the public
+photo (`worker-public` bucket) and stores the full photo in the private `worker-originals` bucket,
+which only members allowed to see that provider can read (signed URL). Optional env:
+`VITE_LINE_OA_URL` (admin contact link shown in the membership sheet).
+
+A pending job that is declined or cancelled is refunded to the customer's wallet; an accepted job
+that is cancelled is not (handle manually).
