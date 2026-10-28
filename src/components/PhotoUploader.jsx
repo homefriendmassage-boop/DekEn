@@ -40,7 +40,7 @@ function mosaicCircle(src, cx, cy, r) {
  *  - mosaicked -> PUBLIC bucket `worker-public`     (the teaser everyone sees)
  * A preview of the public version must be confirmed before anything is uploaded.
  */
-export default function PhotoUploader({ userId, previousOriginal, onUploaded, target = 'worker' }) {
+export default function PhotoUploader({ userId, previousOriginal, onUploaded, target = 'worker', onPicked }) {
   const { t } = useI18n()
   const boxRef = useRef(null)
   const dragging = useRef(false)
@@ -50,7 +50,7 @@ export default function PhotoUploader({ userId, previousOriginal, onUploaded, ta
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState(null)
 
-  useEffect(() => () => { src && URL.revokeObjectURL(src); preview && URL.revokeObjectURL(preview.url) }, []) // eslint-disable-line
+  useEffect(() => () => { src && URL.revokeObjectURL(src) }, []) // eslint-disable-line
 
   function onFile(e) {
     const f = e.target.files?.[0]
@@ -101,6 +101,12 @@ export default function PhotoUploader({ userId, previousOriginal, onUploaded, ta
   }
 
   async function upload() {
+    if (onPicked) {                       // the parent uploads (several pictures, staged before the application exists)
+      onPicked({ orig: preview.orig, pub: preview.pub, url: preview.url })
+      setSrc(null)
+      setPreview(null)
+      return
+    }
     setBusy(true)
     setMsg(null)
     try {

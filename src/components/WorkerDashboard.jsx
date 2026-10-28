@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useI18n } from '../i18n'
-import PhotoUploader from './PhotoUploader'
 import ThreadList from './ThreadList'
 import ChatModal from './ChatModal'
 import RankBoost from './RankBoost'
-import WorkerFields, { profileFromRow, profileToPayload, validateProfile } from './WorkerFields'
+import ProfileSection from './ProfileSection'
 import { logoUrl } from '../lib/logo'
 import { clearAgencyCode, getAgencyCode } from '../lib/auth'
 
@@ -14,9 +13,7 @@ export default function WorkerDashboard({ userId, onTopUp }) {
   const { t, money, catName, statusName } = useI18n()
   const [worker, setWorker] = useState(null)
   const [jobs, setJobs] = useState([])
-  const [form, setForm] = useState({ display_name: '', price: '', province: '', district: '', nearby: '' })
   const [chat, setChat] = useState(null)
-  const [prof, setProf] = useState(null)   // details / prices / location (WorkerFields)
   const [note, setNote] = useState(null)
   const [invite, setInvite] = useState(() => getAgencyCode())      // invitation link opened earlier
   const [inviteAgency, setInviteAgency] = useState(null)
@@ -27,8 +24,6 @@ export default function WorkerDashboard({ userId, onTopUp }) {
     const { data, error } = await supabase.from('workers').select('*').eq('user_id', userId).single()
     if (error) return setError(t('errGeneric'))
     setWorker(data)
-    setProf(profileFromRow(data))
-    setForm({ display_name: data.display_name, price: String(data.price), province: data.province ?? '', district: data.district ?? '', nearby: data.nearby ?? '' })
   }, [userId]) // eslint-disable-line
 
   const loadJobs = useCallback(async () => {
@@ -86,8 +81,6 @@ export default function WorkerDashboard({ userId, onTopUp }) {
 
   if (!worker) return <p className="py-20 text-center text-neutral-500">{error ?? t('loading')}</p>
 
-  const input = 'mt-1 w-full rounded-xl bg-white/10 px-3 py-2.5 text-base outline-none ring-1 ring-white/10 focus:ring-line'
-
   return (
     <div className="space-y-5 p-4">
       {/* Online switch */}
@@ -102,6 +95,7 @@ export default function WorkerDashboard({ userId, onTopUp }) {
       </button>
 
       {error && <p className="rounded-lg bg-red-500/10 p-2 text-sm text-red-300">{error}</p>}
+      {note && <p className="rounded-lg bg-green-500/10 p-2 text-sm text-green-300">{note}</p>}
 
       {/* Invitation from an agency (also how a girl who left comes back) */}
       {invite && inviteAgency && !aff && (
@@ -179,41 +173,9 @@ export default function WorkerDashboard({ userId, onTopUp }) {
         <ThreadList role="worker" onOpen={(th) => setChat(th)} />
       </section>
 
-      {/* Profile */}
-      <section className="space-y-3">
-        <h2 className="text-base font-bold">{t('profile')} · <span className="text-sm font-normal text-neutral-400">{(worker.categories ?? []).map(catName).join(' · ')}</span></h2>
-        <label className="block text-sm">{t('fName')}
-          <input value={form.display_name} maxLength={40} onChange={(e) => setForm((f) => ({ ...f, display_name: e.target.value }))} className={input} />
-        </label>
-        {prof && <WorkerFields v={prof} set={(p) => setProf((x) => ({ ...x, ...p }))} />}
-        <label className="block text-sm">{t('fDistrict')}
-          <input value={form.district} maxLength={60} onChange={(e) => setForm((f) => ({ ...f, district: e.target.value }))} className={input} />
-        </label>
-        <label className="block text-sm">{t('fNearby')}
-          <input value={form.nearby} maxLength={120} onChange={(e) => setForm((f) => ({ ...f, nearby: e.target.value }))} className={input} />
-        </label>
-        <button
-          onClick={() => {
-            const bad = prof && validateProfile(prof)
-            if (bad) return setError(t(bad))
-            update({
-              display_name: form.display_name.trim(), ...profileToPayload(prof),
-              district: form.district.trim() || null, nearby: form.nearby.trim() || null,
-            })
-          }}
-          className="w-full rounded-xl bg-white/10 py-2.5 text-sm font-semibold active:scale-95"
-        >
-          {t('save')}
-        </button>
-        {note && <p className="text-sm text-green-400">{note}</p>}
-      </section>
+      {/* Profile: locked, changes are requests the admin approves */}
+      <ProfileSection worker={worker} userId={userId} onChanged={loadWorker} onTopUp={onTopUp} />
 
-      {/* Photo */}
-      <section className="space-y-3">
-        <h2 className="text-base font-bold">{t('photo')}</h2>
-        {worker.profile_image && <img src={worker.profile_image} alt="" className="mx-auto max-h-64 rounded-xl" />}
-        <PhotoUploader userId={userId} previousOriginal={worker.original_path} onUploaded={loadWorker} />
-      </section>
       {/* Buying a rank comes last: finish and save the profile first */}
       <RankBoost worker={worker} userId={userId} onTopUp={onTopUp} />
 

@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react'
+import { supabase } from '../supabaseClient'
 import { useI18n } from '../i18n'
 import { logoUrl } from '../lib/logo'
 
@@ -15,6 +17,23 @@ export const priceLabel = (label, t) => (label === '@4h' ? t('price4h') : label 
 // Full profile of one provider (only reached for providers the viewer may open). Chat and booking start from here.
 export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlock, isMe }) {
   const { t, money, catName } = useI18n()
+  const [imgs, setImgs] = useState([])      // gallery: the clear picture where the viewer may see it, else the mosaic
+  const [idx, setIdx] = useState(0)
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      const { data } = await supabase.rpc('worker_photos', { p_worker: w.user_id })
+      const rows = data ?? []
+      const paths = rows.filter((r) => r.original_path).map((r) => r.original_path)
+      const signed = {}
+      if (paths.length) {
+        const { data: urls } = await supabase.storage.from('worker-originals').createSignedUrls(paths, 3600)
+        urls?.forEach((u) => { if (u.signedUrl) signed[u.path] = u.signedUrl })
+      }
+      if (alive) setImgs(rows.map((r) => ({ id: r.id, url: (r.original_path && signed[r.original_path]) || r.public_url })))
+    })()
+    return () => { alive = false }
+  }, [w.user_id, w.canView])
   const facts = [
     w.gender && [t('fGender'), t(`gender_${w.gender}`)],
     w.age && [t('fAge'), `${w.age}`],
@@ -30,7 +49,7 @@ export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlo
       <div onClick={(e) => e.stopPropagation()}
         className="max-h-[94vh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-neutral-900 shadow-2xl sm:rounded-3xl">
         <div className="relative aspect-[3/4] max-h-[52vh] w-full overflow-hidden bg-neutral-800">
-          {w.image && <img src={w.image} alt={w.display_name} draggable={false} className="h-full w-full select-none object-cover" />}
+          {(imgs[idx]?.url ?? w.image) && <img src={imgs[idx]?.url ?? w.image} alt={w.display_name} draggable={false} className="h-full w-full select-none object-cover" />}
           <button onClick={onClose} aria-label={t('close')} className="absolute right-3 top-3 rounded-full bg-black/60 px-3 py-1 text-sm active:scale-95">✕</button>
           {w.agency_logo && (
             <span className="absolute bottom-3 left-3 flex items-center gap-1 rounded-full bg-black/60 py-0.5 pl-0.5 pr-2 text-xs">
@@ -40,6 +59,17 @@ export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlo
         </div>
 
         <div className="space-y-4 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+          {imgs.length > 1 && (
+            <ul className="flex gap-2 overflow-x-auto">
+              {imgs.map((im, i) => (
+                <li key={im.id} className="shrink-0">
+                  <button onClick={() => setIdx(i)} className={`block h-16 w-12 overflow-hidden rounded-lg ring-2 ${i === idx ? 'ring-pink-400' : 'ring-transparent'}`}>
+                    <img src={im.url} alt="" className="h-full w-full object-cover" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
           <div>
             <h2 className="text-xl font-bold">{w.display_name}</h2>
             <div className="mt-1 flex flex-wrap items-center gap-1">

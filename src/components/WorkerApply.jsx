@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { CATEGORIES } from '../config'
 import { useI18n } from '../i18n'
-import PhotoUploader from './PhotoUploader'
+import PhotoManager from './PhotoManager'
+import AgeProof from './AgeProof'
+import { uploadPhoto } from '../lib/photos'
 import WorkerFields, { emptyProfile, profileFromRow, profileToPayload, validateProfile } from './WorkerFields'
 import { clearAgencyCode, getAgencyCode } from '../lib/auth'
 import { logoUrl } from '../lib/logo'
@@ -24,6 +26,8 @@ export default function WorkerApply({ userId, defaultName }) {
   const [busy, setBusy] = useState(false)
   const [prof, setProf] = useState(emptyProfile)
   const [terms, setTerms] = useState(false)
+  const [photos, setPhotos] = useState([])     // my_photos() rows (an existing application)
+  const [local, setLocal] = useState([])       // pictures picked before the application exists
   const [error, setError] = useState(null)
   const [note, setNote] = useState(null)
   const [invite, setInvite] = useState(() => getAgencyCode())   // code from the agency's own link, if any
@@ -35,6 +39,7 @@ export default function WorkerApply({ userId, defaultName }) {
     const row = data?.[0] ?? null
     setApp(row)
     if (row) { setForm(toForm(row)); setProf(profileFromRow(row)) } // pending: edit it; rejected: prefill a fresh attempt
+    if (row?.status === 'pending') { const ph = await supabase.rpc('my_photos'); setPhotos(ph.data ?? []) }
     setLoading(false)
   }, [userId])
 
@@ -63,6 +68,7 @@ export default function WorkerApply({ userId, defaultName }) {
     const bad = validateProfile(prof)
     if (bad) return setError(t(bad))
     if (app?.status !== 'pending' && !terms) return setError(t('errTerms'))
+    if (app?.status !== 'pending' && local.length === 0) return setError(t('errNeedPhoto'))
     if (!form.phone.trim() && !form.line_id.trim()) return setError(t('contactHint'))
     const joining = app?.status !== 'pending' && !!invite && !!agency
 
@@ -84,6 +90,10 @@ export default function WorkerApply({ userId, defaultName }) {
     setBusy(false)
     if (error) return setError(error.message.includes('app_contact_check') ? t('errPhone') : error.message.includes('AGENCY_NOT_FOUND') ? t('errAgencyNotFound') : error.message.includes('AGENCY_FULL') ? t('errAgencyFull') : t('errApply'))
     if (joining) clearAgencyCode()
+    if (!editing && local.length > 0) {            // the application exists now: send the pictures picked earlier
+      try { for (const pic of local) await uploadPhoto(userId, pic, 'application') } catch (e) { console.error(e); setError(t('errUpload')) }
+      setLocal([])
+    }
     setNote(t('saved'))
     load()
   }
@@ -108,17 +118,14 @@ export default function WorkerApply({ userId, defaultName }) {
         </>
       )}
 
-      {/* Promo photo (needs an existing application, so it appears after the first submit) */}
+      {/* The admin asked for proof of age */}
+      {editing && app.age_check_status === 'requested' && <AgeProof userId={userId} note={app.age_check_note} onDone={load} />}
+      {editing && app.age_check_status === 'submitted' && <p className="rounded-2xl bg-white/5 p-3 text-sm text-neutral-300">🪪 {t('ageProofSent')}</p>}
+
+      {/* Promo pictures: 1-5, attached to the application so the admin can judge them together with the form */}
       <section className="space-y-3">
         <h2 className="text-base font-bold">{t('appPhotoTitle')}</h2>
-        {editing ? (
-          <>
-            {app.profile_image && <img src={app.profile_image} alt="" className="mx-auto max-h-64 rounded-xl" />}
-            <PhotoUploader target="application" userId={userId} previousOriginal={app.original_path} onUploaded={load} />
-          </>
-        ) : (
-          <p className="rounded-xl bg-white/5 p-3 text-sm text-neutral-400">{t('appPhotoAfter')}</p>
-        )}
+        <PhotoManager userId={userId} state="application" photos={photos} local={editing ? undefined : local} setLocal={editing ? undefined : setLocal} onChanged={load} />
       </section>
 
       <form onSubmit={submit} className="space-y-4">

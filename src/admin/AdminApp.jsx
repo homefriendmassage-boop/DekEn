@@ -7,6 +7,7 @@ import Members from './Members'
 import Reviews from './Reviews'
 import Support from './Support'
 import Agencies from './Agencies'
+import ProfileEdits from './ProfileEdits'
 import { baht } from './format'
 
 // Separate back office (admin.html). Access is decided by the DATABASE: every admin_* function
@@ -17,6 +18,7 @@ export default function AdminApp() {
   const [adminName, setAdminName] = useState('')
   const [tab, setTab] = useState('apps')
   const [stats, setStats] = useState(null)
+  const [editCount, setEditCount] = useState(0)   // pending profile changes + removal requests
   const [prefill, setPrefill] = useState(null)   // { user, tier } from "renew" on the Members tab
   const [toast, setToast] = useState(null)
 
@@ -25,6 +27,8 @@ export default function AdminApp() {
   const loadStats = useCallback(async () => {
     const { data } = await supabase.rpc('admin_stats')
     setStats(data?.[0] ?? null)
+    const [e, d] = await Promise.all([supabase.rpc('admin_list_profile_edits', { p_status: 'pending' }), supabase.rpc('admin_list_deletions')])
+    setEditCount((e.data?.length ?? 0) + (d.data?.length ?? 0))
   }, [])
 
   // A new customer message or a new slip review refreshes the counters (admins can read all support messages)
@@ -70,6 +74,7 @@ export default function AdminApp() {
     ['reviews', `🔎 ตรวจสลิป${stats?.pending_reviews ? ` (${stats.pending_reviews})` : ''}`],
     ['support', `💬 แชท${stats?.support_unread ? ` (${stats.support_unread})` : ''}`],
     ['pay', '💳 รับชำระเงิน'],
+    ['edits', `✏️ แก้ไข/ลบโปรไฟล์${editCount ? ` (${editCount})` : ''}`],
     ['agencies', '🏢 สังกัด'],
     ['members', '👑 สมาชิก'],
   ]
@@ -106,6 +111,7 @@ export default function AdminApp() {
         {tab === 'reviews' && <Reviews onChanged={loadStats} toast={showToast} />}
         {tab === 'support' && <Support onChanged={loadStats} />}
         {tab === 'pay' && <Payments prefill={prefill} clearPrefill={() => setPrefill(null)} onChanged={loadStats} toast={showToast} />}
+        {tab === 'edits' && <ProfileEdits onChanged={loadStats} toast={showToast} />}
         {tab === 'agencies' && <Agencies onChanged={loadStats} toast={showToast} />}
         {tab === 'members' && <Members toast={showToast} onRenew={(user) => { setPrefill({ user, tier: user.vip_tier }); setTab('pay') }} />}
       </main>
