@@ -21,6 +21,7 @@ supabase/migration_012.sql       Upgrade by paying the difference (same expiry);
 supabase/migration_013.sql       Suspended providers are hidden from the feed and cannot be booked/chatted (run after 012)
 supabase/migration_014.sql       Two balances (Wallet + Bonus) and a ledger of every money movement (run after 013)
 supabase/migration_015.sql       Share links (link/Flex/QR), sales attribution, 20% membership referral reward, pay packages from the Wallet (run after 014)
+supabase/migration_016.sql       Paid chat: 40 THB hold -> 30 to the provider / 10 platform when they reply, refund after 3 h (run after 015)
 supabase/functions/send-renewal/ Edge Function (admin only): LINE Flex renewal reminder with a button to the plan picker
 supabase/functions/verify-slip/  Edge Function: verifies the slip with Thunder, opens the plan / credits the wallet
 admin.html + src/admin/          Separate admin page (not linked from the customer app)
@@ -239,3 +240,9 @@ expired is not rejected: it goes to Admin > Slip review, linked to the customer'
 - **Whose customer is this?** (`users.referred_by` = the customer's *sales*). Registering through a link makes that person the sales at once. A later click on another link (`referral_clicks`) takes over only if the customer pays for a package (or books) within **24 hours** of the click; otherwise it is forgotten. Top-ups never change it, existing accounts are not re-attributed retroactively. The latest link wins.
 - **Reward:** every membership payment (slip, admin, wallet) pays 20% to the sales' bonus wallet (`referral_rewards`, one per payment, rate in `referral_membership_rate()`), unlimited renewals.
 - **Pay from the Wallet:** `buy_membership_with_wallet(tier)` — new, renew or upgrade (difference, same expiry). Always allowed while the Wallet has enough money.
+
+## Paid chat (migration_016)
+- The customer's first message of a conversation sets 40 THB aside from the Wallet (consent popup; the server refuses without `p_accept_fee`). The provider's first valid reply within 3 hours (>= 2 letters/digits, not one repeated character; emoji and punctuation ignored) settles it: 30 THB to the provider's bonus wallet, 10 THB stays with the platform (`chat_fees.platform_amount`). The conversation is then free for 24 hours; after that the next message sets 40 THB aside again.
+- No valid reply within 3 hours: the 40 THB returns to the Wallet. This happens when either side opens the chat, when the wallet or app is opened, and every 10 minutes if **pg_cron** is enabled (Supabase: Database > Extensions > pg_cron, then run migration_016 again or `select cron.schedule('release-chat-holds','*/10 * * * *','select public.release_expired_chat_holds()')`).
+- A booking the provider accepts opens the chat for 72 hours at no charge (a pending hold counts as settled by the acceptance).
+- All amounts and hours live in the small `chat_*()` functions at the top of the migration.

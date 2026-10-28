@@ -21,6 +21,9 @@ export default function WalletModal({ me, onTopUp, onClose, onChanged }) {
     setRows(data ?? [])
   }, [])
   useEffect(() => { load() }, [load, wallet, bonus])
+  useEffect(() => {   // expired chat holds return to the Wallet when it is opened
+    supabase.rpc('release_my_expired_holds').then(({ data }) => { if (data > 0) onChanged?.() })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function transfer() {
     const n = Number(amount)

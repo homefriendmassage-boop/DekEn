@@ -92,6 +92,7 @@ export default function App() {
         const s = await signIn()
         if (cancelled) return
         setSession(s)
+        try { await supabase.rpc('release_my_expired_holds') } catch { /* optional */ }   // chat holds that ran out go back to the Wallet
         await loadMe()
         if (takeOpenIntent() === 'plans') { setView('categories'); setShowMembership(true) } // opened from a renewal reminder
         if (!cancelled) setPhase('ready')
@@ -339,7 +340,8 @@ export default function App() {
         </div>
       )}
 
-      {chat && view !== 'worker' && <ChatModal threadId={chat.id} title={chat.other_name} meId={me.id} onClose={() => setChat(null)} />}
+      {chat && view !== 'worker' && <ChatModal threadId={chat.id} title={chat.other_name} meId={me.id} onClose={() => setChat(null)}
+          onTopUp={() => { setChat(null); setPay({ kind: 'wallet_topup' }) }} />}
 
       {showMembership && (
         <MembershipModal tier={tier} walletBalance={Number(me?.wallet_balance ?? 0)} onPayWallet={payWithWallet} onClose={() => setShowMembership(false)}
