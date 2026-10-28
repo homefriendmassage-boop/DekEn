@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { FREE_RANK_LIMIT, MIN_TIER } from '../config'
 import { useI18n } from '../i18n'
 import { logoUrl } from '../lib/logo'
-import WorkerDetail from './WorkerDetail'
+import WorkerDetail, { LocBadge } from './WorkerDetail'
 
 /**
  * Grid of workers in one category. Mobile-first: 2 columns on phones, 3 on tablets+.
@@ -61,6 +61,7 @@ export default function HomeFeed({ workers, category, tier, loading, onBook, onU
 
       {detail && (
         <WorkerDetail worker={detail} isMe={detail.user_id === meId} onClose={() => setDetail(null)}
+          onUnlock={() => { setDetail(null); onUnlock() }}
           onBook={() => { const w = detail; setDetail(null); onBook(w) }}
           onAsk={() => { const w = detail; setDetail(null); if (canChat) onAsk(w); else onUnlock() }} />
       )}
@@ -130,6 +131,7 @@ function WorkerCard({ worker: w, onUnlock, onDetail, isMe }) {
           </div>
         </div>
         {w.distance_km != null && <p className="text-[11px] font-semibold text-amber-300 sm:text-xs">📍 {t('kmAway', { n: w.distance_km })}</p>}
+        {w.province && <div><LocBadge verified={!!w.loc_verified} /></div>}
         {w.province && (
           <p className="truncate text-[11px] text-neutral-400 sm:text-xs">
             📍 {w.province}{w.district ? ` · ${w.district}` : ''}
@@ -142,9 +144,10 @@ function WorkerCard({ worker: w, onUnlock, onDetail, isMe }) {
         {isMe ? (
           <p className="rounded-xl bg-white/10 py-2.5 text-center text-sm font-semibold text-neutral-300">{t('ownProfile')}</p>
         ) : locked ? (
-          <button onClick={onUnlock} className="w-full rounded-xl bg-amber-400 py-2.5 text-sm font-bold text-black transition active:scale-95">
-            👑 {t('unlock')}
-          </button>
+          <div className="grid gap-1.5">
+            <button onClick={onDetail} className="w-full rounded-xl bg-pink-500 py-2.5 text-sm font-bold text-white transition active:scale-95">{t('viewDetail')}</button>
+            <button onClick={onUnlock} className="w-full rounded-xl bg-amber-400 py-2 text-xs font-bold text-black transition active:scale-95">👑 {t('unlock')}</button>
+          </div>
         ) : (
           <button onClick={onDetail} className="w-full rounded-xl bg-pink-500 py-2.5 text-sm font-bold text-white transition active:scale-95">
             {t('viewDetail')}

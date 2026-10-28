@@ -1,10 +1,19 @@
 import { useI18n } from '../i18n'
 import { logoUrl } from '../lib/logo'
 
+export function LocBadge({ verified }) {
+  const { t } = useI18n()
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${verified ? 'bg-green-500/20 text-green-300' : 'bg-amber-400/20 text-amber-300'}`}>
+      {verified ? t('locVerifiedBadge') : t('locSelfBadge')}
+    </span>
+  )
+}
+
 export const priceLabel = (label, t) => (label === '@4h' ? t('price4h') : label === '@6h' ? t('price6h') : label)
 
 // Full profile of one provider (only reached for providers the viewer may open). Chat and booking start from here.
-export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, isMe }) {
+export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlock, isMe }) {
   const { t, money, catName } = useI18n()
   const facts = [
     w.gender && [t('fGender'), t(`gender_${w.gender}`)],
@@ -37,8 +46,11 @@ export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, isMe }
               {(w.categories ?? [w.category]).map((c) => <span key={c} className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-neutral-300">{catName(c)}</span>)}
               <span className={`text-xs ${w.is_online ? 'text-green-400' : 'text-neutral-400'}`}>● {w.is_online ? t('online') : t('offline')}</span>
               {w.distance_km != null && <span className="text-xs text-amber-300">📍 {t('kmAway', { n: w.distance_km })}</span>}
+              {w.province && <LocBadge verified={!!w.loc_verified} />}
             </div>
+            {w.province && !w.loc_verified && <p className="mt-1 text-[11px] text-amber-200/80">{t('locSelfNote')}</p>}
           </div>
+          {!w.canView && <p className="rounded-xl bg-amber-400/10 p-3 text-xs text-amber-200">{t('blurredNote')}</p>}
 
           {facts.length > 0 && (
             <dl className="grid grid-cols-2 gap-2">
@@ -77,10 +89,14 @@ export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, isMe }
           ) : (
             <div className="grid gap-2">
               <button onClick={onAsk} className="rounded-xl bg-pink-500 py-3 font-bold text-white active:scale-95">💬 {t('chatDirect')}</button>
-              <button onClick={onBook} disabled={!w.is_online}
-                className="rounded-xl bg-line py-3 font-bold text-black active:scale-95 disabled:bg-neutral-700 disabled:text-neutral-400">
-                {w.is_online ? t('bookThis') : t('unavailable')}
-              </button>
+              {w.canView ? (
+                <button onClick={onBook} disabled={!w.is_online}
+                  className="rounded-xl bg-line py-3 font-bold text-black active:scale-95 disabled:bg-neutral-700 disabled:text-neutral-400">
+                  {w.is_online ? t('bookThis') : t('unavailable')}
+                </button>
+              ) : (
+                <button onClick={onUnlock} className="rounded-xl bg-amber-400 py-3 font-bold text-black active:scale-95">{t('unlockFace')}</button>
+              )}
             </div>
           )}
         </div>

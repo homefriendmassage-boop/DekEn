@@ -157,10 +157,12 @@ export default function WorkerFields({ v, set }) {
         <button type="button" disabled={busy} onClick={locate} className="w-full rounded-xl bg-line py-2.5 font-bold text-black active:scale-95 disabled:opacity-50">
           {busy ? t('locDetecting') : v.loc || v.locVerified ? t('locRecheck') : t('locConfirm')}
         </button>
+        {!v.manual && <button type="button" onClick={() => set({ manual: true })} className="text-xs text-neutral-400 underline">{t('locCannot')}</button>}
         {err && <p className="rounded-lg bg-red-500/10 p-2 text-xs text-red-300">{err}</p>}
+        {v.manual && v.province && !v.loc && <p className="rounded-lg bg-amber-400/10 p-2 text-xs text-amber-200">{t('locSelfNote')}</p>}
         {v.manual && (
           <label className="block text-sm">{t('locManual')}
-            <select value={v.province} onChange={(e) => set({ province: e.target.value })} className={input}>
+            <select value={v.province} onChange={(e) => set({ province: e.target.value, loc: null, locNew: false, locVerified: false })} className={input}>
               <option value="" className="text-black">{t('chooseProvince')}</option>
               {PROVINCES.map((p) => <option key={p} value={p} className="text-black">{p}</option>)}
             </select>
