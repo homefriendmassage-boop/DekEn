@@ -2,7 +2,7 @@ import { PLAN_META } from '../config'
 import { LangSwitcher, useI18n } from '../i18n'
 
 // Sticky top bar shared by every screen: back button, language switcher, tier + wallet chips.
-export default function Header({ title, onBack, displayName, tier, expiresAt, walletBalance, onTierClick, onChatClick, chatUnread }) {
+export default function Header({ title, onBack, displayName, tier, expiresAt, walletBalance, onTierClick, onChatClick, chatUnread, onWalletClick }) {
   const { t, money, fmtDate } = useI18n()
 
   return (
@@ -34,7 +34,7 @@ export default function Header({ title, onBack, displayName, tier, expiresAt, wa
             >
               {tier > 0 ? `${PLAN_META[tier].icon} ${PLAN_META[tier].name}` : t('freePlan')}
             </button>
-            <span className="rounded-full bg-white/10 px-3 py-1 text-sm font-semibold">💰 {money(walletBalance)}</span>
+            <button onClick={onWalletClick} className="rounded-full bg-white/10 px-3 py-1 text-sm font-semibold active:scale-95">💰 {money(walletBalance)}</button>
           </div>
         )}
       </div>

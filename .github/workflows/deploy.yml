@@ -32,6 +32,8 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_LIFF_ID: ${{ secrets.VITE_LIFF_ID }}
+          VITE_PROMPTPAY_ID: ${{ secrets.VITE_PROMPTPAY_ID }}
+          VITE_LINE_OA_URL: ${{ secrets.VITE_LINE_OA_URL }}
           VITE_USE_MOCK_LIFF: 'false'
       - uses: actions/upload-pages-artifact@v3
         with:

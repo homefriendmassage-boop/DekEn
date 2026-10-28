@@ -12,6 +12,8 @@ supabase/migration_003.sql       Remove ENT Plus, rename Spa, service area, memb
 supabase/migration_004.sql       Multi-category providers, phone + LINE ID, editable applications, promo photo (run after 003)
 supabase/migration_005.sql       Admin back office: admins, payment ledger, review/payment functions (run after 004)
 supabase/migration_006.sql       LINE profile picture + last seen; admin user list shows recent users (run after 005)
+supabase/migration_007.sql       Automatic payment: unique-amount requests, slip ledger (run after 006)
+supabase/functions/verify-slip/  Edge Function: verifies the slip with Thunder, opens the plan / credits the wallet
 admin.html + src/admin/          Separate admin page (not linked from the customer app)
 supabase/functions/line-auth/    Edge Function: LIFF ID token -> Supabase session
 src/lib/auth.js                  LIFF init, ?ref capture, mock login    (Part 2)
@@ -146,3 +148,24 @@ reason the applicant sees); record verified payments (membership or wallet top-u
 them in one step; duplicate transfer references are rejected; list active members with expiry and renew them.
 Payments are recorded by the admin after checking a slip/bank statement; there is no automatic payment
 gateway or customer slip upload yet.
+
+## Automatic payment (migration_007 + `verify-slip`)
+
+Flow: the customer taps a plan (or the wallet chip) -> the server creates a payment request with a unique amount
+(e.g. 100.37) -> the app shows a PromptPay QR with that amount pre-filled -> they pay and attach the slip ->
+the browser reads the slip's QR text -> the `verify-slip` Edge Function asks Thunder (`POST /v2/verify/bank`) ->
+if the slip is genuine, paid **to your account**, for **exactly** that amount, and its transfer reference was never used,
+the plan opens (or the wallet is credited) in one database transaction.
+
+Setup:
+1. Run `supabase/migration_007.sql`.
+2. Deploy the function `verify-slip` (Edge Functions > Via Editor, paste `supabase/functions/verify-slip/index.ts`, turn **off** Verify JWT).
+3. Edge Functions > Secrets: `THUNDER_API_KEY`, and `RECEIVER_NAME_CONTAINS` and/or `RECEIVER_BANK`
+   (the function refuses to approve anything until at least one receiver check is set).
+4. GitHub secrets: `VITE_PROMPTPAY_ID` (your PromptPay phone / 13-digit ID / e-wallet ID) and optionally `VITE_LINE_OA_URL`.
+5. Make one small real test payment, then check **Admin > Payments > failed slips** to tune the receiver check.
+
+Safety: the Thunder key stays server-side; amounts come from a server-side price list; a slip can't be replayed
+(unique amount per open request + unique transfer reference); 8 attempts/hour/user protect your Thunder quota;
+every failed attempt is listed for the admin, who can still record a payment by hand.
+Only bank-transfer slips are supported (not TrueMoney wallet slips).

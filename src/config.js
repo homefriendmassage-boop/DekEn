@@ -6,6 +6,9 @@ export const LIFF_ID = import.meta.env.VITE_LIFF_ID
 export const USE_MOCK_LIFF = import.meta.env.VITE_USE_MOCK_LIFF === 'true'
 // Where "contact admin to subscribe" points, e.g. https://line.me/R/ti/p/@youroa
 export const LINE_OA_URL = import.meta.env.VITE_LINE_OA_URL
+// PromptPay ID that receives payments: mobile number, 13-digit national/tax ID, or 15-digit e-wallet ID.
+// It is a public receiving address (customers see it in their banking app anyway).
+export const PROMPTPAY_ID = import.meta.env.VITE_PROMPTPAY_ID
 
 export const CATEGORIES = ['bartender', 'ent', 'masseuse', 'spa']
 

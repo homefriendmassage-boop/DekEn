@@ -12,6 +12,7 @@ import MembershipModal from './components/MembershipModal'
 import WorkerApply from './components/WorkerApply'
 import WorkerDashboard from './components/WorkerDashboard'
 import ChatModal from './components/ChatModal'
+import PaymentModal from './components/PaymentModal'
 import ThreadList from './components/ThreadList'
 
 // Mock mode only, when the workers table is empty: lets you click through the UI
@@ -61,6 +62,7 @@ export default function App() {
   const [chat, setChat] = useState(null)              // { id, other_name } of the open chat
   const [showThreads, setShowThreads] = useState(false)
   const [chatUnread, setChatUnread] = useState(0)
+  const [pay, setPay] = useState(null)               // { kind: 'membership', tier } | { kind: 'wallet_topup' }
 
   const showToast = (msg) => {
     setToast(msg)
@@ -180,6 +182,7 @@ export default function App() {
     expiresAt: me?.vip_expires_at,
     walletBalance: me?.wallet_balance ?? 0,
     onTierClick: () => setShowMembership(true),
+    onWalletClick: () => setPay({ kind: 'wallet_topup' }),
     // chat icon only for paid members (others have no chat to show)
     onChatClick: tier >= 1 ? () => setShowThreads(true) : undefined,
     chatUnread,
@@ -251,6 +254,7 @@ export default function App() {
           customerId={me.id}
           walletBalance={me?.wallet_balance ?? 0}
           onClose={() => setSelected(null)}
+          onTopUp={() => { setSelected(null); setPay({ kind: 'wallet_topup' }) }}
           onBooked={async () => {
             setSelected(null)
             await loadMe() // refresh balance immediately (realtime is a backup)
@@ -271,7 +275,15 @@ export default function App() {
 
       {chat && view !== 'worker' && <ChatModal threadId={chat.id} title={chat.other_name} meId={me.id} onClose={() => setChat(null)} />}
 
-      {showMembership && <MembershipModal tier={tier} onClose={() => setShowMembership(false)} />}
+      {showMembership && (
+        <MembershipModal tier={tier} onClose={() => setShowMembership(false)}
+          onPay={(planTier) => { setShowMembership(false); setPay({ kind: 'membership', tier: planTier }) }} />
+      )}
+
+      {pay && (
+        <PaymentModal kind={pay.kind} tier={pay.tier} onClose={() => setPay(null)}
+          onPaid={() => { loadMe(); if (view === 'feed') loadFeed(category) }} />
+      )}
 
       {toast && (
         <div className="fixed inset-x-4 bottom-6 z-[60] mx-auto max-w-sm rounded-xl bg-line px-4 py-3 text-center text-sm font-semibold text-black shadow-lg">

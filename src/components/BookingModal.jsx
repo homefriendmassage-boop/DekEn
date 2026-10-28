@@ -16,7 +16,7 @@ const errorKey = (msg = '') =>
  * Bottom sheet on phones, centered dialog on larger screens.
  * Props: worker, customerId, walletBalance, onClose(), onBooked()
  */
-export default function BookingModal({ worker, customerId, walletBalance, onClose, onBooked }) {
+export default function BookingModal({ worker, customerId, walletBalance, onClose, onBooked, onTopUp }) {
   const { t, money } = useI18n()
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
@@ -75,6 +75,7 @@ export default function BookingModal({ worker, customerId, walletBalance, onClos
         {insufficient && (
           <p className="mt-3 rounded-lg bg-red-500/10 p-2 text-sm text-red-300">
             {t('lowBalance', { fee: money(BOOKING_FEE) })}
+            {onTopUp && <button onClick={onTopUp} className="mt-2 block w-full rounded-lg bg-line py-2 font-bold text-black">{t('topUp')}</button>}
           </p>
         )}
         {error && <p className="mt-3 rounded-lg bg-red-500/10 p-2 text-sm text-red-300">{t(error)}</p>}

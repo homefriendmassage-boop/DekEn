@@ -33,10 +33,13 @@ export default function Payments({ prefill, clearPrefill, onChanged, toast }) {
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [ledger, setLedger] = useState(null)
+  const [failed, setFailed] = useState([])
 
   const loadLedger = useCallback(async () => {
     const { data } = await supabase.rpc('admin_list_payments', { p_limit: 100 })
     setLedger(data ?? [])
+    const f = await supabase.rpc('admin_list_slip_attempts', { p_limit: 30 })
+    setFailed(f.data ?? [])
   }, [])
   useEffect(() => { loadLedger() }, [loadLedger])
 
@@ -208,7 +211,7 @@ export default function Payments({ prefill, clearPrefill, onChanged, toast }) {
                       <td className="p-2">{p.kind === 'membership' ? `${PLAN_META[p.tier].name} +${p.days} วัน` : 'เติม Wallet'}{p.note ? <span className="block text-[11px] text-neutral-500">{p.note}</span> : null}</td>
                       <td className="whitespace-nowrap p-2 text-right font-semibold">{baht(p.amount)}</td>
                       <td className="p-2 text-xs">{METHODS[p.method]}{p.reference ? <span className="block text-neutral-500">{p.reference}</span> : null}</td>
-                      <td className="p-2 text-xs text-neutral-400">{p.admin_name}</td>
+                      <td className="p-2 text-xs text-neutral-400">{p.source === 'slip_auto' ? '🤖 อัตโนมัติ (สลิป)' : p.admin_name}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -216,6 +219,30 @@ export default function Payments({ prefill, clearPrefill, onChanged, toast }) {
             </div>
           )}
       </section>
+
+      {/* Slips that did NOT pass automatic verification: the admin can settle these by hand above */}
+      {failed.length > 0 && (
+        <section>
+          <h2 className="mb-1 text-base font-bold">สลิปที่ระบบอัตโนมัติไม่ผ่านล่าสุด</h2>
+          <p className="mb-2 text-xs text-neutral-500">ถ้าลูกค้าโอนจริงแต่ไม่ผ่าน ตรวจสลิปกับบัญชีแล้วบันทึกด้วยมือในฟอร์มด้านบนได้</p>
+          <ul className="space-y-2">
+            {failed.map((f) => (
+              <li key={f.id} className="rounded-xl bg-white/5 p-3 text-sm ring-1 ring-white/10">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold">{f.user_name ?? '—'}</span>
+                  <span className="shrink-0 rounded-full bg-red-500/20 px-2 py-0.5 text-[11px] text-red-300">{f.result}</span>
+                </div>
+                <p className="text-[11px] text-neutral-500">
+                  {fmtDateTime(f.created_at)}{f.trans_ref ? ` · ref ${f.trans_ref}` : ''}
+                  {f.detail?.paid != null ? ` · สลิป ${baht(f.detail.paid)}` : ''}
+                  {f.detail?.expected ? ` · ต้องโอน ${f.detail.expected.map(baht).join(' / ')}` : ''}
+                  {f.detail?.receiverName ? ` · ผู้รับในสลิป: ${f.detail.receiverName} (${f.detail.receiverBank ?? '?'})` : ''}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   )
 }
