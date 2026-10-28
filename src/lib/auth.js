@@ -49,6 +49,35 @@ export function takeWorkerIntent() {
     return v && UUID.test(v) ? v : null
   } catch { return null }
 }
+// Opened from the "new message" LINE push: https://liff.line.me/<id>?chat=<thread uuid>
+export function captureChatParam() {
+  const params = new URLSearchParams(window.location.search)
+  let id = params.get('chat')
+  if (!id) {
+    const state = params.get('liff.state')
+    if (state) {
+      const q = state.indexOf('?')
+      id = new URLSearchParams(q >= 0 ? state.slice(q) : state).get('chat')
+    }
+  }
+  try { if (id && UUID.test(id)) sessionStorage.setItem('open_chat', id) } catch { /* storage blocked */ }
+}
+export function takeChatIntent() {
+  try {
+    const v = sessionStorage.getItem('open_chat')
+    sessionStorage.removeItem('open_chat')
+    return v && UUID.test(v) ? v : null
+  } catch { return null }
+}
+
+// LINE login tickets expire (the app was left open for a long time): sign out of LIFF and log in again instead of failing.
+const isExpired = (e) => /expired|invalid.*token|token.*invalid|unauthorized/i.test(`${e?.message ?? ''} ${e?.code ?? ''} ${e?.error ?? ''}`)
+function relogin() {
+  try { liff.logout() } catch { /* ignore */ }
+  liff.login({ redirectUri: window.location.href })   // leaves the page
+  return new Promise(() => {})
+}
+
 // true when the user already follows the official account. Unknown (no bot linked, mock mode) counts as a friend so nobody is locked out.
 export async function isOaFriend() {
   if (USE_MOCK_LIFF) return true
@@ -116,6 +145,7 @@ export async function signIn() {
   captureRefCode()
   captureOpenParam()
   captureWorkerParam()
+  captureChatParam()
   captureAgencyCode()
 
   let profile
@@ -134,14 +164,18 @@ export async function signIn() {
       liff.login({ redirectUri: window.location.href }) // leaves the page
       return new Promise(() => {})                       // never resolves; page reloads
     }
-    profile = await liff.getProfile()
+    try { profile = await liff.getProfile() } catch (e) { if (isExpired(e)) return relogin(); throw e }
 
     const { data: existing } = await supabase.auth.getSession()
     if (!existing.session) {
       const { data, error } = await supabase.functions.invoke('line-auth', {
         body: { idToken: liff.getIDToken() },
       })
-      if (error || !data?.session) throw error ?? new Error('LINE auth failed')
+      if (error || !data?.session) {
+        const detail = `${error?.message ?? ''} ${await (error?.context?.text?.().catch(() => '') ?? '')}`
+        if (isExpired({ message: detail })) return relogin()
+        throw error ?? new Error('LINE auth failed')
+      }
       await supabase.auth.setSession({
         access_token: data.session.access_token,
         refresh_token: data.session.refresh_token,
@@ -154,6 +188,7 @@ export async function signIn() {
 
   captureOpenParam()
   captureWorkerParam()
+  captureChatParam()
   captureAgencyCode()
   const refCode = captureRefCode() // URL is clean again after init(); re-check
   if (refCode) {

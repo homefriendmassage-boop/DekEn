@@ -9,11 +9,12 @@ import { logoUrl } from '../lib/logo'
 import { clearAgencyCode, getAgencyCode } from '../lib/auth'
 
 // Provider home: online switch, profile edit, photo upload, live job inbox.
-export default function WorkerDashboard({ userId, onTopUp }) {
+export default function WorkerDashboard({ userId, onTopUp, me, onWallet, openChat }) {
   const { t, money, catName, statusName } = useI18n()
   const [worker, setWorker] = useState(null)
   const [jobs, setJobs] = useState([])
-  const [chat, setChat] = useState(null)
+  const [chat, setChat] = useState(openChat ?? null)      // openChat: arrived from a "new message" LINE push
+  const [wdNote, setWdNote] = useState(false)
   const [note, setNote] = useState(null)
   const [invite, setInvite] = useState(() => getAgencyCode())      // invitation link opened earlier
   const [inviteAgency, setInviteAgency] = useState(null)
@@ -83,6 +84,22 @@ export default function WorkerDashboard({ userId, onTopUp }) {
 
   return (
     <div className="space-y-5 p-4">
+      {/* My money: the Bonus wallet is where chat income, commissions and referral rewards land */}
+      {me && (
+        <section className="space-y-2 rounded-2xl bg-amber-400/10 p-3 ring-1 ring-amber-400/30">
+          <div className="grid grid-cols-2 gap-2">
+            <div><p className="text-[11px] text-amber-200">🎁 {t('bonusWallet')}</p><p className="text-xl font-extrabold text-amber-300">{money(me.bonus_balance ?? 0)}</p></div>
+            <div><p className="text-[11px] text-neutral-400">💰 {t('walletMain')}</p><p className="text-xl font-extrabold">{money(me.wallet_balance ?? 0)}</p></div>
+          </div>
+          <p className="text-[11px] text-neutral-400">{t('bonusWhere')}</p>
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={onWallet} className="rounded-xl bg-white/10 py-2 text-sm font-semibold active:scale-95">{t('walletHistory')}</button>
+            <button onClick={() => setWdNote((x) => !x)} className="rounded-xl bg-amber-400 py-2 text-sm font-bold text-black active:scale-95">{t('withdraw')}</button>
+          </div>
+          {wdNote && <p className="rounded-lg bg-black/30 p-2 text-xs text-amber-100">{t('withdrawSoon')}</p>}
+        </section>
+      )}
+
       {/* Online switch */}
       <button
         onClick={() => update({ is_online: !worker.is_online })}
@@ -167,7 +184,7 @@ export default function WorkerDashboard({ userId, onTopUp }) {
         )}
       </section>
 
-      {/* Messages from members (in-app chat; no LINE push) */}
+      {/* Messages from members (in-app chat; a LINE push with a button to the room is sent by notify-chat, migration_027) */}
       <section>
         <h2 className="mb-2 text-base font-bold">{t('messages')}</h2>
         <ThreadList role="worker" onOpen={(th) => setChat(th)} />

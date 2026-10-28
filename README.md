@@ -295,3 +295,14 @@ Run `supabase/migration_026.sql` once, after migration_025.
 - **Starting rate (mandatory):** a provider ticks which rate a first hire starts at (1 hour / 4 h / 6 h / one of her own rows). Stored in `workers.start_rate` / `worker_applications.start_rate`; the feed card shows "from <that price>", the details page marks the row; changing it later goes through an admin-approved profile edit.
 - **Invite Flex:** hero picture with the DekN logo (`public/flex-hero.jpg`, `public/dekn-logo.jpg` are served with the site so LINE can fetch them over https).
 - **Share this provider:** button on the details page (Flex only, needs the LIFF share target picker). The card carries her public (face-mosaicked) photo and details, never price or location. The button opens `?ref=<my code>&worker=<id>`; the app asks the viewer to add the official account as a friend first (`liff.getFriendship`, needs `VITE_LINE_OA_URL`) and then opens that profile through `get_worker()`, which applies the usual visibility rules. In the LIFF settings also set "Add friend option" to On (normal/aggressive) and link the official account.
+
+## migration_027 — one price is enough, chat push, bonus card, expired LINE login
+
+Run `supabase/migration_027.sql` once, after migration_026.
+
+- **Prices:** only one rate has to be filled in (4 h / 6 h / hourly / own rows). Every rate is a `price_options` row (`1h`, `@4h`, `@6h`, own label); the first hire starts at the ticked row, else the first filled in the order 4 h → 6 h → hourly → own rows. `workers.price` always mirrors the starting rate (bookings and the feed read it). Existing hourly prices are moved into `price_options` as the `1h` row.
+- **Chat push (Flex):** trigger `notify_chat_message` on `chat_messages` calls the Edge Function `notify-chat` (through pg_net) which pushes a Flex "new message from <name>" with the button "เปิดห้องแชต" → `https://liff.line.me/<LIFF_ID>?chat=<thread id>`. At most one push per chat and recipient every 10 minutes (`chat_push_log`), so the OA's push quota is not eaten by every line.
+  Setup (once): deploy `supabase/functions/notify-chat` with "Verify JWT" OFF; Edge Function secrets `LINE_CHANNEL_ACCESS_TOKEN`, `LIFF_ID`, `CHAT_NOTIFY_SECRET` (any long random text) and optional `APP_URL`; then in the SQL Editor run
+  `select public.configure_chat_notify('https://<project>.supabase.co/functions/v1/notify-chat', '<the same CHAT_NOTIFY_SECRET>');`
+- **Provider money card:** the provider dashboard shows the Bonus wallet and the Wallet, a history button and a withdraw button (withdrawals themselves are step 6, still on hold).
+- **"The access token expired":** `signIn()` now logs out of LIFF and logs in again when LINE says the login ticket is expired.

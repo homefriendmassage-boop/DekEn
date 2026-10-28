@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from './supabaseClient'
-import { signIn, takeOpenIntent, takeWorkerIntent, isOaFriend, getAgencyCode } from './lib/auth'
+import { signIn, takeOpenIntent, takeWorkerIntent, takeChatIntent, isOaFriend, getAgencyCode } from './lib/auth'
 import { LINE_OA_URL } from './config'
 import { getPosition } from './lib/geo'
 import { CATEGORIES, PLAN_META, canViewWorker, suspensionOf, tierOf } from './config'
@@ -77,6 +77,7 @@ export default function App() {
   const [showWallet, setShowWallet] = useState(false)
   const [invitedBy, setInvitedBy] = useState(null)       // agency name when the app was opened from an agency invitation
   const [walletPaying, setWalletPaying] = useState(false)
+  const [openChat, setOpenChat] = useState(null)      // chat to open inside the provider side
   const [shared, setShared] = useState(null)         // { id, friend, worker } when the app was opened from a shared profile link
   const [pay, setPay] = useState(null)               // { kind: 'membership', tier } | { kind: 'wallet_topup' }
 
@@ -103,13 +104,20 @@ export default function App() {
         if (cancelled) return
         setSession(s)
         try { await supabase.rpc('release_my_expired_holds') } catch { /* optional */ }   // chat holds that ran out go back to the Wallet
-        await loadMe()
+        const meRow = await loadMe()
         const inv = getAgencyCode()
         if (inv) {
           const { data } = await supabase.rpc('agency_public', { p_code: inv })
           if (data?.[0]) { setInvitedBy(data[0].name); setView('worker') }   // straight to the application form
         }
         if (takeOpenIntent() === 'plans') { setView('categories'); setShowMembership(true) } // opened from a renewal reminder
+        const chatId = takeChatIntent()        // opened from the "new message" push: go straight to that chat room
+        if (chatId && meRow) {
+          const { data: ths } = await supabase.rpc('my_threads', { p_role: null })
+          const th = (ths ?? []).find((x) => x.id === chatId)
+          if (th && th.worker_id === meRow.id) { setView('worker'); setWorkerTab('self'); setOpenChat(th) }
+          else if (th) { setView('categories'); setChat(th) }
+        }
         const sharedId = takeWorkerIntent()
         if (sharedId) { setView('categories'); setShared({ id: sharedId, friend: await isOaFriend(), worker: null }) }
         if (!cancelled) setPhase('ready')
@@ -376,7 +384,7 @@ export default function App() {
           {workerTab === 'agency'
             ? <AgencyArea embedded me={me} onChanged={loadMe} onTopUp={() => setPay({ kind: 'wallet_topup' })} onWallet={() => setShowWallet(true)} />
             : me?.role === 'worker'
-              ? <WorkerDashboard userId={me.id} onTopUp={() => setPay({ kind: 'wallet_topup' })} />
+              ? <WorkerDashboard userId={me.id} me={me} openChat={openChat} onWallet={() => setShowWallet(true)} onTopUp={() => setPay({ kind: 'wallet_topup' })} />
               : <WorkerApply userId={me.id} defaultName={session.profile.displayName} />}
         </>
       )}

@@ -4,7 +4,7 @@ import { baht, fmtDateTime } from './format'
 
 const LABELS = {
   display_name: 'ชื่อที่แสดง', categories: 'หมวด', gender: 'เพศ', age: 'อายุ', height_cm: 'ส่วนสูง (ซม.)', weight_kg: 'น้ำหนัก (กก.)',
-  measurements: 'สัดส่วน', tags: 'บุคลิก', about: 'แนะนำตัว', price: 'ราคาต่อชั่วโมง', price_options: 'ราคาอื่น', start_rate: 'ราคาเริ่มต้น', district: 'อำเภอ/เขต',
+  measurements: 'สัดส่วน', tags: 'บุคลิก', about: 'แนะนำตัว', price: 'ราคาเริ่มต้น (ตัวเลข)', price_options: 'ราคาทั้งหมด', start_rate: 'ราคาเริ่มต้น', district: 'อำเภอ/เขต',
   nearby: 'พื้นที่ใกล้เคียง', province: 'จังหวัด', loc_lat: 'พิกัดใหม่ (ยืนยันจาก GPS)', loc_lng: '',
 }
 const GENDER = { female: 'หญิง', male: 'ชาย', lgbt: 'LGBT' }
@@ -13,7 +13,7 @@ const show = (k, v) => {
   if (k === 'gender') return GENDER[v] ?? v
   if (k === 'price') return baht(v)
   if (k === 'tags' || k === 'categories') return (v ?? []).join(', ') || '—'
-  if (k === 'price_options') return (v ?? []).map((o) => `${o.label === '@4h' ? '4 ชม.' : o.label === '@6h' ? '6 ชม.' : o.label} ${baht(o.price)}`).join(' · ') || '—'
+  if (k === 'price_options') return (v ?? []).map((o) => `${o.label === '1h' ? '1 ชม.' : o.label === '@4h' ? '4 ชม.' : o.label === '@6h' ? '6 ชม.' : o.label} ${baht(o.price)}`).join(' · ') || '—'
   return String(v)
 }
 

@@ -14,7 +14,15 @@ export function LocBadge({ verified }) {
   )
 }
 
-export const priceLabel = (label, t) => (label === '@4h' ? t('price4h') : label === '@6h' ? t('price6h') : label)
+export const priceLabel = (label, t) => (label === '1h' ? t('price1h') : label === '@4h' ? t('price4h') : label === '@6h' ? t('price6h') : label)
+
+// All of a provider's rates as [key, label, price], in display order: 4 h, 6 h, hourly, then her own rows.
+export function ratesOf(w, t) {
+  const rows = Array.isArray(w.price_options) ? w.price_options : []
+  const rank = (l) => (l === '@4h' ? 0 : l === '@6h' ? 1 : l === '1h' ? 2 : 3)
+  const list = rows.map((o, i) => [o.label, priceLabel(o.label, t), o.price, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[3] - b[3])
+  return list.length ? list.map(([k, l, p]) => [k, l, p]) : [['1h', t('price1h'), w.price]]
+}
 
 // Full profile of one provider (only reached for providers the viewer may open). Chat and booking start from here.
 export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlock, isMe }) {
@@ -68,7 +76,7 @@ export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlo
     w.measurements && [t('fMeasure'), w.measurements],
     w.province && [t('fProvince'), `${w.province}${w.district ? ` · ${w.district}` : ''}`],
   ].filter(Boolean)
-  const prices = [['1h', t('price1h'), w.price], ...(w.price_options ?? []).map((o) => [o.label, priceLabel(o.label, t), o.price])]
+  const prices = ratesOf(w, t)
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center sm:p-4" onClick={onClose} role="dialog" aria-modal="true">
@@ -135,7 +143,7 @@ export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlo
             <ul className="divide-y divide-white/5 rounded-xl bg-white/5 text-sm">
               {prices.map(([key, label, price]) => (
                 <li key={key} className="flex items-center justify-between px-3 py-2">
-                  <span>{label}{(w.start_rate ?? '1h') === key && <span className="ml-2 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-bold text-black">{t('startHere')}</span>}</span><b>{money(price)}</b></li>
+                  <span>{label}{(w.start_rate || prices[0]?.[0]) === key && <span className="ml-2 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-bold text-black">{t('startHere')}</span>}</span><b>{money(price)}</b></li>
               ))}
             </ul>
             <p className="mt-1 text-[11px] text-neutral-500">{t('priceNote')}</p>
