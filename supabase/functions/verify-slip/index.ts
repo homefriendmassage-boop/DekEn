@@ -14,7 +14,11 @@
 //   RECEIVER_NAME_CONTAINS or RECEIVER_ACCOUNT_DIGITS is REQUIRED. The bank code alone is NOT enough:
 //   it would accept a slip paid to ANY account at that bank (e.g. the buyer's own other account).
 //
-// Business outcomes are returned with HTTP 200 and { ok, code, ... }; only crashes return 5xx.
+// Outcomes (HTTP 200, { ok, code }):
+//   OK                  paid + amount matches an open request  -> plan opened / wallet credited
+//   REVIEW_SUBMITTED    genuine slip to our account, amount matches nothing -> sent to the admin
+//   SLIP_REJECTED / WRONG_RECEIVER / DUPLICATE_SLIP / ALREADY_UNDER_REVIEW  -> refused, customer attaches again
+// Only crashes return 5xx.
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
@@ -160,10 +164,25 @@ Deno.serve(async (req) => {
       p_user: userId, p_amount: check.amount, p_trans_ref: check.transRef,
     })
     if (error) {
-      const code = error.message.includes('DUPLICATE_SLIP') ? 'DUPLICATE_SLIP'
-        : error.message.includes('NO_MATCHING_INTENT') ? 'AMOUNT_MISMATCH' : 'SERVER_ERROR'
+      if (error.message.includes('NO_MATCHING_INTENT')) {
+        // A genuine slip, paid to OUR account, but the amount matches no open request:
+        // the only case that goes to a human. (Fake / duplicate / wrong receiver were rejected above.)
+        const { error: rerr } = await admin.rpc('submit_payment_review', {
+          p_user: userId, p_trans_ref: check.transRef, p_amount: check.amount,
+          p_detail: { receiver: receiverInfo, expected },
+        })
+        if (rerr) {
+          const code = rerr.message.includes('ALREADY_UNDER_REVIEW') ? 'ALREADY_UNDER_REVIEW'
+            : rerr.message.includes('DUPLICATE_SLIP') ? 'DUPLICATE_SLIP' : 'SERVER_ERROR'
+          await log(code, check.transRef, { paid: check.amount, expected })
+          return json({ ok: false, code })
+        }
+        await log('REVIEW_SUBMITTED', check.transRef, { paid: check.amount, expected })
+        return json({ ok: false, code: 'REVIEW_SUBMITTED', paid: check.amount, expected })
+      }
+      const code = error.message.includes('DUPLICATE_SLIP') ? 'DUPLICATE_SLIP' : 'SERVER_ERROR'
       await log(code, check.transRef, { paid: check.amount, expected, receiver: receiverInfo })
-      return json({ ok: false, code, paid: check.amount, expected })
+      return json({ ok: false, code })
     }
 
     await log('OK', check.transRef, { paid: check.amount })

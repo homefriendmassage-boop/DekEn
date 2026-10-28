@@ -13,6 +13,7 @@ import WorkerApply from './components/WorkerApply'
 import WorkerDashboard from './components/WorkerDashboard'
 import ChatModal from './components/ChatModal'
 import PaymentModal from './components/PaymentModal'
+import SupportChat from './components/SupportChat'
 import ThreadList from './components/ThreadList'
 
 // Mock mode only, when the workers table is empty: lets you click through the UI
@@ -62,6 +63,8 @@ export default function App() {
   const [chat, setChat] = useState(null)              // { id, other_name } of the open chat
   const [showThreads, setShowThreads] = useState(false)
   const [chatUnread, setChatUnread] = useState(0)
+  const [support, setSupport] = useState(null)       // { threadId } while the admin chat is open
+  const [supportUnread, setSupportUnread] = useState(0)
   const [pay, setPay] = useState(null)               // { kind: 'membership', tier } | { kind: 'wallet_topup' }
 
   const showToast = (msg) => {
@@ -106,6 +109,26 @@ export default function App() {
       .subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [me?.id])
+
+  // Admin replies: unread badge on the support button (RLS limits these events to my own thread)
+  const loadSupportUnread = useCallback(async () => {
+    const { data } = await supabase.rpc('my_support')
+    setSupportUnread(data?.[0]?.unread ?? 0)
+  }, [])
+  useEffect(() => {
+    if (!me?.id) return
+    loadSupportUnread()
+    const ch = supabase.channel('support-badge')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'support_messages' }, loadSupportUnread)
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [me?.id, loadSupportUnread])
+
+  async function openSupport() {
+    const { data, error } = await supabase.rpc('support_open')
+    if (error || !data) return showToast(t('errGeneric'))
+    setSupport({ threadId: data })
+  }
 
   const tier = session?.isMock && previewTier !== null ? previewTier : tierOf(me)
 
@@ -183,6 +206,8 @@ export default function App() {
     walletBalance: me?.wallet_balance ?? 0,
     onTierClick: () => setShowMembership(true),
     onWalletClick: () => setPay({ kind: 'wallet_topup' }),
+    onSupportClick: openSupport,
+    supportUnread,
     // chat icon only for paid members (others have no chat to show)
     onChatClick: tier >= 1 ? () => setShowThreads(true) : undefined,
     chatUnread,
@@ -277,12 +302,17 @@ export default function App() {
 
       {showMembership && (
         <MembershipModal tier={tier} onClose={() => setShowMembership(false)}
-          onPay={(planTier) => { setShowMembership(false); setPay({ kind: 'membership', tier: planTier }) }} />
+          onPay={(planTier) => { setShowMembership(false); setPay({ kind: 'membership', tier: planTier }) }}
+          onSupport={() => { setShowMembership(false); openSupport() }} />
       )}
 
       {pay && (
-        <PaymentModal kind={pay.kind} tier={pay.tier} onClose={() => setPay(null)}
+        <PaymentModal kind={pay.kind} tier={pay.tier} onClose={() => setPay(null)} onOpenSupport={openSupport}
           onPaid={() => { loadMe(); if (view === 'feed') loadFeed(category) }} />
+      )}
+
+      {support && (
+        <SupportChat threadId={support.threadId} onClose={() => { setSupport(null); loadSupportUnread() }} />
       )}
 
       {toast && (

@@ -6,7 +6,7 @@ import { useI18n } from '../i18n'
 
 const TOPUP_CHOICES = [100, 300, 500, 1000]
 const KNOWN_ERRORS = ['SLIP_REJECTED', 'WRONG_RECEIVER', 'AMOUNT_MISMATCH', 'DUPLICATE_SLIP', 'NO_PENDING_INTENT',
-  'RATE_LIMIT', 'UPSTREAM_ERROR', 'CONFIG_MISSING', 'BAD_PAYLOAD', 'SERVER_ERROR', 'UNAUTHORIZED']
+  'RATE_LIMIT', 'UPSTREAM_ERROR', 'CONFIG_MISSING', 'BAD_PAYLOAD', 'SERVER_ERROR', 'UNAUTHORIZED', 'ALREADY_UNDER_REVIEW']
 
 // Read the QR code printed on a bank-transfer slip (browser-side; only the decoded text is sent to the server).
 async function decodeSlipQr(file) {
@@ -42,6 +42,15 @@ const HAS_QR = Boolean(PROMPTPAY_ID)
 const HAS_BANK = Boolean(BANK.no)
 const READY = HAS_QR || HAS_BANK
 
+function InfoRow({ label, value }) {
+  return (
+    <div className="text-sm">
+      <span className="block text-[11px] text-neutral-500">{label}</span>
+      <span className="block break-words font-semibold">{value}</span>
+    </div>
+  )
+}
+
 function CopyRow({ label, value }) {
   const { t } = useI18n()
   const [done, setDone] = useState(false)
@@ -69,7 +78,7 @@ const mmss = (ms) => {
  * 1) server creates a request with a unique amount (e.g. 100.37)  2) QR with that amount  3) slip upload -> verified server-side.
  * kind: 'membership' (+ tier) | 'wallet_topup'
  */
-export default function PaymentModal({ kind, tier, onClose, onPaid }) {
+export default function PaymentModal({ kind, tier, onClose, onPaid, onOpenSupport }) {
   const { t, money } = useI18n()
   const [step, setStep] = useState(kind === 'membership' ? 'creating' : 'choose') // choose | creating | pay | verifying | done
   const [topup, setTopup] = useState(500)
@@ -78,6 +87,7 @@ export default function PaymentModal({ kind, tier, onClose, onPaid }) {
   const [error, setError] = useState(null)
   const [now, setNow] = useState(Date.now())
   const [result, setResult] = useState(null)
+  const [review, setReview] = useState(null) // { paid, expected } when the slip was sent to the admin
 
   const create = useCallback(async () => {
     setStep('creating')
@@ -123,6 +133,11 @@ export default function PaymentModal({ kind, tier, onClose, onPaid }) {
     const { data, error } = await supabase.functions.invoke('verify-slip', { body: { payload } })
     if (error || !data) {
       setError(t('errGeneric'))
+      return setStep('pay')
+    }
+    if (data.code === 'REVIEW_SUBMITTED') {
+      // Genuine slip to our account, wrong amount: a human decides. Pop up the chat with the admin.
+      setReview({ paid: money(data.paid), expected: (data.expected ?? []).map(money).join(' / ') })
       return setStep('pay')
     }
     if (!data.ok) {
@@ -194,10 +209,10 @@ export default function PaymentModal({ kind, tier, onClose, onPaid }) {
                 {HAS_BANK && (
                   <div className="space-y-2 rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
                     <p className="text-xs font-semibold text-neutral-300">{HAS_QR ? t('orBank') : t('bankTransfer')}</p>
-                    {BANK.name && <CopyRow label={t('bankName')} value={BANK.name} />}
+                    {BANK.name && <InfoRow label={t('bankName')} value={BANK.name} />}
                     <CopyRow label={t('accountNo')} value={BANK.no} />
-                    {BANK.holder && <CopyRow label={t('accountName')} value={BANK.holder} />}
-                    <CopyRow label={t('amountLabel')} value={intent.amount.toFixed(2)} />
+                    {BANK.holder && <InfoRow label={t('accountName')} value={BANK.holder} />}
+                    <InfoRow label={t('amountLabel')} value={intent.amount.toFixed(2)} />
                   </div>
                 )}
                 <p className="text-center text-xs text-neutral-500">{t('payExpires', { time: mmss(intent.expires - now) })}</p>
@@ -214,6 +229,20 @@ export default function PaymentModal({ kind, tier, onClose, onPaid }) {
           </div>
         )}
       </div>
+
+      {/* Popup: slip sent to the admin because the amount did not match */}
+      {review && (
+        <div className="fixed inset-0 z-[65] flex items-center justify-center bg-black/80 p-5" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-sm space-y-4 rounded-3xl bg-neutral-900 p-5 text-center shadow-2xl ring-1 ring-white/10">
+            <p className="text-4xl">📨</p>
+            <h3 className="text-lg font-bold">{t('payReviewTitle')}</h3>
+            <p className="text-sm text-neutral-300">{t('payReviewBody', review)}</p>
+            <button onClick={() => { onOpenSupport?.(); onClose() }}
+              className="w-full rounded-xl bg-line py-3 font-bold text-black active:scale-95">{t('chatAdmin')}</button>
+            <button onClick={() => { setReview(null); onClose() }} className="w-full rounded-xl bg-white/10 py-2.5 text-sm font-semibold active:scale-95">{t('close')}</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -14,6 +14,7 @@ supabase/migration_005.sql       Admin back office: admins, payment ledger, revi
 supabase/migration_006.sql       LINE profile picture + last seen; admin user list shows recent users (run after 005)
 supabase/migration_007.sql       Automatic payment: unique-amount requests, slip ledger (run after 006)
 supabase/migration_008.sql       Idempotent admin payment entry: double tap can't apply twice (run after 007)
+supabase/migration_009.sql       Slip review (amount mismatch -> admin) + support chat with admin (run after 008)
 supabase/functions/verify-slip/  Edge Function: verifies the slip with Thunder, opens the plan / credits the wallet
 admin.html + src/admin/          Separate admin page (not linked from the customer app)
 supabase/functions/line-auth/    Edge Function: LIFF ID token -> Supabase session
@@ -185,3 +186,16 @@ delete from public.payments where id = '<the duplicate payment id>';
 update public.users set vip_expires_at = vip_expires_at - interval '30 days' where id = '<user id>';   -- membership duplicate
 -- wallet duplicate: update public.users set wallet_balance = wallet_balance - <amount> where id = '<user id>';
 ```
+
+## Slip outcomes, review and support chat (migration_009)
+
+| Slip | Result |
+|---|---|
+| duplicate / fake or unverifiable / wrong receiver account or name | refused: the customer attaches a new slip |
+| genuine, paid to our account, but the amount matches no open request | sent to the admin (Admin > Slip review) and a popup offers the chat with the admin |
+| amount matches | plan opened / wallet credited automatically |
+
+A slip under review can never also be auto-approved (its transfer reference is reserved). The admin approves (choosing
+plan/days or a wallet credit; the slip amount is what is recorded) or rejects with a reason; the customer gets a message in
+their support chat either way. Support chat is in-app (Realtime), open to every user (a free user paying for the first
+time needs it) and does not push to LINE. Redeploy `verify-slip` after this migration: it now routes mismatches to review.

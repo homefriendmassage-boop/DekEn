@@ -4,6 +4,8 @@ import { signIn } from '../lib/auth'
 import Applications from './Applications'
 import Payments from './Payments'
 import Members from './Members'
+import Reviews from './Reviews'
+import Support from './Support'
 import { baht } from './format'
 
 // Separate back office (admin.html). Access is decided by the DATABASE: every admin_* function
@@ -23,6 +25,15 @@ export default function AdminApp() {
     const { data } = await supabase.rpc('admin_stats')
     setStats(data?.[0] ?? null)
   }, [])
+
+  // A new customer message or a new slip review refreshes the counters (admins can read all support messages)
+  useEffect(() => {
+    if (phase !== 'ready') return
+    const ch = supabase.channel('admin-counters')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'support_messages' }, loadStats)
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [phase, loadStats])
 
   useEffect(() => {
     ;(async () => {
@@ -55,6 +66,8 @@ export default function AdminApp() {
 
   const tabs = [
     ['apps', `📝 ใบสมัคร${stats?.pending_apps ? ` (${stats.pending_apps})` : ''}`],
+    ['reviews', `🔎 ตรวจสลิป${stats?.pending_reviews ? ` (${stats.pending_reviews})` : ''}`],
+    ['support', `💬 แชท${stats?.support_unread ? ` (${stats.support_unread})` : ''}`],
     ['pay', '💳 รับชำระเงิน'],
     ['members', '👑 สมาชิก'],
   ]
@@ -78,7 +91,8 @@ export default function AdminApp() {
 
       {stats && (
         <section className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-4">
-          <Stat label="ใบสมัครรอตรวจ" value={stats.pending_apps} warn={stats.pending_apps > 0} />
+          <Stat label="รอจัดการ: ใบสมัคร / สลิป / แชทใหม่" value={`${stats.pending_apps} / ${stats.pending_reviews} / ${stats.support_unread}`}
+            warn={stats.pending_apps + stats.pending_reviews + stats.support_unread > 0} />
           <Stat label="สมาชิก Gold / Plat. / Diamond" value={`${stats.gold} / ${stats.platinum} / ${stats.diamond}`} />
           <Stat label="ใกล้หมดอายุ (7 วัน)" value={stats.expiring_7d} warn={stats.expiring_7d > 0} />
           <Stat label="รายรับสมาชิกเดือนนี้" value={baht(stats.membership_month)} sub={`เติม Wallet ${baht(stats.topup_month)}`} />
@@ -87,6 +101,8 @@ export default function AdminApp() {
 
       <main className="px-4">
         {tab === 'apps' && <Applications onChanged={loadStats} toast={showToast} />}
+        {tab === 'reviews' && <Reviews onChanged={loadStats} toast={showToast} />}
+        {tab === 'support' && <Support onChanged={loadStats} />}
         {tab === 'pay' && <Payments prefill={prefill} clearPrefill={() => setPrefill(null)} onChanged={loadStats} toast={showToast} />}
         {tab === 'members' && <Members onRenew={(user) => { setPrefill({ user, tier: user.vip_tier }); setTab('pay') }} />}
       </main>

@@ -3,7 +3,7 @@ import { useI18n } from '../i18n'
 
 // Plan comparison. Payment is handled manually by an admin for now
 // (select public.set_membership(user_id, tier, 30) in the SQL editor).
-export default function MembershipModal({ tier, onClose, onPay }) {
+export default function MembershipModal({ tier, onClose, onPay, onSupport }) {
   const { t } = useI18n()
 
   return (
@@ -41,15 +41,10 @@ export default function MembershipModal({ tier, onClose, onPay }) {
           })}
         </ul>
 
-        <p className="mt-4 text-xs text-neutral-500">{t('contactAdminHint')}</p>
-        <div className="mt-3 grid grid-cols-2 gap-3">
+        <div className="mt-4 grid grid-cols-2 gap-3">
           <button onClick={onClose} className="rounded-xl bg-white/10 py-3 font-semibold active:scale-95">{t('close')}</button>
-          {LINE_OA_URL ? (
-            <a href={LINE_OA_URL} target="_blank" rel="noreferrer" className="rounded-xl bg-line py-3 text-center font-bold text-black active:scale-95">
-              {t('contactAdmin')}
-            </a>
-          ) : (
-            <span className="rounded-xl bg-neutral-800 py-3 text-center text-sm text-neutral-500">{t('contactAdmin')}</span>
+          {onSupport && (
+            <button onClick={onSupport} className="rounded-xl bg-white/10 py-3 font-semibold active:scale-95">{t('chatAdmin')}</button>
           )}
         </div>
       </div>

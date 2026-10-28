@@ -2,14 +2,22 @@ import { PLAN_META } from '../config'
 import { LangSwitcher, useI18n } from '../i18n'
 
 // Sticky top bar shared by every screen: back button, language switcher, tier + wallet chips.
-export default function Header({ title, onBack, displayName, tier, expiresAt, walletBalance, onTierClick, onChatClick, chatUnread, onWalletClick }) {
+export default function Header({ title, onBack, displayName, tier, expiresAt, walletBalance, onTierClick, onChatClick, chatUnread, onWalletClick, onSupportClick, supportUnread }) {
   const { t, money, fmtDate } = useI18n()
 
   return (
     <header className="sticky top-0 z-30 border-b border-white/10 bg-neutral-950/90 px-4 py-3 backdrop-blur">
       <div className="flex items-center justify-between gap-3">
         <p className="min-w-0 truncate text-xs text-neutral-400">{t('hello', { name: displayName })}</p>
-        <LangSwitcher />
+        <div className="flex shrink-0 items-center gap-2">
+          {onSupportClick && (
+            <button onClick={onSupportClick} aria-label="support" className="relative rounded-full bg-white/10 px-2.5 py-1 text-xs font-semibold active:scale-95">
+              🛟 {t('supportTitle')}
+              {supportUnread > 0 && <span className="absolute -right-1 -top-1 rounded-full bg-red-500 px-1.5 text-[10px] font-bold">{supportUnread}</span>}
+            </button>
+          )}
+          <LangSwitcher />
+        </div>
       </div>
       <div className="mt-1 flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
