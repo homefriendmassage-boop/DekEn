@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { PLAN_META } from '../config'
 import { baht, fmtDate, ago } from './format'
+import ManageUser from './ManageUser'
 
 const ERRORS = {
   CONFIG_MISSING: 'ยังไม่ได้ตั้งค่า LINE_CHANNEL_ACCESS_TOKEN / LIFF_ID ใน Supabase Secrets ของฟังก์ชัน send-renewal',
@@ -13,6 +14,9 @@ const ERRORS = {
 export default function Members({ onRenew, toast }) {
   const [rows, setRows] = useState(null)
   const [busy, setBusy] = useState(null) // user id | 'bulk'
+  const [manage, setManage] = useState(null) // user id whose controls are open
+  const [q, setQ] = useState('')
+  const [found, setFound] = useState([])
 
   const load = () => supabase.rpc('admin_list_members').then(({ data }) => setRows(data ?? []))
   useEffect(() => { load() }, [])
@@ -30,13 +34,38 @@ export default function Members({ onRenew, toast }) {
     load()
   }
 
+  // Search any user (members, expired, non-members) to open their controls.
+  useEffect(() => {
+    if (q.trim().length < 2) return setFound([])
+    const h = setTimeout(() => supabase.rpc('admin_search_users', { p_q: q }).then(({ data }) => setFound(data ?? [])), 300)
+    return () => clearTimeout(h)
+  }, [q])
+
   if (rows === null) return <p className="py-10 text-center text-neutral-500">กำลังโหลด…</p>
-  if (rows.length === 0) return <p className="rounded-2xl bg-white/5 p-6 text-center text-neutral-500">ยังไม่มีสมาชิกที่ใช้งานอยู่</p>
 
   const expiring = rows.filter((m) => new Date(m.vip_expires_at) - Date.now() < 7 * 86400000)
 
   return (
     <div className="space-y-3">
+      <div>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 ค้นหาผู้ใช้ (ชื่อ / LINE ID) เพื่อยกเลิก แก้แพ็กเกจ หรือระงับบัญชี"
+          className="w-full rounded-xl bg-white/10 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-line" />
+        {found.length > 0 && (
+          <ul className="mt-2 space-y-1">
+            {found.map((f) => (
+              <li key={f.id}>
+                <button onClick={() => setManage(f.id)} className="flex w-full items-center justify-between rounded-xl bg-white/5 px-3 py-2 text-left text-sm active:scale-95">
+                  <span className="truncate">{f.display_name ?? '—'}</span>
+                  <span className="text-xs text-neutral-400">{f.vip_tier > 0 && new Date(f.vip_expires_at) > new Date() ? PLAN_META[f.vip_tier].name : 'ไม่มีแพ็กเกจ'}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {rows.length === 0 && <p className="rounded-2xl bg-white/5 p-6 text-center text-neutral-500">ยังไม่มีสมาชิกที่ใช้งานอยู่</p>}
+
       {expiring.length > 0 && (
         <button
           disabled={busy}
@@ -66,7 +95,7 @@ export default function Members({ onRenew, toast }) {
                   <p className="text-[11px] text-neutral-500">Wallet {baht(m.wallet_balance)}{m.last_notice_at ? ` · แจ้งต่ออายุแล้ว ${ago(m.last_notice_at)}` : ''}</p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <button
                   disabled={busy}
                   onClick={() => window.confirm(`ส่งข้อความแจ้งต่ออายุถึง ${m.display_name ?? 'สมาชิก'} ทาง LINE?\n(นับโควตาข้อความ LINE OA 1 ข้อความ)`) && notify({ user_id: m.id }, m.display_name ?? 'สมาชิก')}
@@ -74,11 +103,13 @@ export default function Members({ onRenew, toast }) {
                   {busy === m.id ? 'กำลังส่ง…' : '📣 แจ้งต่ออายุ'}
                 </button>
                 <button onClick={() => onRenew(m)} className="rounded-xl bg-white/10 py-2 text-sm font-semibold active:scale-95">บันทึกรับเงิน</button>
+                <button onClick={() => setManage(m.id)} className="rounded-xl bg-white/10 py-2 text-sm font-semibold active:scale-95">⚙️ จัดการ</button>
               </div>
             </li>
           )
         })}
       </ul>
+      {manage && <ManageUser userId={manage} onClose={() => setManage(null)} onChanged={load} toast={toast} />}
     </div>
   )
 }

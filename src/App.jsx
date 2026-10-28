@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import { signIn, takeOpenIntent } from './lib/auth'
-import { CATEGORIES, canViewWorker, tierOf } from './config'
+import { CATEGORIES, canViewWorker, suspensionOf, tierOf } from './config'
 import { useI18n } from './i18n'
 import Header from './components/Header'
 import Landing from './components/Landing'
@@ -202,6 +202,23 @@ export default function App() {
     )
   }
 
+  const suspension = suspensionOf(me)
+  if (suspension) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 p-6 text-center">
+        <p className="text-5xl">⛔</p>
+        <p className="text-lg font-bold">{t('suspendedTitle')}</p>
+        <p className="text-sm text-neutral-300">
+          {suspension.forever ? t('suspendedForever') : t('suspendedUntil', { date: suspension.until.toLocaleDateString() })}
+          {me.suspend_reason ? ` · ${me.suspend_reason}` : ''}
+        </p>
+        <p className="max-w-sm text-sm text-neutral-400">{t('suspendedBody')}</p>
+        <button onClick={openSupport} className="rounded-full bg-line px-5 py-2 font-semibold text-black">{t('chatAdmin')}</button>
+        {support && <SupportChat threadId={support.threadId} onClose={() => { setSupport(null); loadSupportUnread() }} />}
+      </div>
+    )
+  }
+
   const headerProps = {
     displayName: session.profile.displayName,
     tier,
@@ -306,12 +323,12 @@ export default function App() {
 
       {showMembership && (
         <MembershipModal tier={tier} onClose={() => setShowMembership(false)}
-          onPay={(planTier) => { setShowMembership(false); setPay({ kind: 'membership', tier: planTier }) }}
+          onPay={(planTier) => { setShowMembership(false); setPay({ kind: 'membership', tier: planTier, upgrade: tier > 0 && planTier > tier }) }}
           onSupport={() => { setShowMembership(false); openSupport() }} />
       )}
 
       {pay && (
-        <PaymentModal kind={pay.kind} tier={pay.tier} onClose={() => setPay(null)} onOpenSupport={openSupport}
+        <PaymentModal kind={pay.kind} tier={pay.tier} upgrade={pay.upgrade} onClose={() => setPay(null)} onOpenSupport={openSupport}
           onPaid={() => { loadMe(); if (view === 'feed') loadFeed(category) }} />
       )}
 

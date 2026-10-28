@@ -41,4 +41,12 @@ export const canViewWorker = (category, rank, tier) =>
 
 // Effective tier of a users row (expired membership => 0).
 export const tierOf = (me) =>
-  me?.vip_expires_at && new Date(me.vip_expires_at) > new Date() ? me.vip_tier : 0
+  me?.vip_expires_at && new Date(me.vip_expires_at) > new Date() && !suspensionOf(me) ? me.vip_tier : 0
+
+// Active suspension of a users row: null, or { forever, until } (permanent = year 9999).
+export const suspensionOf = (me) => {
+  if (!me?.suspended_until) return null
+  const until = new Date(me.suspended_until)
+  if (!(until > new Date())) return null
+  return { forever: until.getFullYear() >= 9000, until }
+}

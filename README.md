@@ -17,6 +17,7 @@ supabase/migration_008.sql       Idempotent admin payment entry: double tap can'
 supabase/migration_009.sql       Slip review (amount mismatch -> admin) + support chat with admin (run after 008)
 supabase/migration_010.sql       Per-role chat lists, self-chat error, renewal notice ledger (run after 009)
 supabase/migration_011.sql       Payment requests are reusable (same amount when you come back); late slips go to review (run after 010)
+supabase/migration_012.sql       Upgrade by paying the difference (same expiry); admin cancel/change plan + suspend accounts (run after 011)
 supabase/functions/send-renewal/ Edge Function (admin only): LINE Flex renewal reminder with a button to the plan picker
 supabase/functions/verify-slip/  Edge Function: verifies the slip with Thunder, opens the plan / credits the wallet
 admin.html + src/admin/          Separate admin page (not linked from the customer app)
@@ -217,3 +218,8 @@ Secrets for the function: `LINE_CHANNEL_ACCESS_TOKEN` (Messaging API channel of 
 or top-up amount, so leaving the app to transfer and returning never changes the amount to match. A different plan makes a
 different request (the earlier one stays valid; at most 2 older ones are kept). A genuine slip that arrives after the request
 expired is not rejected: it goes to Admin > Slip review, linked to the customer's latest request of the last 24 hours.
+
+## Upgrades, cancelling and suspending (migration_012)
+- **Upgrade**: a member on Gold who picks Platinum pays only the price difference (e.g. 200 − 100 = 100). The slip is verified automatically like any payment and the plan changes immediately; the **expiry date stays the same**. Buying a lower plan than the active one is refused (`ALREADY_HIGHER`). If the lower plan lapsed before the slip arrived, the slip goes to admin review.
+- **Admin → สมาชิก → ⚙️ จัดการ** (or search any user): set a plan + expiry date (fixes a wrong upgrade), cancel the plan now, or suspend the account for 3/7/30 days or permanently (can be lifted). A reason is required and every action is stored in `membership_events`.
+- A suspended account sees a "suspended" screen, loses membership benefits, cannot book, pay or chat with providers, but can still chat with the admin. Admin accounts cannot be suspended. Refunds are not automatic.

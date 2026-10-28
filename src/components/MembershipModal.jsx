@@ -5,6 +5,7 @@ import { useI18n } from '../i18n'
 // (select public.set_membership(user_id, tier, 30) in the SQL editor).
 export default function MembershipModal({ tier, onClose, onPay, onSupport }) {
   const { t } = useI18n()
+  const curPrice = PLANS.find((p) => p.tier === tier)?.price ?? 0
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center sm:p-4" onClick={onClose} role="dialog" aria-modal="true">
@@ -32,9 +33,12 @@ export default function MembershipModal({ tier, onClose, onPay, onSupport }) {
                 {tier === p.tier && <p className="mt-1 text-xs text-green-300">✓ {t('yourPlan')}</p>}
                 <p className="mt-2 text-neutral-300">{t(`plan${p.tier}`)}</p>
                 {onPay && p.tier >= tier && (
-                  <button onClick={() => onPay(p.tier)} className={`mt-3 w-full rounded-xl py-2 text-sm font-bold shadow active:scale-95 ${m.badge}`}>
-                    {tier === p.tier ? t('renew') : t('pay')} · {p.price} {t('currency')}
-                  </button>
+                  <>
+                    <button onClick={() => onPay(p.tier)} className={`mt-3 w-full rounded-xl py-2 text-sm font-bold shadow active:scale-95 ${m.badge}`}>
+                      {tier === p.tier ? t('renew') : tier > 0 ? t('upgrade') : t('pay')} · {tier > 0 && p.tier > tier ? p.price - curPrice : p.price} {t('currency')}
+                    </button>
+                    {tier > 0 && p.tier > tier && <p className="mt-1 text-center text-[11px] text-neutral-400">{t('upgradeNote')}</p>}
+                  </>
                 )}
               </li>
             )

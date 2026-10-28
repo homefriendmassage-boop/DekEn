@@ -78,7 +78,7 @@ const mmss = (ms) => {
  * 1) server creates a request with a unique amount (e.g. 100.37)  2) QR with that amount  3) slip upload -> verified server-side.
  * kind: 'membership' (+ tier) | 'wallet_topup'
  */
-export default function PaymentModal({ kind, tier, onClose, onPaid, onOpenSupport }) {
+export default function PaymentModal({ kind, tier, upgrade, onClose, onPaid, onOpenSupport }) {
   const { t, money } = useI18n()
   const [step, setStep] = useState(kind === 'membership' ? 'creating' : 'choose') // choose | creating | pay | verifying | done
   const [topup, setTopup] = useState(500)
@@ -99,7 +99,7 @@ export default function PaymentModal({ kind, tier, onClose, onPaid, onOpenSuppor
     })
     const row = data?.[0]
     if (error || !row) {
-      setError(t(error?.message?.includes('BUSY') ? 'payErr_BUSY' : 'errGeneric'))
+      setError(t(['BUSY', 'ALREADY_HIGHER', 'SUSPENDED'].map((c) => error?.message?.includes(c) && `payErr_${c}`).find(Boolean) || 'errGeneric'))
       return setStep(kind === 'membership' ? 'error' : 'choose')
     }
     const amount = Number(row.intent_amount)
@@ -187,7 +187,7 @@ export default function PaymentModal({ kind, tier, onClose, onPaid, onOpenSuppor
             <p className="text-lg font-bold">
               {result?.kind === 'membership' ? t('paySuccessMembership', { plan: PLAN_META[result.tier]?.name ?? '' }) : t('paySuccessTopup', { amount: money(result?.paid ?? 0) })}
             </p>
-            {result?.kind === 'membership' && <p className="text-sm text-neutral-400">{t('membershipSub', { days: result.days ?? MEMBERSHIP_DAYS })}</p>}
+            {result?.kind === 'membership' && <p className="text-sm text-neutral-400">{upgrade ? t('upgradeDone') : t('membershipSub', { days: result.days ?? MEMBERSHIP_DAYS })}</p>}
             <button onClick={onClose} className="w-full rounded-xl bg-line py-3 font-bold text-black active:scale-95">{t('close')}</button>
           </div>
         ) : (
@@ -195,6 +195,7 @@ export default function PaymentModal({ kind, tier, onClose, onPaid, onOpenSuppor
             <div className="rounded-2xl bg-amber-400/10 p-3 text-center ring-1 ring-amber-400/40">
               <p className="text-xs text-amber-200">{t('payExact')}</p>
               <p className="mt-1 text-3xl font-extrabold text-amber-300">{money(intent.amount)}</p>
+              {upgrade && <p className="mt-1 text-xs text-amber-200">{t('upgradeNote')}</p>}
             </div>
 
             {expired ? (
