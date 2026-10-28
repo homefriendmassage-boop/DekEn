@@ -1,3 +1,4 @@
+import { PLAN_META } from '../config'
 import { LangSwitcher, useI18n } from '../i18n'
 
 // Sticky top bar shared by every screen: back button, language switcher, tier + wallet chips.
@@ -27,11 +28,11 @@ export default function Header({ title, onBack, displayName, tier, expiresAt, wa
             )}
             <button
               onClick={onTierClick}
-              className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
-                tier > 0 ? 'bg-gradient-to-r from-yellow-300 to-amber-500 text-black' : 'bg-white/10 text-neutral-300'
+              className={`rounded-full px-2.5 py-0.5 text-[11px] font-extrabold tracking-wide shadow ${
+                tier > 0 ? PLAN_META[tier].badge : 'bg-white/10 text-neutral-300'
               }`}
             >
-              {tier > 0 ? `VIP ${tier * 100}` : t('freePlan')}
+              {tier > 0 ? `${PLAN_META[tier].icon} ${PLAN_META[tier].name}` : t('freePlan')}
             </button>
             <span className="rounded-full bg-white/10 px-3 py-1 text-sm font-semibold">💰 {money(walletBalance)}</span>
           </div>

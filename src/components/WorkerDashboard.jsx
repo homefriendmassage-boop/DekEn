@@ -119,7 +119,7 @@ export default function WorkerDashboard({ userId }) {
 
       {/* Profile */}
       <section className="space-y-3">
-        <h2 className="text-base font-bold">{t('profile')} · <span className="text-sm font-normal text-neutral-400">{catName(worker.category)}</span></h2>
+        <h2 className="text-base font-bold">{t('profile')} · <span className="text-sm font-normal text-neutral-400">{(worker.categories ?? []).map(catName).join(' · ')}</span></h2>
         <label className="block text-sm">{t('fName')}
           <input value={form.display_name} maxLength={40} onChange={(e) => setForm((f) => ({ ...f, display_name: e.target.value }))} className={input} />
         </label>

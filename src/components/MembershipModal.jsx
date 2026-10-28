@@ -1,4 +1,4 @@
-import { FREE_RANK_LIMIT, LINE_OA_URL, MEMBERSHIP_DAYS, PLANS } from '../config'
+import { FREE_RANK_LIMIT, LINE_OA_URL, MEMBERSHIP_DAYS, PLAN_META, PLANS } from '../config'
 import { useI18n } from '../i18n'
 
 // Plan comparison. Payment is handled manually by an admin for now
@@ -13,7 +13,7 @@ export default function MembershipModal({ tier, onClose }) {
         className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-neutral-900 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl sm:rounded-3xl"
       >
         <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-white/20 sm:hidden" />
-        <h2 className="text-xl font-bold">👑 {t('membershipTitle')}</h2>
+        <h2 className="text-xl font-bold">✨ {t('membershipTitle')}</h2>
         <p className="mt-1 text-sm text-neutral-400">{t('membershipSub', { days: MEMBERSHIP_DAYS })}</p>
 
         <ul className="mt-4 space-y-2 text-sm">
@@ -21,15 +21,19 @@ export default function MembershipModal({ tier, onClose }) {
             <p className="font-bold">{t('freePlan')} {tier === 0 && <span className="ml-1 text-xs text-green-300">· {t('yourPlan')}</span>}</p>
             <p className="text-neutral-400">{t('planFree', { n: FREE_RANK_LIMIT })}</p>
           </li>
-          {PLANS.map((p) => (
-            <li key={p.tier} className={`rounded-2xl p-3 ${tier === p.tier ? 'bg-amber-400/15 ring-1 ring-amber-400' : 'bg-white/5'}`}>
-              <div className="flex items-baseline justify-between gap-2">
-                <p className="font-bold">VIP {p.price} {tier === p.tier && <span className="ml-1 text-xs text-amber-300">· {t('yourPlan')}</span>}</p>
-                <p className="text-xs text-amber-300">{t('pricePer', { price: p.price, days: MEMBERSHIP_DAYS })}</p>
-              </div>
-              <p className="text-neutral-400">{t(`plan${p.tier}`)}</p>
-            </li>
-          ))}
+          {PLANS.map((p) => {
+            const m = PLAN_META[p.tier]
+            return (
+              <li key={p.tier} className={`rounded-2xl p-3 ring-1 ${m.soft} ${tier === p.tier ? `${m.ring} ring-2` : 'ring-white/10'}`}>
+                <div className="flex items-center justify-between gap-2">
+                  <span className={`rounded-full px-3 py-0.5 text-sm font-extrabold tracking-wide shadow ${m.badge}`}>{m.icon} {m.name}</span>
+                  <p className="text-xs font-semibold text-white">{t('pricePer', { price: p.price, days: MEMBERSHIP_DAYS })}</p>
+                </div>
+                {tier === p.tier && <p className="mt-1 text-xs text-green-300">✓ {t('yourPlan')}</p>}
+                <p className="mt-2 text-neutral-300">{t(`plan${p.tier}`)}</p>
+              </li>
+            )
+          })}
         </ul>
 
         <p className="mt-4 text-xs text-neutral-500">{t('contactAdminHint')}</p>

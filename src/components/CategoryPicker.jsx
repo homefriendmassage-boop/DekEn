@@ -1,4 +1,4 @@
-import { CATEGORIES, MIN_TIER } from '../config'
+import { CATEGORIES, MIN_TIER, PLAN_META } from '../config'
 import { useI18n } from '../i18n'
 
 const EMOJI = { bartender: '🍸', ent: '🎤', masseuse: '💆', spa: '🧖' }
@@ -28,7 +28,7 @@ export default function CategoryPicker({ tier, onPick, onLocked }) {
                 <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
                   free ? 'bg-green-500/20 text-green-300' : open ? 'bg-amber-400/20 text-amber-300' : 'bg-black/40 text-neutral-400'
                 }`}>
-                  {free ? t('freeView') : open ? 'VIP ✓' : `🔒 ${t('needTier', { tier: MIN_TIER[c] === 2 ? 200 : 300 })}`}
+                  {free ? t('freeView') : open ? `${PLAN_META[tier].icon} ✓` : `🔒 ${t('needTier', { tier: PLAN_META[MIN_TIER[c]].name })}`}
                 </span>
               </button>
             </li>

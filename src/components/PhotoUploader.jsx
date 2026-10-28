@@ -40,7 +40,7 @@ function mosaicCircle(src, cx, cy, r) {
  *  - mosaicked -> PUBLIC bucket `worker-public`     (the teaser everyone sees)
  * A preview of the public version must be confirmed before anything is uploaded.
  */
-export default function PhotoUploader({ userId, previousOriginal, onUploaded }) {
+export default function PhotoUploader({ userId, previousOriginal, onUploaded, target = 'worker' }) {
   const { t } = useI18n()
   const boxRef = useRef(null)
   const [src, setSrc] = useState(null)               // object URL of the chosen file
@@ -112,9 +112,12 @@ export default function PhotoUploader({ userId, previousOriginal, onUploaded }) 
       if (up2.error) throw up2.error
 
       const url = supabase.storage.from('worker-public').getPublicUrl(pubPath).data.publicUrl
-      const { error } = await supabase.from('workers')
+      // Applicants save onto their pending application; approved providers onto their profile.
+      let q = supabase.from(target === 'application' ? 'worker_applications' : 'workers')
         .update({ profile_image: url, original_path: origPath })
         .eq('user_id', userId)
+      if (target === 'application') q = q.eq('status', 'pending')
+      const { error } = await q
       if (error) throw error
 
       if (previousOriginal) supabase.storage.from('worker-originals').remove([previousOriginal]) // best effort

@@ -9,6 +9,7 @@ supabase/seed.sql                Dev-only demo workers
 supabase/migration_002.sql       Categories, membership tiers, photo storage, worker apps (run after schema.sql)
 supabase/seed2.sql               Dev-only: 21 more demo workers (tests the top-10 free limit)
 supabase/migration_003.sql       Remove ENT Plus, rename Spa, service area, members-only chat (run after migration_002)
+supabase/migration_004.sql       Multi-category providers, phone + LINE ID, editable applications, promo photo (run after 003)
 supabase/functions/line-auth/    Edge Function: LIFF ID token -> Supabase session
 src/lib/auth.js                  LIFF init, ?ref capture, mock login    (Part 2)
 src/App.jsx                      App shell, data loading, realtime      (Part 2)
@@ -73,12 +74,14 @@ src/components/BookingModal.jsx  Deposit explainer + Confirm Booking    (Part 3)
 
 Run `supabase/migration_002.sql` once after `schema.sql`, then `migration_003.sql` (and optionally `seed2.sql`).
 
-| Plan | Sees |
-|---|---|
-| Free | Bartender + ENT, only the top 10 of each category |
-| VIP 100 | Bartender + ENT, everyone |
-| VIP 200 | + Masseuse |
-| VIP 300 | Everything (incl. Spa) |
+| Plan | Price | Sees |
+|---|---|---|
+| Free | 0 | Bartender + ENT, only the top 10 of each category |
+| 🥇 Gold (tier 1) | 100 | Bartender + ENT, everyone |
+| 💠 Platinum (tier 2) | 200 | + Masseuse |
+| 💎 Diamond (tier 3) | 300 | Everything (incl. Spa) |
+
+Plan names/looks live in `PLAN_META` in `src/config.js` (the database only knows tier 1/2/3).
 
 Each plan lasts 30 days. Payment is manual for now; activate / extend from the SQL Editor:
 
@@ -109,3 +112,14 @@ that is cancelled is not (handle manually).
   quota (reply messages are free but need a recent message from that user), so per-message LINE alerts
   would cost money. Providers see unread counts when they open the app. Limits: 500 chars/message,
   10 messages/minute. A lapsed member can read old chats but not send.
+
+## Applications and multi-category (migration_004)
+
+Run `migration_004.sql` after 003. Order for a fresh project: `schema` -> `migration_002` -> (`seed`, `seed2`) -> `migration_003` -> `migration_004`.
+
+- A provider can work in several categories; they appear in each category's feed (rank is per category).
+  Categories are fixed at approval (change them as admin: `update public.workers set categories = '{ent,spa}' where user_id = '...'`).
+- Applicants give phone and LINE ID separately (at least one). These stay private to the admin and are
+  never copied to the public provider profile.
+- While an application is `pending` the applicant can edit it and upload a promo photo (face mosaic, same as providers).
+  Approval carries the photo over.

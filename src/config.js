@@ -13,6 +13,12 @@ export const CATEGORIES = ['bartender', 'ent', 'masseuse', 'spa']
 // The database is the authority; this copy only drives UI locks and demo data.
 export const MEMBERSHIP_DAYS = 30
 export const FREE_RANK_LIMIT = 10
+// Display names/looks for the three paid tiers (the DB only knows tier 1/2/3).
+export const PLAN_META = {
+  1: { name: 'Gold', icon: '🥇', badge: 'bg-gradient-to-r from-yellow-200 via-amber-300 to-amber-500 text-black', ring: 'ring-amber-400', soft: 'bg-amber-400/10' },
+  2: { name: 'Platinum', icon: '💠', badge: 'bg-gradient-to-r from-slate-100 via-slate-300 to-slate-400 text-black', ring: 'ring-slate-300', soft: 'bg-slate-300/10' },
+  3: { name: 'Diamond', icon: '💎', badge: 'bg-gradient-to-r from-cyan-200 via-sky-300 to-fuchsia-400 text-black', ring: 'ring-cyan-300', soft: 'bg-cyan-300/10' },
+}
 export const PLANS = [
   { tier: 1, price: 100 },
   { tier: 2, price: 200 },

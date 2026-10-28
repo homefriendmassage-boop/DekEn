@@ -21,6 +21,7 @@ const DEMO_WORKERS = CATEGORIES.flatMap((category, ci) =>
     user_id: `demo-${category}-${i}`,
     display_name: `Demo ${ci * 10 + i + 1}`,
     category,
+    categories: [category],
     price: 1500 + i * 250,
     profile_image: `https://picsum.photos/seed/${category}${i}/600/800`,
     is_online: i % 4 !== 3,

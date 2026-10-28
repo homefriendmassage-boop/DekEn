@@ -101,7 +101,11 @@ function WorkerCard({ worker: w, onBook, onUnlock, onAsk }) {
       <div className="space-y-2 p-3">
         <div>
           <h2 className="truncate text-sm font-bold sm:text-base">{w.display_name}</h2>
-          <span className="mt-1 inline-block rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-neutral-300 sm:text-xs">{catName(w.category)}</span>
+          <div className="mt-1 flex flex-wrap gap-1">
+            {(w.categories ?? [w.category]).map((c) => (
+              <span key={c} className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-neutral-300 sm:text-xs">{catName(c)}</span>
+            ))}
+          </div>
         </div>
         {w.province && (
           <p className="truncate text-[11px] text-neutral-400 sm:text-xs">
