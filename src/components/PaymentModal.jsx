@@ -3,40 +3,11 @@ import { supabase } from '../supabaseClient'
 import { BANK, LINE_OA_URL, MEMBERSHIP_DAYS, PLAN_META, PROMPTPAY_ID } from '../config'
 import { promptPayPayload } from '../lib/promptpay'
 import { useI18n } from '../i18n'
+import { decodeSlipQr } from '../lib/slipQr'
 
 const TOPUP_CHOICES = [100, 300, 500, 1000]
 const KNOWN_ERRORS = ['SLIP_REJECTED', 'WRONG_RECEIVER', 'AMOUNT_MISMATCH', 'DUPLICATE_SLIP', 'NO_PENDING_INTENT',
   'RATE_LIMIT', 'UPSTREAM_ERROR', 'CONFIG_MISSING', 'BAD_PAYLOAD', 'SERVER_ERROR', 'UNAUTHORIZED', 'ALREADY_UNDER_REVIEW', 'SLIP_PENDING']
-
-// Read the QR code printed on a bank-transfer slip (browser-side; only the decoded text is sent to the server).
-async function decodeSlipQr(file) {
-  const url = URL.createObjectURL(file)
-  try {
-    const img = await new Promise((res, rej) => {
-      const i = new Image()
-      i.onload = () => res(i)
-      i.onerror = rej
-      i.src = url
-    })
-    const { default: jsQR } = await import('jsqr')
-    // Slips are tall and the QR is small: try a few resolutions.
-    for (const maxSide of [1800, 1200, 800]) {
-      const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight))
-      const w = Math.round(img.naturalWidth * scale)
-      const h = Math.round(img.naturalHeight * scale)
-      const canvas = document.createElement('canvas')
-      canvas.width = w
-      canvas.height = h
-      const ctx = canvas.getContext('2d', { willReadFrequently: true })
-      ctx.drawImage(img, 0, 0, w, h)
-      const code = jsQR(ctx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: 'attemptBoth' })
-      if (code?.data) return code.data
-    }
-    return null
-  } finally {
-    URL.revokeObjectURL(url)
-  }
-}
 
 const HAS_QR = Boolean(PROMPTPAY_ID)
 const HAS_BANK = Boolean(BANK.no)
@@ -127,8 +98,11 @@ export default function PaymentModal({ kind, tier, upgrade, onClose, onPaid, onO
     setError(null)
     setStep('verifying')
     let payload = null
-    try { payload = await decodeSlipQr(file) } catch { /* unreadable image */ }
+    const info = {}
+    try { payload = await decodeSlipQr(file, info) } catch (err) { info.error = String(err?.message ?? err).slice(0, 80) }
     if (!payload) {
+      // tell the back office what the phone handed over (size / type only, never the picture)
+      supabase.rpc('report_slip_problem', { p_detail: info }).then(() => {}, () => {})
       setError(t('payErr_NO_QR'))
       return setStep('pay')
     }

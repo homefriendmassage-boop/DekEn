@@ -5,6 +5,7 @@ import { PROVINCES } from '../provinces'
 import PhotoUploader from './PhotoUploader'
 import ThreadList from './ThreadList'
 import ChatModal from './ChatModal'
+import RankBoost from './RankBoost'
 import { logoUrl } from '../lib/logo'
 import { clearAgencyCode, getAgencyCode } from '../lib/auth'
 
@@ -169,6 +170,8 @@ export default function WorkerDashboard({ userId }) {
           </ul>
         )}
       </section>
+
+      <RankBoost worker={worker} userId={userId} />
 
       {/* Messages from members (in-app chat; no LINE push) */}
       <section>

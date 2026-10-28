@@ -260,6 +260,7 @@ export default function Payments({ prefill, clearPrefill, onChanged, toast }) {
                   {fmtDateTime(f.created_at)}{f.trans_ref ? ` · ref ${f.trans_ref}` : ''}
                   {f.detail?.paid != null ? ` · สลิป ${baht(f.detail.paid)}` : ''}
                   {f.detail?.expected ? ` · ต้องโอน ${f.detail.expected.map(baht).join(' / ')}` : ''}
+                  {f.detail?.width ? ` · รูปที่แนบ ${f.detail.width}×${f.detail.height} ${f.detail.type ?? ''} ${f.detail.bytes ? Math.round(f.detail.bytes / 1024) + 'KB' : ''}${f.detail.error ? ` (error: ${f.detail.error})` : ''}` : ''}
                   {f.detail?.receiver ? ` · ผู้รับที่ Thunder อ่านได้: ${f.detail.receiver.account?.name?.th ?? '?'} (${f.detail.receiver.bank?.short ?? '?'})` : ''}
                 </p>
                 {(f.detail?.status != null || f.detail?.response || f.detail?.thunder) && (
