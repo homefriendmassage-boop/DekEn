@@ -21,7 +21,7 @@ export default function Applications({ onChanged, toast }) {
 
   async function review(id, approve, reason) {
     const { error } = await supabase.rpc('admin_review_application', { p_app: id, p_approve: approve, p_reason: reason ?? null })
-    if (error) return toast('ทำรายการไม่สำเร็จ: ' + (error.message.includes('NOT_FOUND') ? 'ใบสมัครนี้ถูกจัดการไปแล้ว' : error.message))
+    if (error) return toast('ทำรายการไม่สำเร็จ: ' + (error.message.includes('NOT_FOUND') ? 'ใบสมัครนี้ถูกจัดการไปแล้ว' : error.message.includes('AGENCY_NOT_CONFIRMED') ? 'ต้องรอให้โมเดลลิ่งกดรับเข้าสังกัดก่อน' : error.message))
     toast(approve ? 'อนุมัติแล้ว' : 'ปฏิเสธแล้ว')
     load()
     onChanged()
@@ -75,6 +75,7 @@ function Card({ a, onReview }) {
         <dt className="text-neutral-400">เบอร์โทร</dt><dd>{a.phone ? <a className="text-line underline" href={`tel:${a.phone}`}>{a.phone}</a> : '—'}</dd>
         <dt className="text-neutral-400">LINE ID</dt><dd>{a.line_id ?? '—'}</dd>
         {a.note && <><dt className="text-neutral-400">หมายเหตุ</dt><dd className="whitespace-pre-wrap break-words">{a.note}</dd></>}
+        {a.agency_name && <><dt className="text-neutral-400">สังกัด</dt><dd>{a.agency_name} · <span className={a.agency_status === 'accepted' ? 'text-green-300' : 'text-amber-300'}>{a.agency_status === 'accepted' ? 'โมเดลลิ่งยืนยันแล้ว' : a.agency_status === 'rejected' ? 'โมเดลลิ่งปฏิเสธ' : 'รอโมเดลลิ่งยืนยัน'}</span></dd></>}
         <dt className="text-neutral-400">ส่งเมื่อ</dt><dd>{fmtDateTime(a.created_at)}</dd>
         {a.reject_reason && <><dt className="text-neutral-400">เหตุผลที่ไม่ผ่าน</dt><dd className="text-red-300">{a.reject_reason}</dd></>}
       </dl>

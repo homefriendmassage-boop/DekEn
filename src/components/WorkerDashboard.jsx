@@ -5,6 +5,7 @@ import { PROVINCES } from '../provinces'
 import PhotoUploader from './PhotoUploader'
 import ThreadList from './ThreadList'
 import ChatModal from './ChatModal'
+import { logoUrl } from '../lib/logo'
 
 // Provider home: online switch, profile edit, photo upload, live job inbox.
 export default function WorkerDashboard({ userId }) {
@@ -14,6 +15,7 @@ export default function WorkerDashboard({ userId }) {
   const [form, setForm] = useState({ display_name: '', price: '', province: '', district: '', nearby: '' })
   const [chat, setChat] = useState(null)
   const [note, setNote] = useState(null)
+  const [aff, setAff] = useState(null)   // my_worker_agency(): { agency_name, logo_path, plan_expires_at, can_leave }
   const [error, setError] = useState(null)
 
   const loadWorker = useCallback(async () => {
@@ -28,7 +30,16 @@ export default function WorkerDashboard({ userId }) {
     setJobs(data ?? [])
   }, [])
 
-  useEffect(() => { loadWorker(); loadJobs() }, [loadWorker, loadJobs])
+  const loadAff = useCallback(() => supabase.rpc('my_worker_agency').then(({ data }) => setAff(data?.[0] ?? null)), [])
+  useEffect(() => { loadWorker(); loadJobs(); loadAff() }, [loadWorker, loadJobs, loadAff])
+
+  async function leaveAgency() {
+    if (!window.confirm(t('leaveAgencyConfirm'))) return
+    const { error } = await supabase.rpc('worker_leave_agency')
+    if (error) return setError(t('errGeneric'))
+    setNote(t('leftAgency'))
+    loadAff()
+  }
 
   // New bookings / status changes appear instantly (RLS lets the worker see their own jobs).
   useEffect(() => {
@@ -72,6 +83,24 @@ export default function WorkerDashboard({ userId }) {
       </button>
 
       {error && <p className="rounded-lg bg-red-500/10 p-2 text-sm text-red-300">{error}</p>}
+
+      {/* Agency affiliation: leaving is possible only once the agency's period has ended */}
+      {aff && (
+        <section className="space-y-2 rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
+          <div className="flex items-center gap-3">
+            {aff.logo_path && <img src={logoUrl(aff.logo_path)} alt="" className="h-10 w-10 rounded-full object-cover" />}
+            <div className="min-w-0">
+              <p className="text-xs text-neutral-400">{t('myAgency')}</p>
+              <p className="truncate font-bold">{aff.agency_name}</p>
+            </div>
+          </div>
+          <button disabled={!aff.can_leave} onClick={leaveAgency}
+            className="w-full rounded-xl bg-white/10 py-2 text-sm font-semibold active:scale-95 disabled:opacity-40">{t('leaveAgency')}</button>
+          {!aff.can_leave && aff.plan_expires_at && (
+            <p className="text-[11px] text-neutral-500">{t('leaveAgencyWait', { date: new Date(aff.plan_expires_at).toLocaleDateString() })}</p>
+          )}
+        </section>
+      )}
 
       {/* Inbox */}
       <section>

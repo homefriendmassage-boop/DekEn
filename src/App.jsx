@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
-import { signIn, takeOpenIntent } from './lib/auth'
+import { signIn, takeOpenIntent, getAgencyCode } from './lib/auth'
 import { CATEGORIES, PLAN_META, canViewWorker, suspensionOf, tierOf } from './config'
 import { useI18n } from './i18n'
 import Header from './components/Header'
@@ -15,6 +15,7 @@ import ChatModal from './components/ChatModal'
 import PaymentModal from './components/PaymentModal'
 import WalletModal from './components/WalletModal'
 import SupportChat from './components/SupportChat'
+import AgencyArea from './components/agency/AgencyArea'
 import ThreadList from './components/ThreadList'
 
 // Mock mode only, when the workers table is empty: lets you click through the UI
@@ -52,7 +53,7 @@ export default function App() {
   const [session, setSession] = useState(null)  // { profile, isMock, refCode }
   const [me, setMe] = useState(null)            // row from public.users
 
-  const [view, setView] = useState('landing')   // landing | categories | feed | worker
+  const [view, setView] = useState('landing')   // landing | categories | feed | worker | agency
   const [category, setCategory] = useState(null)
   const [workers, setWorkers] = useState([])
   const [signedUrls, setSignedUrls] = useState({})     // original_path -> signed URL
@@ -67,6 +68,7 @@ export default function App() {
   const [support, setSupport] = useState(null)       // { threadId } while the admin chat is open
   const [supportUnread, setSupportUnread] = useState(0)
   const [showWallet, setShowWallet] = useState(false)
+  const [invitedBy, setInvitedBy] = useState(null)       // agency name when the app was opened from an agency invitation
   const [walletPaying, setWalletPaying] = useState(false)
   const [pay, setPay] = useState(null)               // { kind: 'membership', tier } | { kind: 'wallet_topup' }
 
@@ -94,6 +96,11 @@ export default function App() {
         setSession(s)
         try { await supabase.rpc('release_my_expired_holds') } catch { /* optional */ }   // chat holds that ran out go back to the Wallet
         await loadMe()
+        const inv = getAgencyCode()
+        if (inv) {
+          const { data } = await supabase.rpc('agency_public', { p_code: inv })
+          if (data?.[0]) { setInvitedBy(data[0].name); setView('worker') }   // straight to the application form
+        }
         if (takeOpenIntent() === 'plans') { setView('categories'); setShowMembership(true) } // opened from a renewal reminder
         if (!cancelled) setPhase('ready')
       } catch (e) {
@@ -276,6 +283,8 @@ export default function App() {
           role={me?.role}
           onCustomer={() => setView('categories')}
           onWorker={() => setView('worker')}
+          onAgency={() => setView('agency')}
+          invitedBy={invitedBy}
         />
       )}
 
@@ -300,6 +309,11 @@ export default function App() {
             meId={me?.id}
           />
         </>
+      )}
+
+      {view === 'agency' && (
+        <AgencyArea me={me} onBack={() => setView('landing')} onChanged={loadMe}
+          onTopUp={() => setPay({ kind: 'wallet_topup' })} onWallet={() => setShowWallet(true)} />
       )}
 
       {view === 'worker' && (

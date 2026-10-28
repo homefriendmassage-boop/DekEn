@@ -1,7 +1,7 @@
 import { LangSwitcher, useI18n } from '../i18n'
 
 // First screen: customer or provider.
-export default function Landing({ displayName, role, onCustomer, onWorker }) {
+export default function Landing({ displayName, role, onCustomer, onWorker, onAgency, invitedBy }) {
   const { t } = useI18n()
   const isWorker = role === 'worker'
 
@@ -15,13 +15,20 @@ export default function Landing({ displayName, role, onCustomer, onWorker }) {
       <div className="flex flex-1 flex-col justify-center gap-4">
         <h1 className="mb-2 text-center text-2xl font-extrabold">{t('landingTitle')}</h1>
 
-        <Choice emoji="🛍️" title={t('imCustomer')} sub={t('imCustomerSub')} onClick={onCustomer} primary />
+        {invitedBy && (
+          <button onClick={onWorker} className="flex w-full items-center gap-3 rounded-3xl bg-amber-400 p-4 text-left text-black active:scale-[0.98]">
+            <span className="text-3xl">🏢</span>
+            <span><span className="block font-bold">{t('invitedBy', { name: invitedBy })}</span><span className="block text-sm text-black/70">{t('invitedApply')}</span></span>
+          </button>
+        )}
+        <Choice emoji="🛍️" title={t('imCustomer')} sub={t('imCustomerSub')} onClick={onCustomer} primary={!invitedBy} />
         <Choice
           emoji={isWorker ? '💼' : '📝'}
           title={isWorker ? t('workerArea') : t('imWorker')}
           sub={isWorker ? t('workerAreaSub') : t('imWorkerSub')}
           onClick={onWorker}
         />
+        {onAgency && <Choice emoji="🏢" title={t('agencyArea')} sub={t('agencyAreaSub')} onClick={onAgency} />}
       </div>
     </div>
   )

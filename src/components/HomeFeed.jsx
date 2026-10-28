@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { FREE_RANK_LIMIT, MIN_TIER } from '../config'
 import { useI18n } from '../i18n'
+import { logoUrl } from '../lib/logo'
 
 /**
  * Grid of workers in one category. Mobile-first: 2 columns on phones, 3 on tablets+.
@@ -85,6 +86,13 @@ function WorkerCard({ worker: w, onBook, onUnlock, onAsk, isMe }) {
         {w.is_boosted && (
           <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-300 to-orange-500 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-black shadow sm:text-xs">
             {t('topRank')}
+          </span>
+        )}
+
+        {w.agency_logo && (
+          <span className="absolute bottom-2 left-2 flex max-w-[80%] items-center gap-1 rounded-full bg-black/60 py-0.5 pl-0.5 pr-2 text-[10px] sm:text-xs">
+            <img src={logoUrl(w.agency_logo)} alt="" className="h-5 w-5 shrink-0 rounded-full object-cover" />
+            <span className="truncate">{w.agency_name}</span>
           </span>
         )}
 

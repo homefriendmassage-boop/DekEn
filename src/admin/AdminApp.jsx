@@ -6,6 +6,7 @@ import Payments from './Payments'
 import Members from './Members'
 import Reviews from './Reviews'
 import Support from './Support'
+import Agencies from './Agencies'
 import { baht } from './format'
 
 // Separate back office (admin.html). Access is decided by the DATABASE: every admin_* function
@@ -69,6 +70,7 @@ export default function AdminApp() {
     ['reviews', `🔎 ตรวจสลิป${stats?.pending_reviews ? ` (${stats.pending_reviews})` : ''}`],
     ['support', `💬 แชท${stats?.support_unread ? ` (${stats.support_unread})` : ''}`],
     ['pay', '💳 รับชำระเงิน'],
+    ['agencies', '🏢 สังกัด'],
     ['members', '👑 สมาชิก'],
   ]
 
@@ -104,6 +106,7 @@ export default function AdminApp() {
         {tab === 'reviews' && <Reviews onChanged={loadStats} toast={showToast} />}
         {tab === 'support' && <Support onChanged={loadStats} />}
         {tab === 'pay' && <Payments prefill={prefill} clearPrefill={() => setPrefill(null)} onChanged={loadStats} toast={showToast} />}
+        {tab === 'agencies' && <Agencies onChanged={loadStats} toast={showToast} />}
         {tab === 'members' && <Members toast={showToast} onRenew={(user) => { setPrefill({ user, tier: user.vip_tier }); setTab('pay') }} />}
       </main>
 

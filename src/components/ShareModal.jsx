@@ -8,7 +8,7 @@ const APP_NAME = 'DekN'
 
 // Share my link: copy, LINE Flex message (share target picker) or QR code.
 // Whoever opens the link and registers / pays through it counts as my customer (server-side rules, migration_015).
-export default function ShareModal({ onClose }) {
+export default function ShareModal({ onClose, agencyCode }) {
   const { t, money } = useI18n()
   const [stats, setStats] = useState(null)
   const [qr, setQr] = useState(null)
@@ -16,13 +16,15 @@ export default function ShareModal({ onClose }) {
   const [note, setNote] = useState(null)
 
   useEffect(() => {
+    if (agencyCode) return setStats({ code: agencyCode })     // agency invitation: no referral numbers
     supabase.rpc('my_referral_stats').then(({ data }) => setStats(data?.[0] ?? null))
-  }, [])
+  }, [agencyCode])
 
+  const param = agencyCode ? 'agency' : 'ref'
   const link = stats?.code
     ? USE_MOCK_LIFF || !LIFF_ID
-      ? `${window.location.origin}${window.location.pathname}?ref=${stats.code}`
-      : `https://liff.line.me/${LIFF_ID}?ref=${stats.code}`
+      ? `${window.location.origin}${window.location.pathname}?${param}=${stats.code}`
+      : `https://liff.line.me/${LIFF_ID}?${param}=${stats.code}`
     : null
 
   const canFlex = !USE_MOCK_LIFF && (() => { try { return liff.isApiAvailable('shareTargetPicker') } catch { return false } })()
@@ -42,7 +44,7 @@ export default function ShareModal({ onClose }) {
             type: 'box', layout: 'vertical', spacing: 'md',
             contents: [
               { type: 'text', text: APP_NAME, weight: 'bold', size: 'xl' },
-              { type: 'text', text: t('shareFlexBody'), wrap: true, size: 'sm', color: '#666666' },
+              { type: 'text', text: t(agencyCode ? 'agencyFlexBody' : 'shareFlexBody'), wrap: true, size: 'sm', color: '#666666' },
             ],
           },
           footer: {
@@ -65,15 +67,15 @@ export default function ShareModal({ onClose }) {
       <div onClick={(e) => e.stopPropagation()}
         className="max-h-[92vh] w-full max-w-md space-y-4 overflow-y-auto rounded-t-3xl bg-neutral-900 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl sm:rounded-3xl">
         <div className="mx-auto h-1.5 w-10 rounded-full bg-white/20 sm:hidden" />
-        <h2 className="text-xl font-bold">🎁 {t('shareTitle')}</h2>
-        <p className="text-sm text-neutral-400">{t('shareBody')}</p>
+        <h2 className="text-xl font-bold">{agencyCode ? '🏢' : '🎁'} {t(agencyCode ? 'agencyInviteTitle' : 'shareTitle')}</h2>
+        <p className="text-sm text-neutral-400">{t(agencyCode ? 'agencyInviteBody' : 'shareBody')}</p>
 
         {!stats ? <p className="py-6 text-center text-neutral-500">{t('loading')}</p> : (
           <>
-            <div className="grid grid-cols-2 gap-2 text-center">
+            {!agencyCode && <div className="grid grid-cols-2 gap-2 text-center">
               <div className="rounded-2xl bg-white/5 p-3"><p className="text-xs text-neutral-400">{t('shareFriends')}</p><p className="text-xl font-bold">{stats.friends}</p></div>
               <div className="rounded-2xl bg-amber-400/10 p-3"><p className="text-xs text-amber-200">{t('shareEarned')}</p><p className="text-xl font-bold text-amber-300">{money(stats.earned)}</p></div>
-            </div>
+            </div>}
 
             <p className="break-all rounded-xl bg-white/5 p-3 text-xs text-neutral-300">{link}</p>
             <div className="grid grid-cols-2 gap-2">
@@ -83,7 +85,7 @@ export default function ShareModal({ onClose }) {
             </div>
             {qr && <img src={qr} alt="QR" className="mx-auto w-56 rounded-xl bg-white p-2" />}
             {note && <p className="break-all text-xs text-amber-200">{note}</p>}
-            <p className="text-[11px] text-neutral-500">{t('shareRule')}</p>
+            {!agencyCode && <p className="text-[11px] text-neutral-500">{t('shareRule')}</p>}
           </>
         )}
         <button onClick={onClose} className="w-full rounded-xl bg-white/10 py-3 font-semibold active:scale-95">{t('close')}</button>

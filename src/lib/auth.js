@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient'
 import { LIFF_ID, USE_MOCK_LIFF } from '../config'
 
 const REF_KEY = 'partner_ref'
+const AGENCY_KEY = 'agency_code'
 const REF_PATTERN = /^[A-Za-z0-9_-]{1,32}$/ // reject anything odd before it reaches the DB
 
 // Deep link from the renewal reminder: https://liff.line.me/<id>?open=plans  ->  open the plan picker once.
@@ -26,6 +27,27 @@ export function takeOpenIntent() {
     return v
   } catch { return null }
 }
+
+// Invitation from a modelling agency: https://liff.line.me/<id>?agency=<code>  (same liff.state gotcha as ref).
+export function captureAgencyCode() {
+  const params = new URLSearchParams(window.location.search)
+  let code = params.get('agency')
+  if (!code) {
+    const state = params.get('liff.state')
+    if (state) {
+      const q = state.indexOf('?')
+      code = new URLSearchParams(q >= 0 ? state.slice(q) : state).get('agency')
+    }
+  }
+  try {
+    if (code && REF_PATTERN.test(code)) localStorage.setItem(AGENCY_KEY, code)
+    return localStorage.getItem(AGENCY_KEY)
+  } catch {
+    return code && REF_PATTERN.test(code) ? code : null
+  }
+}
+export const getAgencyCode = () => { try { return localStorage.getItem(AGENCY_KEY) } catch { return null } }
+export const clearAgencyCode = () => { try { localStorage.removeItem(AGENCY_KEY) } catch { /* storage blocked */ } }
 
 /**
  * Read the share code from the URL, e.g. https://liff.line.me/<id>?ref=k3m9x2ab
@@ -66,6 +88,7 @@ export function captureRefCode() {
 export async function signIn() {
   captureRefCode()
   captureOpenParam()
+  captureAgencyCode()
 
   let profile
   if (USE_MOCK_LIFF) {
@@ -102,6 +125,7 @@ export async function signIn() {
   try { await supabase.rpc('touch_profile', { p_name: profile.displayName, p_picture: profile.pictureUrl ?? null }) } catch { /* ignore */ }
 
   captureOpenParam()
+  captureAgencyCode()
   const refCode = captureRefCode() // URL is clean again after init(); re-check
   if (refCode) {
     // The server decides who counts as this customer's sales (see migration_015). Failure must not block login.

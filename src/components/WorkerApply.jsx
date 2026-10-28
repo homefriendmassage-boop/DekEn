@@ -4,6 +4,8 @@ import { CATEGORIES } from '../config'
 import { PROVINCES } from '../provinces'
 import { useI18n } from '../i18n'
 import PhotoUploader from './PhotoUploader'
+import { clearAgencyCode, getAgencyCode } from '../lib/auth'
+import { logoUrl } from '../lib/logo'
 
 const EMPTY = { display_name: '', categories: [], price: '', province: '', district: '', nearby: '', phone: '', line_id: '', note: '' }
 const toForm = (a) => ({
@@ -22,6 +24,9 @@ export default function WorkerApply({ userId, defaultName }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const [note, setNote] = useState(null)
+  const [mode, setMode] = useState(() => (getAgencyCode() ? 'agency' : 'self'))   // self | agency
+  const [agencyCode, setAgencyCode] = useState(() => getAgencyCode() ?? '')
+  const [agency, setAgency] = useState(null)          // { name, logo_path } for the typed / invited code
 
   const load = useCallback(async () => {
     const { data } = await supabase.from('worker_applications').select('*')
@@ -34,6 +39,14 @@ export default function WorkerApply({ userId, defaultName }) {
 
   useEffect(() => { load() }, [load])
 
+  // Show which agency a code belongs to (also for an application that already carries one).
+  const lookupCode = app?.agency_code ?? (mode === 'agency' ? agencyCode.trim() : '')
+  useEffect(() => {
+    if (!lookupCode) return setAgency(null)
+    const h = setTimeout(() => supabase.rpc('agency_public', { p_code: lookupCode }).then(({ data }) => setAgency(data?.[0] ?? null)), 300)
+    return () => clearTimeout(h)
+  }, [lookupCode])
+
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
   const toggleCat = (c) => setForm((f) => ({
     ...f, categories: f.categories.includes(c) ? f.categories.filter((x) => x !== c) : [...f.categories, c],
@@ -45,6 +58,8 @@ export default function WorkerApply({ userId, defaultName }) {
     setNote(null)
     if (form.categories.length === 0) return setError(t('pickCategory'))
     if (!form.phone.trim() && !form.line_id.trim()) return setError(t('contactHint'))
+    const joining = app?.status !== 'pending' && mode === 'agency'
+    if (joining && !agency) return setError(t('errAgencyNotFound'))
 
     const payload = {
       display_name: form.display_name.trim(),
@@ -61,9 +76,10 @@ export default function WorkerApply({ userId, defaultName }) {
     const editing = app?.status === 'pending'
     const { error } = editing
       ? await supabase.from('worker_applications').update(payload).eq('id', app.id)
-      : await supabase.from('worker_applications').insert({ user_id: userId, ...payload })
+      : await supabase.from('worker_applications').insert({ user_id: userId, ...payload, agency_code: joining ? agencyCode.trim() : null })
     setBusy(false)
-    if (error) return setError(error.message.includes('app_contact_check') ? t('errPhone') : t('errApply'))
+    if (error) return setError(error.message.includes('app_contact_check') ? t('errPhone') : error.message.includes('AGENCY_NOT_FOUND') ? t('errAgencyNotFound') : t('errApply'))
+    if (joining) clearAgencyCode()
     setNote(t('saved'))
     load()
   }
@@ -102,6 +118,43 @@ export default function WorkerApply({ userId, defaultName }) {
       </section>
 
       <form onSubmit={submit} className="space-y-4">
+        {editing && app.agency_id ? (
+          <div className="flex items-center gap-3 rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
+            {agency?.logo_path && <img src={logoUrl(agency.logo_path)} alt="" className="h-10 w-10 rounded-full object-cover" />}
+            <div className="text-sm">
+              <p className="font-semibold">{t('agencyIs', { name: agency?.name ?? '…' })}</p>
+              <p className="text-xs text-neutral-400">
+                {app.agency_status === 'accepted' ? t('affAccepted', { name: agency?.name ?? '' })
+                  : app.agency_status === 'rejected' ? t('affRejected', { name: agency?.name ?? '' }) : t('affPending', { name: agency?.name ?? '' })}
+              </p>
+            </div>
+          </div>
+        ) : !editing && (
+          <fieldset className="space-y-2 rounded-2xl bg-white/5 p-3">
+            <legend className="px-1 text-sm font-semibold">{t('affTitle')}</legend>
+            <div className="grid grid-cols-2 gap-2">
+              {[['self', t('affSelf')], ['agency', t('affAgency')]].map(([id, label]) => (
+                <button type="button" key={id} onClick={() => setMode(id)} aria-pressed={mode === id}
+                  className={`rounded-xl py-2 text-sm font-semibold ring-1 active:scale-95 ${mode === id ? 'bg-line text-black ring-line' : 'bg-white/10 ring-white/15'}`}>{label}</button>
+              ))}
+            </div>
+            {mode === 'agency' && (
+              <>
+                <label className="block text-sm">{t('agencyCodeLabel')}
+                  <input value={agencyCode} onChange={(e) => setAgencyCode(e.target.value)} maxLength={32} className={input} />
+                </label>
+                {agency && (
+                  <div className="flex items-center gap-2 text-sm text-green-300">
+                    {agency.logo_path && <img src={logoUrl(agency.logo_path)} alt="" className="h-8 w-8 rounded-full object-cover" />}
+                    {t('agencyIs', { name: agency.name })}
+                  </div>
+                )}
+                <p className="text-xs text-neutral-400">{t('agencyInfo')}</p>
+              </>
+            )}
+          </fieldset>
+        )}
+
         <label className="block text-sm">{t('fName')}
           <input required maxLength={40} value={form.display_name} onChange={set('display_name')} className={input} />
         </label>
