@@ -1,4 +1,4 @@
-import { formatTHB } from '../config'
+import { LangSwitcher, useI18n } from '../i18n'
 
 /**
  * Gallery of workers. Mobile-first: 2 columns on phones, 3 on tablets+.
@@ -9,32 +9,37 @@ import { formatTHB } from '../config'
  * (e.g. a separate `profile_image_blur` column / Storage policy).
  */
 export default function HomeFeed({ workers, isVip, walletBalance, displayName, onBook }) {
+  const { t, money } = useI18n()
+
   return (
     <div>
-      {/* Sticky header with wallet chip */}
-      <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-white/10 bg-neutral-950/90 px-4 py-3 backdrop-blur">
-        <div className="min-w-0">
-          <p className="truncate text-xs text-neutral-400">Hello, {displayName}</p>
-          <h1 className="text-lg font-bold leading-tight">Discover</h1>
+      {/* Sticky header with language switcher + wallet chip */}
+      <header className="sticky top-0 z-30 border-b border-white/10 bg-neutral-950/90 px-4 py-3 backdrop-blur">
+        <div className="flex items-center justify-between gap-3">
+          <p className="min-w-0 truncate text-xs text-neutral-400">{t('hello', { name: displayName })}</p>
+          <LangSwitcher />
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {isVip && (
-            <span className="rounded-full bg-gradient-to-r from-yellow-300 to-amber-500 px-2 py-0.5 text-[10px] font-extrabold text-black">VIP</span>
-          )}
-          <span className="rounded-full bg-white/10 px-3 py-1 text-sm font-semibold">
-            💰 {formatTHB(walletBalance)}
-          </span>
+        <div className="mt-1 flex items-center justify-between gap-3">
+          <h1 className="text-lg font-bold leading-tight">{t('discover')}</h1>
+          <div className="flex shrink-0 items-center gap-2">
+            {isVip && (
+              <span className="rounded-full bg-gradient-to-r from-yellow-300 to-amber-500 px-2 py-0.5 text-[10px] font-extrabold text-black">VIP</span>
+            )}
+            <span className="rounded-full bg-white/10 px-3 py-1 text-sm font-semibold">
+              💰 {money(walletBalance)}
+            </span>
+          </div>
         </div>
       </header>
 
       {!isVip && (
         <div className="mx-3 mt-3 rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-200 sm:text-sm">
-          🔒 Photos are blurred. Upgrade to VIP to view full profiles.
+          {t('blurNotice')}
         </div>
       )}
 
       {workers.length === 0 ? (
-        <p className="py-20 text-center text-neutral-500">No one is available right now.</p>
+        <p className="py-20 text-center text-neutral-500">{t('noWorkers')}</p>
       ) : (
         <ul className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3 sm:gap-4">
           {workers.map((w) => (
@@ -47,6 +52,8 @@ export default function HomeFeed({ workers, isVip, walletBalance, displayName, o
 }
 
 function WorkerCard({ worker: w, isVip, onBook }) {
+  const { t, money, service } = useI18n()
+
   return (
     <li
       className={`relative overflow-hidden rounded-2xl bg-neutral-900 ring-1 ${
@@ -68,14 +75,14 @@ function WorkerCard({ worker: w, isVip, onBook }) {
 
         {!isVip && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-            <span className="rounded-full bg-black/60 px-3 py-1 text-xs font-semibold">🔒 VIP only</span>
+            <span className="rounded-full bg-black/60 px-3 py-1 text-xs font-semibold">{t('vipOnly')}</span>
           </div>
         )}
 
         {/* Boosted / Top Rank badge */}
         {w.is_boosted && (
           <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-300 to-orange-500 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-black shadow sm:text-xs">
-            🔥 Top Rank
+            {t('topRank')}
           </span>
         )}
 
@@ -86,7 +93,7 @@ function WorkerCard({ worker: w, isVip, onBook }) {
           }`}
         >
           <span className={`h-1.5 w-1.5 rounded-full ${w.is_online ? 'bg-green-400' : 'bg-neutral-500'}`} />
-          {w.is_online ? 'Online' : 'Offline'}
+          {w.is_online ? t('online') : t('offline')}
         </span>
       </div>
 
@@ -95,19 +102,19 @@ function WorkerCard({ worker: w, isVip, onBook }) {
           <h2 className="truncate text-sm font-bold sm:text-base">{w.display_name}</h2>
           <div className="mt-1 flex flex-wrap gap-1">
             {w.service_types?.map((s) => (
-              <span key={s} className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] capitalize text-neutral-300 sm:text-xs">{s}</span>
+              <span key={s} className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-neutral-300 sm:text-xs">{service(s)}</span>
             ))}
           </div>
         </div>
         <p className="text-xs text-neutral-400 sm:text-sm">
-          From <span className="font-semibold text-white">{formatTHB(w.price)}</span>
+          {t('from')} <span className="font-semibold text-white">{money(w.price)}</span>
         </p>
         <button
           onClick={() => onBook(w)}
           disabled={!w.is_online}
           className="w-full rounded-xl bg-line py-2.5 text-sm font-bold text-black transition active:scale-95 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-400"
         >
-          {w.is_online ? 'Book' : 'Unavailable'}
+          {w.is_online ? t('book') : t('unavailable')}
         </button>
       </div>
     </li>

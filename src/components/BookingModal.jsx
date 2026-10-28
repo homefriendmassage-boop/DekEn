@@ -1,20 +1,22 @@
 import { useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { BOOKING_FEE, formatTHB } from '../config'
+import { BOOKING_FEE } from '../config'
+import { useI18n } from '../i18n'
 
-// Map the exceptions raised by the jobs_before_insert trigger to friendly text.
-const ERRORS = {
-  INSUFFICIENT_BALANCE: 'Your wallet balance is too low. Please top up and try again.',
-  WORKER_UNAVAILABLE: 'This worker just went offline. Please pick someone else.',
+// Map the exceptions raised by the jobs_before_insert trigger to translated text keys.
+const ERROR_KEYS = {
+  INSUFFICIENT_BALANCE: 'errInsufficient',
+  WORKER_UNAVAILABLE: 'errUnavailable',
 }
-const friendly = (msg = '') =>
-  Object.entries(ERRORS).find(([k]) => msg.includes(k))?.[1] ?? 'Something went wrong. Please try again.'
+const errorKey = (msg = '') =>
+  Object.entries(ERROR_KEYS).find(([k]) => msg.includes(k))?.[1] ?? 'errGeneric'
 
 /**
  * Bottom sheet on phones, centered dialog on larger screens.
  * Props: worker, customerId, walletBalance, onClose(), onBooked()
  */
 export default function BookingModal({ worker, customerId, walletBalance, onClose, onBooked }) {
+  const { t, money } = useI18n()
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
 
@@ -35,7 +37,7 @@ export default function BookingModal({ worker, customerId, walletBalance, onClos
     })
 
     setSubmitting(false)
-    if (error) return setError(friendly(error.message))
+    if (error) return setError(errorKey(error.message))
     onBooked()
   }
 
@@ -45,7 +47,6 @@ export default function BookingModal({ worker, customerId, walletBalance, onClos
       onClick={onClose} // tap backdrop to dismiss
       role="dialog"
       aria-modal="true"
-      aria-label="Confirm booking"
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -53,41 +54,40 @@ export default function BookingModal({ worker, customerId, walletBalance, onClos
       >
         <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-white/20 sm:hidden" />
 
-        <h2 className="text-xl font-bold">Book {worker.display_name}</h2>
-        <p className="mt-1 text-sm text-neutral-400">Review how payment works before confirming.</p>
+        <h2 className="text-xl font-bold">{t('bookTitle', { name: worker.display_name })}</h2>
+        <p className="mt-1 text-sm text-neutral-400">{t('reviewPayment')}</p>
 
         <dl className="mt-4 divide-y divide-white/10 rounded-2xl bg-white/5 text-sm">
-          <Row label="Platform fee (deducted from Wallet)" value={`${formatTHB(BOOKING_FEE)}`} strong />
-          <Row label="Pay directly to worker (cash, on meeting)" value={formatTHB(worker.price)} />
+          <Row label={t('platformFee')} value={money(BOOKING_FEE)} strong />
+          <Row label={t('payWorker')} value={money(worker.price)} />
           <Row
-            label="Your wallet balance"
-            value={formatTHB(walletBalance)}
+            label={t('walletBalance')}
+            value={money(walletBalance)}
             valueClass={insufficient ? 'text-red-400' : 'text-green-400'}
           />
         </dl>
 
         <p className="mt-3 text-xs leading-relaxed text-neutral-500">
-          The {formatTHB(BOOKING_FEE)} fee secures your booking. The service fee is paid in cash
-          directly to {worker.display_name} — never through this app.
+          {t('feeNote', { fee: money(BOOKING_FEE), name: worker.display_name })}
         </p>
 
         {insufficient && (
           <p className="mt-3 rounded-lg bg-red-500/10 p-2 text-sm text-red-300">
-            Wallet balance is below {formatTHB(BOOKING_FEE)}. Please top up first.
+            {t('lowBalance', { fee: money(BOOKING_FEE) })}
           </p>
         )}
-        {error && <p className="mt-3 rounded-lg bg-red-500/10 p-2 text-sm text-red-300">{error}</p>}
+        {error && <p className="mt-3 rounded-lg bg-red-500/10 p-2 text-sm text-red-300">{t(error)}</p>}
 
         <div className="mt-5 grid grid-cols-2 gap-3">
           <button onClick={onClose} className="rounded-xl bg-white/10 py-3 font-semibold active:scale-95">
-            Cancel
+            {t('cancel')}
           </button>
           <button
             onClick={confirm}
             disabled={submitting || insufficient}
             className="rounded-xl bg-line py-3 font-bold text-black transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {submitting ? 'Booking…' : 'Confirm Booking'}
+            {submitting ? t('booking') : t('confirm')}
           </button>
         </div>
       </div>

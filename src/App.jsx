@@ -3,6 +3,7 @@ import { supabase } from './supabaseClient'
 import { signIn } from './lib/auth'
 import HomeFeed from './components/HomeFeed'
 import BookingModal from './components/BookingModal'
+import { useI18n } from './i18n'
 
 // Shown only in mock mode when the workers table is empty, so the UI is testable
 // before you run supabase/seed.sql. Booking these will fail (fake ids) by design.
@@ -23,6 +24,7 @@ function resetAndRetry() {
 }
 
 export default function App() {
+  const { t } = useI18n()
   const [phase, setPhase] = useState('loading') // loading | ready | error
   const [error, setError] = useState(null)
   const [session, setSession] = useState(null)  // { profile, isMock, refCode }
@@ -98,9 +100,9 @@ export default function App() {
   if (phase === 'error') {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 p-6 text-center">
-        <p className="text-lg font-semibold">Couldn't start the app</p>
+        <p className="text-lg font-semibold">{t('startFail')}</p>
         <p className="max-w-sm break-words text-sm text-neutral-400">{error}</p>
-        <button onClick={resetAndRetry} className="rounded-full bg-line px-5 py-2 font-semibold text-black">Retry</button>
+        <button onClick={resetAndRetry} className="rounded-full bg-line px-5 py-2 font-semibold text-black">{t('retry')}</button>
       </div>
     )
   }
@@ -138,7 +140,7 @@ export default function App() {
           onBooked={async () => {
             setSelected(null)
             await loadMe() // refresh balance immediately (realtime is a backup)
-            showToast('Booking confirmed! The worker has been notified.')
+            showToast(t('booked'))
           }}
         />
       )}

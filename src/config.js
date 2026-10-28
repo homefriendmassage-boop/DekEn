@@ -5,4 +5,4 @@ export const BOOKING_FEE = 500
 export const LIFF_ID = import.meta.env.VITE_LIFF_ID
 export const USE_MOCK_LIFF = import.meta.env.VITE_USE_MOCK_LIFF === 'true'
 
-export const formatTHB = (n) => `${Number(n).toLocaleString('en-US')} THB`
+
