@@ -348,3 +348,14 @@ Run `supabase/migration_033.sql` and then `supabase/migration_034.sql`, once, af
 - Modelling agency: tab "📝 ร่างใบสมัคร" in the agency area → submit to an admin → admin approves (link issued) or rejects with a reason → the agency sends the link. An agency draft always joins that agency when claimed (the slot is counted then: `AGENCY_FULL` otherwise). The agency may re-issue the link of an already approved draft.
 - Link = `https://liff.line.me/<LIFF_ID>?draft=<64 hex>`: works once, 3 days from issue (`link_expires_at`, cron `expire-application-drafts` hourly), then `EXPIRED`.
 - Photos live in `<draft id>/` (storage insert/delete policies allow the creator while the draft is editable); after the claim `draft_owner_map` lets the girl's clear originals be read through `photo_owner()`.
+
+## migration_035 — booking overhaul (rate, time, place, contact after accept, 30-minute answer, Flex pushes)
+
+Run `supabase/migration_035.sql` once, after migration_034. **Redeploy the Edge Function `notify-chat`** (new code: it now also sends booking Flex messages; same URL, same secrets, nothing else to configure).
+
+- Booking goes through `create_booking()` (direct inserts into `jobs` are closed): the customer picks the rate (`jobs.rate_label`, the cash price is snapshotted into `service_price`), the date/time (15 min – 30 days ahead), the place (GPS pin and / or a Google Maps link and / or a note; notes pass through the contact filter) and a phone number.
+- `job_private` holds the customer's phone and exact place; they reach the provider only after she accepts. The provider's `workers.booking_phone / booking_line_id` (default = her application, editable by her any time) reach the customer only after she accepts.
+- 30 minutes to answer: `expire_pending_jobs()` (pg_cron every minute) cancels the booking (`cancel_reason = 'expired'`) and the fee is refunded by the existing refund path.
+- `job_arrived()` = the "ถึงแล้ว" button. `jobs_notify` trigger -> Edge Function: new → provider; accepted / declined / expired / arrived / completed / worker_cancelled → customer; customer cancel / missed → provider. Buttons open `?job=<id>`.
+- Customer-facing prices = cash price + platform fee (500) everywhere (cards, details); the booking sheet shows the Wallet top right and the three rows: wage (incl. fee), platform fee from the Wallet, remainder paid in cash.
+- `workers.claimed / claim_deadline`: a profile that is not claimed cannot be booked (`UNCLAIMED`).

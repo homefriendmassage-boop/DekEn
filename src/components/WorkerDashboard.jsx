@@ -5,11 +5,12 @@ import ThreadList from './ThreadList'
 import ChatModal from './ChatModal'
 import RankBoost from './RankBoost'
 import ProfileSection from './ProfileSection'
+import WorkerJobs from './WorkerJobs'
 import { logoUrl } from '../lib/logo'
 import { clearAgencyCode, getAgencyCode } from '../lib/auth'
 
 // Provider home: online switch, profile edit, photo upload, live job inbox.
-export default function WorkerDashboard({ userId, onTopUp, me, onWallet, openChat }) {
+export default function WorkerDashboard({ userId, onTopUp, me, onWallet, openChat, highlightJob }) {
   const { t, money, catName, statusName } = useI18n()
   const [worker, setWorker] = useState(null)
   const [jobs, setJobs] = useState([])
@@ -71,13 +72,6 @@ export default function WorkerDashboard({ userId, onTopUp, me, onWallet, openCha
     setNote(t('saved'))
     setTimeout(() => setNote(null), 2000)
     loadWorker()
-  }
-
-  async function setStatus(id, status) {
-    setError(null)
-    const { error } = await supabase.from('jobs').update({ status }).eq('id', id)
-    if (error) setError(t('errGeneric'))
-    loadJobs()
   }
 
   if (!worker) return <p className="py-20 text-center text-neutral-500">{error ?? t('loading')}</p>
@@ -147,42 +141,12 @@ export default function WorkerDashboard({ userId, onTopUp, me, onWallet, openCha
         </section>
       )}
 
+      <BookingContact worker={worker} onSaved={loadWorker} />
+
       {/* Inbox */}
       <section>
         <h2 className="mb-2 text-base font-bold">{t('jobs')}</h2>
-        {jobs.length === 0 ? (
-          <p className="rounded-2xl bg-white/5 p-4 text-center text-sm text-neutral-500">{t('noJobs')}</p>
-        ) : (
-          <ul className="space-y-2">
-            {jobs.map((j) => (
-              <li key={j.id} className="rounded-2xl bg-white/5 p-3 text-sm ring-1 ring-white/10">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-semibold">{t('customer')}: {j.customer_name ?? '—'}</p>
-                  <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px]">{statusName(j.status)}</span>
-                </div>
-                <p className="mt-1 text-xs text-neutral-400">
-                  {t('cashLabel')}: <b className="text-white">{money(j.service_price)}</b> · {t('feeLabel')}: {money(j.booking_fee)}
-                </p>
-                <p className="text-[11px] text-neutral-500">{new Date(j.created_at).toLocaleString()}</p>
-                {(j.status === 'pending' || j.status === 'matched') && (
-                  <div className="mt-2 grid grid-cols-2 gap-2">
-                    {j.status === 'pending' ? (
-                      <>
-                        <button onClick={() => setStatus(j.id, 'matched')} className="rounded-lg bg-line py-2 font-bold text-black active:scale-95">{t('accept')}</button>
-                        <button onClick={() => setStatus(j.id, 'cancelled')} className="rounded-lg bg-white/10 py-2 font-semibold active:scale-95">{t('decline')}</button>
-                      </>
-                    ) : (
-                      <>
-                        <button onClick={() => setStatus(j.id, 'completed')} className="rounded-lg bg-line py-2 font-bold text-black active:scale-95">{t('complete')}</button>
-                        <button onClick={() => setStatus(j.id, 'cancelled')} className="rounded-lg bg-white/10 py-2 font-semibold active:scale-95">{t('cancelJob')}</button>
-                      </>
-                    )}
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
+        <WorkerJobs jobs={jobs} reload={loadJobs} highlightId={highlightJob} onError={setError} />
       </section>
 
       {/* Messages from members (in-app chat; a LINE push with a button to the room is sent by notify-chat, migration_027) */}
@@ -199,5 +163,34 @@ export default function WorkerDashboard({ userId, onTopUp, me, onWallet, openCha
 
       {chat && <ChatModal threadId={chat.id} title={chat.other_name} meId={userId} onClose={() => setChat(null)} />}
     </div>
+  )
+}
+
+// What a customer sees ONLY after she accepted a booking. Starts as what she wrote in her application; she can change it any time.
+function BookingContact({ worker, onSaved }) {
+  const { t } = useI18n()
+  const [phone, setPhone] = useState(worker.booking_phone ?? '')
+  const [line, setLine] = useState(worker.booking_line_id ?? '')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState(null)
+  const input = 'mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-base outline-none ring-1 ring-white/10 focus:ring-line'
+  async function save() {
+    setBusy(true); setMsg(null)
+    const { error } = await supabase.rpc('update_my_booking_contact', { p_phone: phone, p_line_id: line })
+    setBusy(false)
+    setMsg(error ? t(error.message.includes('BAD_PHONE') ? 'errBadPhone' : 'errGeneric') : t('saved'))
+    if (!error) onSaved?.()
+  }
+  return (
+    <section className="space-y-2 rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
+      <h2 className="text-sm font-bold">📞 {t('bcTitle')}</h2>
+      <p className="text-[11px] text-neutral-400">{t('bcHint')}</p>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="block text-xs">{t('fPhone')}<input type="tel" inputMode="tel" maxLength={20} value={phone} onChange={(e) => setPhone(e.target.value)} className={input} /></label>
+        <label className="block text-xs">{t('fLineId')}<input maxLength={40} value={line} onChange={(e) => setLine(e.target.value)} className={input} /></label>
+      </div>
+      <button onClick={save} disabled={busy} className="w-full rounded-xl bg-white/10 py-2 text-sm font-semibold active:scale-95 disabled:opacity-50">{t('saveChanges')}</button>
+      {msg && <p className="text-xs text-amber-200">{msg}</p>}
+    </section>
   )
 }

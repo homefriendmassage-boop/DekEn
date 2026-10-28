@@ -71,6 +71,27 @@ export function takeDraftIntent() {
   } catch { return null }
 }
 
+// Opened from a booking push: https://liff.line.me/<id>?job=<job uuid>
+export function captureJobParam() {
+  const params = new URLSearchParams(window.location.search)
+  let id = params.get('job')
+  if (!id) {
+    const state = params.get('liff.state')
+    if (state) {
+      const q = state.indexOf('?')
+      id = new URLSearchParams(q >= 0 ? state.slice(q) : state).get('job')
+    }
+  }
+  try { if (id && UUID.test(id)) sessionStorage.setItem('open_job', id) } catch { /* storage blocked */ }
+}
+export function takeJobIntent() {
+  try {
+    const v = sessionStorage.getItem('open_job')
+    sessionStorage.removeItem('open_job')
+    return v && UUID.test(v) ? v : null
+  } catch { return null }
+}
+
 // Opened from the "new message" LINE push: https://liff.line.me/<id>?chat=<thread uuid>
 export function captureChatParam() {
   const params = new URLSearchParams(window.location.search)
@@ -169,6 +190,7 @@ export async function signIn() {
   captureWorkerParam()
   captureChatParam()
   captureDraftParam()
+  captureJobParam()
   captureAgencyCode()
 
   let profile
@@ -213,6 +235,7 @@ export async function signIn() {
   captureWorkerParam()
   captureChatParam()
   captureDraftParam()
+  captureJobParam()
   captureAgencyCode()
   const refCode = captureRefCode() // URL is clean again after init(); re-check
   if (refCode) {

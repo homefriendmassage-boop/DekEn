@@ -1,107 +1,136 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { BOOKING_FEE } from '../config'
 import { useI18n } from '../i18n'
+import { getPosition } from '../lib/geo'
+import { bookingErrorKey, withFee } from '../lib/booking'
+import { ratesOf } from './WorkerDetail'
 
-// Map the exceptions raised by the jobs_before_insert trigger to translated text keys.
-const ERROR_KEYS = {
-  INSUFFICIENT_BALANCE: 'errInsufficient',
-  WORKER_UNAVAILABLE: 'errUnavailable',
-  LOCKED: 'errLocked',
-}
-const errorKey = (msg = '') =>
-  Object.entries(ERROR_KEYS).find(([k]) => msg.includes(k))?.[1] ?? 'errGeneric'
+const input = 'mt-1 w-full rounded-xl bg-white/10 px-3 py-2.5 text-base outline-none ring-1 ring-white/10 focus:ring-line'
+const pad = (n) => String(n).padStart(2, '0')
+const localInput = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 
 /**
- * Bottom sheet on phones, centered dialog on larger screens.
- * Props: worker, customerId, walletBalance, onClose(), onBooked()
+ * Booking sheet: pick the rate, when and where, leave a phone number, see exactly what is paid where.
+ * The customer sees (what the provider gets in cash + the platform fee); the fee is taken from the Wallet now,
+ * the rest is paid to the provider in cash when they meet. The provider has 30 minutes to answer.
+ * Props: worker, walletBalance, onClose(), onBooked(), onTopUp()
  */
-export default function BookingModal({ worker, customerId, walletBalance, onClose, onBooked, onTopUp }) {
+export default function BookingModal({ worker, walletBalance, onClose, onBooked, onTopUp }) {
   const { t, money } = useI18n()
+  const rates = useMemo(() => ratesOf(worker, t), [worker, t])
+  const [rate, setRate] = useState(worker.start_rate && rates.some((r) => r[0] === worker.start_rate) ? worker.start_rate : rates[0]?.[0])
+  const soon = useMemo(() => { const d = new Date(Date.now() + 60 * 60000); d.setMinutes(0, 0, 0); return localInput(d) }, [])
+  const [when, setWhen] = useState(soon)
+  const [placeNote, setPlaceNote] = useState('')
+  const [url, setUrl] = useState('')
+  const [pin, setPin] = useState(null)
+  const [pinBusy, setPinBusy] = useState(false)
+  const [phone, setPhone] = useState('')
+  const [note, setNote] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
 
+  const picked = rates.find((r) => r[0] === rate) ?? rates[0]
+  const cash = Number(picked?.[2] ?? 0)
   const insufficient = walletBalance < BOOKING_FEE
 
+  async function pinHere() {
+    setPinBusy(true); setError(null)
+    try { setPin(await getPosition()) } catch { setError(t('locDenied')) } finally { setPinBusy(false) }
+  }
+
   async function confirm() {
-    if (submitting || insufficient) return // guards double-taps
-    setSubmitting(true)
+    if (submitting || insufficient) return
     setError(null)
-
-    // Plain insert. The DB trigger atomically verifies + deducts the wallet,
-    // overrides booking_fee/status, and rejects if the worker is offline.
-    // If anything fails the whole insert rolls back — no half-paid bookings.
-    const { error } = await supabase.from('jobs').insert({
-      customer_id: customerId,
-      worker_id: worker.user_id,
-      booking_fee: BOOKING_FEE,
+    if (!when) return setError(t('errBadTime'))
+    if (!pin && !url.trim() && !placeNote.trim()) return setError(t('errPlaceRequired'))
+    if (phone.replace(/\D/g, '').length < 9) return setError(t('errBadPhone'))
+    setSubmitting(true)
+    const { error } = await supabase.rpc('create_booking', {
+      p_worker: worker.user_id, p_rate: rate, p_scheduled: new Date(when).toISOString(), p_place_note: placeNote, p_note: note,
+      p_phone: phone, p_lat: pin?.lat ?? null, p_lng: pin?.lng ?? null, p_url: url.trim() || null,
     })
-
     setSubmitting(false)
-    if (error) return setError(errorKey(error.message))
+    if (error) return setError(t(bookingErrorKey(error.message)))
     onBooked()
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center sm:p-4"
-      onClick={onClose} // tap backdrop to dismiss
-      role="dialog"
-      aria-modal="true"
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-neutral-900 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl sm:rounded-3xl"
-      >
-        <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-white/20 sm:hidden" />
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center sm:p-4" onClick={onClose} role="dialog" aria-modal="true">
+      <div onClick={(e) => e.stopPropagation()}
+        className="max-h-[92vh] w-full max-w-md space-y-4 overflow-y-auto rounded-t-3xl bg-neutral-900 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl sm:rounded-3xl">
+        <div className="mx-auto h-1.5 w-10 rounded-full bg-white/20 sm:hidden" />
 
-        <h2 className="text-xl font-bold">{t('bookTitle', { name: worker.display_name })}</h2>
-        <p className="mt-1 text-sm text-neutral-400">{t('reviewPayment')}</p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="truncate text-xl font-bold">{t('bookTitle', { name: worker.display_name })}</h2>
+            <p className="mt-1 text-sm text-neutral-400">{t('reviewPayment')}</p>
+          </div>
+          <div className="shrink-0 rounded-2xl bg-white/10 px-3 py-1.5 text-right">
+            <p className="text-[10px] text-neutral-400">💰 Wallet</p>
+            <p className={`text-base font-extrabold ${insufficient ? 'text-red-300' : ''}`}>{money(walletBalance)}</p>
+          </div>
+        </div>
 
-        <dl className="mt-4 divide-y divide-white/10 rounded-2xl bg-white/5 text-sm">
-          <Row label={t('platformFee')} value={money(BOOKING_FEE)} strong />
-          <Row label={t('payWorker')} value={money(worker.price)} />
-          <Row
-            label={t('walletBalance')}
-            value={money(walletBalance)}
-            valueClass={insufficient ? 'text-red-400' : 'text-green-400'}
-          />
-        </dl>
+        <fieldset>
+          <legend className="text-sm font-semibold">{t('bookRate')}</legend>
+          <div className="mt-2 space-y-2">
+            {rates.map(([k, label, price]) => (
+              <button type="button" key={k} aria-pressed={rate === k} onClick={() => setRate(k)}
+                className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left ring-1 active:scale-[0.99] ${rate === k ? 'bg-line text-black ring-line' : 'bg-white/10 ring-white/15'}`}>
+                <span className="font-semibold">{rate === k ? '✓ ' : ''}{label}</span><b>{money(withFee(price))}</b>
+              </button>
+            ))}
+          </div>
+        </fieldset>
 
-        <p className="mt-3 text-xs leading-relaxed text-neutral-500">
-          {t('feeNote', { fee: money(BOOKING_FEE), name: worker.display_name })}
-        </p>
+        <label className="block text-sm font-semibold">{t('bookWhen')}
+          <input type="datetime-local" value={when} min={localInput(new Date(Date.now() + 15 * 60000))} onChange={(e) => setWhen(e.target.value)} className={input} />
+        </label>
+
+        <fieldset className="space-y-2 rounded-2xl bg-white/5 p-3">
+          <legend className="px-1 text-sm font-semibold">{t('bookWhere')}</legend>
+          <button type="button" onClick={pinHere} disabled={pinBusy} className="w-full rounded-xl bg-white/10 py-2.5 text-sm font-semibold active:scale-95 disabled:opacity-50">
+            {pinBusy ? t('locDetecting') : pin ? `✓ ${t('bookPinned')}` : `📍 ${t('bookPin')}`}
+          </button>
+          <label className="block text-sm">{t('bookMapLink')}
+            <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://maps.app.goo.gl/…" className={input} />
+          </label>
+          <label className="block text-sm">{t('bookPlaceNote')}
+            <input maxLength={200} value={placeNote} onChange={(e) => setPlaceNote(e.target.value)} className={input} />
+          </label>
+          <p className="text-[11px] text-neutral-500">{t('bookPrivacy')}</p>
+        </fieldset>
+
+        <label className="block text-sm font-semibold">{t('bookPhone')}
+          <input type="tel" inputMode="tel" maxLength={20} value={phone} onChange={(e) => setPhone(e.target.value)} className={input} />
+          <span className="text-[11px] font-normal text-neutral-500">{t('bookPhoneHint')}</span>
+        </label>
+        <label className="block text-sm">{t('bookNote')}
+          <input maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} className={input} />
+        </label>
+
+        <div className="overflow-hidden rounded-2xl bg-white/5 text-sm ring-1 ring-white/10">
+          <div className="flex items-center justify-between px-4 py-3"><span>{t('bookWage', { rate: picked?.[1] ?? '' })}</span><b>{money(withFee(cash))}</b></div>
+          <div className="flex items-center justify-between border-t border-white/5 px-4 py-3"><span>{t('bookFeeRow')}</span><b>{money(BOOKING_FEE)}</b></div>
+          <div className="flex items-center justify-between border-t border-white/5 bg-white/5 px-4 py-3"><span>{t('bookDirectRow')}</span><b className="text-green-300">{money(cash)}</b></div>
+        </div>
+        <p className="text-[11px] text-neutral-500">{t('bookAnswerNote')}</p>
 
         {insufficient && (
-          <p className="mt-3 rounded-lg bg-red-500/10 p-2 text-sm text-red-300">
-            {t('lowBalance', { fee: money(BOOKING_FEE) })}
-            {onTopUp && <button onClick={onTopUp} className="mt-2 block w-full rounded-lg bg-line py-2 font-bold text-black">{t('topUp')}</button>}
-          </p>
+          <div className="space-y-2 rounded-xl bg-red-500/10 p-3 text-sm text-red-300">
+            <p>{t('lowBalance', { fee: money(BOOKING_FEE) })}</p>
+            {onTopUp && <button onClick={onTopUp} className="w-full rounded-xl bg-line py-2 font-bold text-black active:scale-95">{t('topUp')}</button>}
+          </div>
         )}
-        {error && <p className="mt-3 rounded-lg bg-red-500/10 p-2 text-sm text-red-300">{t(error)}</p>}
+        {error && <p className="rounded-xl bg-red-500/10 p-3 text-sm text-red-300">{error}</p>}
 
-        <div className="mt-5 grid grid-cols-2 gap-3">
-          <button onClick={onClose} className="rounded-xl bg-white/10 py-3 font-semibold active:scale-95">
-            {t('cancel')}
-          </button>
-          <button
-            onClick={confirm}
-            disabled={submitting || insufficient}
-            className="rounded-xl bg-line py-3 font-bold text-black transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {submitting ? t('booking') : t('confirm')}
-          </button>
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={onClose} className="rounded-xl bg-white/10 py-3 font-semibold active:scale-95">{t('cancel')}</button>
+          <button onClick={confirm} disabled={submitting || insufficient} className="rounded-xl bg-line py-3 font-bold text-black active:scale-95 disabled:opacity-50">{submitting ? t('booking') : t('confirm')}</button>
         </div>
       </div>
-    </div>
-  )
-}
-
-function Row({ label, value, strong, valueClass = '' }) {
-  return (
-    <div className="flex items-start justify-between gap-4 px-4 py-3">
-      <dt className="text-neutral-300">{label}</dt>
-      <dd className={`shrink-0 text-right ${strong ? 'font-bold' : 'font-semibold'} ${valueClass}`}>{value}</dd>
     </div>
   )
 }

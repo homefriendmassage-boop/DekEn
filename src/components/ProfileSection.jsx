@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient'
 import { useI18n } from '../i18n'
 import WorkerFields, { groupOf, profileFromRow, profileToPayload, validateProfile } from './WorkerFields'
 import { getPosition } from '../lib/geo'
+import { BOOKING_FEE } from '../config'
 import PhotoManager from './PhotoManager'
 import { LocBadge, ratesOf } from './WorkerDetail'
 
@@ -175,6 +176,7 @@ export default function ProfileSection({ worker, userId, onChanged, onTopUp }) {
         <ul className="divide-y divide-white/5 rounded-xl bg-white/5 text-sm">
           {prices.map(([key, label, price]) => <li key={key} className="flex justify-between px-3 py-2"><span>{label}{(worker.start_rate || prices[0]?.[0]) === key && <span className="ml-2 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-bold text-black">{t('startHere')}</span>}</span><b>{money(price)}</b></li>)}
         </ul>
+        <p className="text-[11px] text-neutral-500">{t('priceOwnNote', { fee: money(BOOKING_FEE) })}</p>
       </div>
 
       <LocationChange worker={worker} onChanged={onChanged} />

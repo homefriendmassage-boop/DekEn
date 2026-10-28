@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from './supabaseClient'
-import { signIn, takeOpenIntent, takeWorkerIntent, takeChatIntent, takeDraftIntent, isOaFriend, getAgencyCode } from './lib/auth'
+import { signIn, takeOpenIntent, takeWorkerIntent, takeChatIntent, takeDraftIntent, takeJobIntent, isOaFriend, getAgencyCode } from './lib/auth'
 import { LINE_OA_URL } from './config'
 import { getPosition } from './lib/geo'
 import { CATEGORIES, PLAN_META, canViewWorker, suspensionOf, tierOf } from './config'
@@ -21,6 +21,7 @@ import AgencyArea from './components/agency/AgencyArea'
 import ThreadList from './components/ThreadList'
 import WorkerDetail from './components/WorkerDetail'
 import ClaimDraft from './components/ClaimDraft'
+import MyBookings from './components/MyBookings'
 
 // Mock mode only, when the workers table is empty: lets you click through the UI
 // before running seed SQL. Rank within a category = order in this list.
@@ -79,6 +80,8 @@ export default function App() {
   const [invitedBy, setInvitedBy] = useState(null)       // agency name when the app was opened from an agency invitation
   const [walletPaying, setWalletPaying] = useState(false)
   const [termsBusy, setTermsBusy] = useState(false)
+  const [showBookings, setShowBookings] = useState(false)
+  const [highlightJob, setHighlightJob] = useState(null)   // a booking opened from its push
   const [claim, setClaim] = useState(null)            // token of an application draft someone filled in for her
   const [openChat, setOpenChat] = useState(null)      // chat to open inside the provider side
   const [shared, setShared] = useState(null)         // { id, friend, worker } when the app was opened from a shared profile link
@@ -120,6 +123,14 @@ export default function App() {
           const th = (ths ?? []).find((x) => x.id === chatId)
           if (th && th.worker_id === meRow.id) { setView('worker'); setWorkerTab('self'); setOpenChat(th) }
           else if (th) { setView('categories'); setChat(th) }
+        }
+        const jobId = takeJobIntent()          // a booking push: provider -> her inbox, customer -> my bookings
+        if (jobId && meRow) {
+          const { data: jb } = await supabase.from('jobs').select('id, customer_id, worker_id').eq('id', jobId).maybeSingle()
+          if (jb) {
+            setHighlightJob(jb.id)
+            if (jb.worker_id === meRow.id) { setView('worker'); setWorkerTab('self') } else { setView('categories'); setShowBookings(true) }
+          }
         }
         const draftTok = takeDraftIntent()     // a link an admin / modelling agency issued for her
         if (draftTok) setClaim(draftTok)
@@ -324,6 +335,7 @@ export default function App() {
     onTierClick: () => setShowMembership(true),
     onWalletClick: () => setShowWallet(true),
     onSupportClick: openSupport,
+    onBookingsClick: () => setShowBookings(true),
     supportUnread,
     // chat icon only for paid members (others have no chat to show)
     onChatClick: tier >= 1 ? () => setShowThreads(true) : undefined,
@@ -397,7 +409,7 @@ export default function App() {
           {workerTab === 'agency'
             ? <AgencyArea embedded me={me} onChanged={loadMe} onTopUp={() => setPay({ kind: 'wallet_topup' })} onWallet={() => setShowWallet(true)} />
             : me?.role === 'worker'
-              ? <WorkerDashboard userId={me.id} me={me} openChat={openChat} onWallet={() => setShowWallet(true)} onTopUp={() => setPay({ kind: 'wallet_topup' })} />
+              ? <WorkerDashboard userId={me.id} me={me} openChat={openChat} highlightJob={highlightJob} onWallet={() => setShowWallet(true)} onTopUp={() => setPay({ kind: 'wallet_topup' })} />
               : <WorkerApply userId={me.id} defaultName={session.profile.displayName} />}
         </>
       )}
@@ -446,7 +458,6 @@ export default function App() {
       {selected && (
         <BookingModal
           worker={selected}
-          customerId={me.id}
           walletBalance={me?.wallet_balance ?? 0}
           onClose={() => setSelected(null)}
           onTopUp={() => { setSelected(null); setPay({ kind: 'wallet_topup' }) }}
@@ -454,9 +465,12 @@ export default function App() {
             setSelected(null)
             await loadMe() // refresh balance immediately (realtime is a backup)
             showToast(t('booked'))
+            setShowBookings(true)
           }}
         />
       )}
+
+      {showBookings && <MyBookings highlightId={highlightJob} onClose={() => { setShowBookings(false); setHighlightJob(null); loadMe() }} />}
 
       {showThreads && (
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 sm:items-center sm:p-4" onClick={() => setShowThreads(false)}>
