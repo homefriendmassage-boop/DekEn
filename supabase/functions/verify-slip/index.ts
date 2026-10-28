@@ -31,14 +31,12 @@ const json = (body: unknown, status = 200) =>
 
 // ---- BEGIN pure rules (unit-tested without Deno) ----------------------------------------------
 export type SlipCheck =
-  | { ok: true; transRef: string; amount: number; receiverBank: string | null; receiverName: string | null }
-  | { ok: false; code: string; receiverBank?: string | null; receiverName?: string | null }
+  | { ok: true; transRef: string; amount: number; receiverBank: string | null; receiverName: string | null; receiver: unknown }
+  | { ok: false; code: string; receiverBank?: string | null; receiverName?: string | null; receiver?: unknown }
 
 const norm = (s: unknown) =>
   String(s ?? '').toLowerCase().replace(/[\s.*\-_,]/g, '')
 
-// Thunder v2 /verify/bank response:
-//   { success, data: { transRef, amount: { amount }, sender: {...}, receiver: { bank: { short }, account: { name: { th } } } } }
 // Collect every digit string found inside an object (account numbers may be masked, e.g. "xxx-x-x1234-x").
 function digitStrings(v: unknown, out: string[] = []): string[] {
   if (v == null) return out
@@ -51,34 +49,49 @@ function digitStrings(v: unknown, out: string[] = []): string[] {
   return out
 }
 
+// The slip fields may sit directly under `data` or one level deeper (e.g. data.rawSlip): find the object holding transRef.
+function findSlip(v: any, depth = 0): any | null {
+  if (!v || typeof v !== 'object' || depth > 4) return null
+  if (typeof v.transRef === 'string') return v
+  for (const x of Object.values(v)) {
+    const f = findSlip(x, depth + 1)
+    if (f) return f
+  }
+  return null
+}
+
+// Thunder v2 /verify/bank answers HTTP 200 + a message like "Bank slip verified successfully" for a verified slip.
 export function evaluateSlip(
   resp: any,
   cfg: { receiverBank?: string; receiverNameContains?: string; receiverAccountDigits?: string },
+  httpStatus?: number,
 ): SlipCheck {
   // The bank alone identifies a whole bank, not your account: require the name or the account digits.
   if (!cfg.receiverNameContains && !cfg.receiverAccountDigits) return { ok: false, code: 'CONFIG_MISSING' }
-  if (!resp || resp.success !== true || typeof resp.data !== 'object' || resp.data === null) {
-    return { ok: false, code: 'SLIP_REJECTED' }
-  }
-  const d = resp.data
-  const transRef = typeof d.transRef === 'string' && d.transRef.length >= 6 ? d.transRef : null
-  const amount = Number(d.amount?.amount)
+  // Success = explicit success:true, or no success flag at all with HTTP 200 and no error object.
+  const okFlag = resp && (resp.success === true || (resp.success === undefined && resp.error === undefined && httpStatus === 200))
+  if (!okFlag) return { ok: false, code: 'SLIP_REJECTED' }
+  const d = findSlip(resp.data ?? resp)
+  if (!d) return { ok: false, code: 'SLIP_REJECTED' }
+  const transRef = d.transRef.length >= 6 ? d.transRef : null
+  const amount = Number(d.amount?.amount ?? d.amount)
   if (!transRef || !Number.isFinite(amount) || amount <= 0) return { ok: false, code: 'SLIP_REJECTED' }
 
+  const receiver = d.receiver ?? null
   const receiverBank = d.receiver?.bank?.short ?? null
   const receiverName = d.receiver?.account?.name?.th ?? d.receiver?.account?.name?.en ?? null
 
   if (cfg.receiverBank && norm(receiverBank) !== norm(cfg.receiverBank)) {
-    return { ok: false, code: 'WRONG_RECEIVER', receiverBank, receiverName }
+    return { ok: false, code: 'WRONG_RECEIVER', receiverBank, receiverName, receiver }
   }
   if (cfg.receiverNameContains && !norm(receiverName).includes(norm(cfg.receiverNameContains))) {
-    return { ok: false, code: 'WRONG_RECEIVER', receiverBank, receiverName }
+    return { ok: false, code: 'WRONG_RECEIVER', receiverBank, receiverName, receiver }
   }
   const wantDigits = String(cfg.receiverAccountDigits ?? '').replace(/\D/g, '')
   if (wantDigits && !digitStrings(d.receiver?.account).some((x) => x.includes(wantDigits))) {
-    return { ok: false, code: 'WRONG_RECEIVER', receiverBank, receiverName }
+    return { ok: false, code: 'WRONG_RECEIVER', receiverBank, receiverName, receiver }
   }
-  return { ok: true, transRef, amount: Math.round(amount * 100) / 100, receiverBank, receiverName }
+  return { ok: true, transRef, amount: Math.round(amount * 100) / 100, receiverBank, receiverName, receiver }
 }
 // ---- END pure rules ---------------------------------------------------------------------------
 
@@ -104,11 +117,14 @@ Deno.serve(async (req) => {
       return json({ ok: false, code: 'BAD_PAYLOAD' })
     }
 
-    // 2) Rate limit (protects the Thunder quota): 8 attempts / hour / user
+    // 2) Rate limit (protects the Thunder quota): 8 attempts / hour / user.
+    //    "The bank hasn't released the slip yet" retries are expected, so they get their own, larger allowance (20).
     const since = new Date(Date.now() - 3600_000).toISOString()
     const { count } = await admin.from('slip_attempts').select('id', { count: 'exact', head: true })
-      .eq('user_id', userId).gte('created_at', since)
-    if ((count ?? 0) >= 8) return json({ ok: false, code: 'RATE_LIMIT' })
+      .eq('user_id', userId).gte('created_at', since).neq('result', 'SLIP_PENDING')
+    const { count: pendingCount } = await admin.from('slip_attempts').select('id', { count: 'exact', head: true })
+      .eq('user_id', userId).gte('created_at', since).eq('result', 'SLIP_PENDING')
+    if ((count ?? 0) >= 8 || (pendingCount ?? 0) >= 20) return json({ ok: false, code: 'RATE_LIMIT' })
 
     // 3) Only spend a Thunder call if the user actually has an open payment request
     const { data: pending } = await admin.from('payment_intents').select('amount')
@@ -141,6 +157,12 @@ Deno.serve(async (req) => {
     // What Thunder said, trimmed, so the admin can see the real reason (no secrets in it).
     const snippet = JSON.stringify(body)?.slice(0, 1000) ?? null
 
+    // The bank hasn't published this slip to Thunder yet (seen with Bangkok Bank): not a bad slip, just retry shortly.
+    if ((body?.error?.code ?? body?.code) === 'SLIP_PENDING') {
+      await log('SLIP_PENDING', null, { status, response: snippet })
+      return json({ ok: false, code: 'SLIP_PENDING' })
+    }
+
     // Our key / credit / rate problem: not the customer's fault, so don't blame the slip.
     if (status === 401 || status === 402 || status === 403 || status === 429 || status >= 500) {
       await log('UPSTREAM_ERROR', null, { status, response: snippet })
@@ -152,8 +174,9 @@ Deno.serve(async (req) => {
       receiverBank: Deno.env.get('RECEIVER_BANK') ?? undefined,
       receiverNameContains: Deno.env.get('RECEIVER_NAME_CONTAINS') ?? undefined,
       receiverAccountDigits: Deno.env.get('RECEIVER_ACCOUNT_DIGITS') ?? undefined,
-    })
-    const receiverInfo = body?.data?.receiver ?? null   // our own receiving account as Thunder reads it (for tuning the checks)
+    }, status)
+    // our own receiving account as Thunder reads it (for tuning the checks)
+    const receiverInfo = (check as { receiver?: unknown }).receiver ?? body?.data?.receiver ?? null
     if (!check.ok) {
       await log(check.code, null, { status, receiver: receiverInfo, response: snippet })
       return json({ ok: false, code: check.code })

@@ -6,7 +6,7 @@ import { useI18n } from '../i18n'
 
 const TOPUP_CHOICES = [100, 300, 500, 1000]
 const KNOWN_ERRORS = ['SLIP_REJECTED', 'WRONG_RECEIVER', 'AMOUNT_MISMATCH', 'DUPLICATE_SLIP', 'NO_PENDING_INTENT',
-  'RATE_LIMIT', 'UPSTREAM_ERROR', 'CONFIG_MISSING', 'BAD_PAYLOAD', 'SERVER_ERROR', 'UNAUTHORIZED', 'ALREADY_UNDER_REVIEW']
+  'RATE_LIMIT', 'UPSTREAM_ERROR', 'CONFIG_MISSING', 'BAD_PAYLOAD', 'SERVER_ERROR', 'UNAUTHORIZED', 'ALREADY_UNDER_REVIEW', 'SLIP_PENDING']
 
 // Read the QR code printed on a bank-transfer slip (browser-side; only the decoded text is sent to the server).
 async function decodeSlipQr(file) {
