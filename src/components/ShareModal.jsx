@@ -3,6 +3,7 @@ import liff from '@line/liff'
 import { supabase } from '../supabaseClient'
 import { LIFF_ID, USE_MOCK_LIFF } from '../config'
 import { useI18n } from '../i18n'
+import { inviteBubble } from '../lib/flex'
 
 const APP_NAME = 'DekN'
 
@@ -38,20 +39,10 @@ export default function ShareModal({ onClose, agencyCode }) {
       await liff.shareTargetPicker([{
         type: 'flex',
         altText: t('shareFlexAlt', { app: APP_NAME }),
-        contents: {
-          type: 'bubble',
-          body: {
-            type: 'box', layout: 'vertical', spacing: 'md',
-            contents: [
-              { type: 'text', text: APP_NAME, weight: 'bold', size: 'xl' },
-              { type: 'text', text: t(agencyCode ? 'agencyFlexBody' : 'shareFlexBody'), wrap: true, size: 'sm', color: '#666666' },
-            ],
-          },
-          footer: {
-            type: 'box', layout: 'vertical',
-            contents: [{ type: 'button', style: 'primary', action: { type: 'uri', label: t('shareFlexButton'), uri: link } }],
-          },
-        },
+        contents: inviteBubble({
+          tagline: t('shareLogoNote'), title: APP_NAME, uri: link,
+          body: t(agencyCode ? 'agencyFlexBody' : 'shareFlexBody'), button: t('shareFlexButton'),
+        }),
       }])
     } catch { setNote(t('shareFailed')) }
   }

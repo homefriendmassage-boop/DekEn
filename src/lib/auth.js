@@ -28,6 +28,33 @@ export function takeOpenIntent() {
   } catch { return null }
 }
 
+// Shared profile: https://liff.line.me/<id>?worker=<provider uuid>  -> open that provider once after login.
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+export function captureWorkerParam() {
+  const params = new URLSearchParams(window.location.search)
+  let id = params.get('worker')
+  if (!id) {
+    const state = params.get('liff.state')
+    if (state) {
+      const q = state.indexOf('?')
+      id = new URLSearchParams(q >= 0 ? state.slice(q) : state).get('worker')
+    }
+  }
+  try { if (id && UUID.test(id)) sessionStorage.setItem('open_worker', id) } catch { /* storage blocked */ }
+}
+export function takeWorkerIntent() {
+  try {
+    const v = sessionStorage.getItem('open_worker')
+    sessionStorage.removeItem('open_worker')
+    return v && UUID.test(v) ? v : null
+  } catch { return null }
+}
+// true when the user already follows the official account. Unknown (no bot linked, mock mode) counts as a friend so nobody is locked out.
+export async function isOaFriend() {
+  if (USE_MOCK_LIFF) return true
+  try { return !!(await liff.getFriendship()).friendFlag } catch { return true }
+}
+
 // Invitation from a modelling agency: https://liff.line.me/<id>?agency=<code>  (same liff.state gotcha as ref).
 export function captureAgencyCode() {
   const params = new URLSearchParams(window.location.search)
@@ -88,6 +115,7 @@ export function captureRefCode() {
 export async function signIn() {
   captureRefCode()
   captureOpenParam()
+  captureWorkerParam()
   captureAgencyCode()
 
   let profile
@@ -125,6 +153,7 @@ export async function signIn() {
   try { await supabase.rpc('touch_profile', { p_name: profile.displayName, p_picture: profile.pictureUrl ?? null }) } catch { /* ignore */ }
 
   captureOpenParam()
+  captureWorkerParam()
   captureAgencyCode()
   const refCode = captureRefCode() // URL is clean again after init(); re-check
   if (refCode) {

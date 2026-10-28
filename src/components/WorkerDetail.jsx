@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useI18n } from '../i18n'
+import liff from '@line/liff'
 import { logoUrl } from '../lib/logo'
+import { appLink, canShareFlex, workerBubble } from '../lib/flex'
 
 export function LocBadge({ verified }) {
   const { t } = useI18n()
@@ -34,6 +36,30 @@ export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlo
     })()
     return () => { alive = false }
   }, [w.user_id, w.canView])
+  const [shareNote, setShareNote] = useState(null)
+
+  // Flex only: the public photo + details, no price and no location. The button brings the friend back to this profile.
+  async function shareWorker() {
+    setShareNote(null)
+    try {
+      const { data } = await supabase.rpc('my_referral_stats')
+      const code = data?.[0]?.code
+      const uri = appLink({ ...(code ? { ref: code } : {}), worker: w.user_id })
+      const lines = [
+        w.gender && t(`gender_${w.gender}`), w.age && `${w.age} ${t('yearsShort')}`,
+        w.height_cm && `${t('fHeight')} ${w.height_cm}`, w.weight_kg && `${t('fWeight')} ${w.weight_kg}`, w.measurements,
+      ].filter(Boolean).join(' · ')
+      await liff.shareTargetPicker([{
+        type: 'flex',
+        altText: t('shareWorkerAlt', { name: w.display_name, app: 'DekN' }),
+        contents: workerBubble({
+          w, facts: lines, tags: (w.tags ?? []).map((k) => `#${t(`tag_${k}`)}`).join(' '), about: w.about,
+          button: t('shareWorkerBtn'), uri, logoLabel: 'DekN',
+        }),
+      }])
+    } catch { setShareNote(t('shareFailed')) }
+  }
+
   const facts = [
     w.gender && [t('fGender'), t(`gender_${w.gender}`)],
     w.age && [t('fAge'), `${w.age}`],
@@ -42,7 +68,7 @@ export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlo
     w.measurements && [t('fMeasure'), w.measurements],
     w.province && [t('fProvince'), `${w.province}${w.district ? ` · ${w.district}` : ''}`],
   ].filter(Boolean)
-  const prices = [[t('price1h'), w.price], ...(w.price_options ?? []).map((o) => [priceLabel(o.label, t), o.price])]
+  const prices = [['1h', t('price1h'), w.price], ...(w.price_options ?? []).map((o) => [o.label, priceLabel(o.label, t), o.price])]
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center sm:p-4" onClick={onClose} role="dialog" aria-modal="true">
@@ -107,12 +133,18 @@ export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlo
           <div>
             <h3 className="mb-1 text-sm font-semibold">{t('priceTable')}</h3>
             <ul className="divide-y divide-white/5 rounded-xl bg-white/5 text-sm">
-              {prices.map(([label, price], i) => (
-                <li key={i} className="flex items-center justify-between px-3 py-2"><span>{label}</span><b>{money(price)}</b></li>
+              {prices.map(([key, label, price]) => (
+                <li key={key} className="flex items-center justify-between px-3 py-2">
+                  <span>{label}{(w.start_rate ?? '1h') === key && <span className="ml-2 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-bold text-black">{t('startHere')}</span>}</span><b>{money(price)}</b></li>
               ))}
             </ul>
             <p className="mt-1 text-[11px] text-neutral-500">{t('priceNote')}</p>
           </div>
+
+          {canShareFlex() && (
+            <button onClick={shareWorker} className="w-full rounded-xl bg-white/10 py-2.5 text-sm font-bold active:scale-95">🔗 {t('shareWorker')}</button>
+          )}
+          {shareNote && <p className="text-xs text-amber-200">{shareNote}</p>}
 
           {isMe ? (
             <p className="rounded-xl bg-white/10 py-2.5 text-center text-sm font-semibold text-neutral-300">{t('ownProfile')}</p>

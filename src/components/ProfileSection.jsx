@@ -11,7 +11,7 @@ const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
 function diffProfile(payload, w) {
   const cur = {
     price: Number(w.price), gender: w.gender, age: w.age, height_cm: w.height_cm, weight_kg: w.weight_kg,
-    measurements: w.measurements, tags: [...(w.tags ?? [])].sort(), about: w.about, price_options: w.price_options ?? [],
+    measurements: w.measurements, tags: [...(w.tags ?? [])].sort(), about: w.about, price_options: w.price_options ?? [], start_rate: w.start_rate ?? '1h',
     district: w.district, nearby: w.nearby, province: w.province, display_name: w.display_name,
   }
   const out = {}
@@ -137,7 +137,7 @@ export default function ProfileSection({ worker, userId, onChanged, onTopUp }) {
     worker.height_cm && [t('fHeight'), worker.height_cm], worker.weight_kg && [t('fWeight'), worker.weight_kg],
     worker.measurements && [t('fMeasure'), worker.measurements],
   ].filter(Boolean)
-  const prices = [[t('price1h'), worker.price], ...(worker.price_options ?? []).map((o) => [priceLabel(o.label, t), o.price])]
+  const prices = [['1h', t('price1h'), worker.price], ...(worker.price_options ?? []).map((o) => [o.label, priceLabel(o.label, t), o.price])]
 
   return (
     <section className="space-y-4">
@@ -179,7 +179,7 @@ export default function ProfileSection({ worker, userId, onChanged, onTopUp }) {
         {worker.tags?.length > 0 && <div className="flex flex-wrap gap-1.5">{worker.tags.map((k) => <span key={k} className="rounded-full bg-pink-500/15 px-2.5 py-1 text-xs text-pink-200">{t(`tag_${k}`)}</span>)}</div>}
         {worker.about && <p className="whitespace-pre-wrap break-words text-sm text-neutral-200">{worker.about}</p>}
         <ul className="divide-y divide-white/5 rounded-xl bg-white/5 text-sm">
-          {prices.map(([label, price], i) => <li key={i} className="flex justify-between px-3 py-2"><span>{label}</span><b>{money(price)}</b></li>)}
+          {prices.map(([key, label, price]) => <li key={key} className="flex justify-between px-3 py-2"><span>{label}{(worker.start_rate ?? '1h') === key && <span className="ml-2 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-bold text-black">{t('startHere')}</span>}</span><b>{money(price)}</b></li>)}
         </ul>
       </div>
 

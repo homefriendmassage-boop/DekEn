@@ -10,8 +10,17 @@ const MAX_CUSTOM = 5
 
 export const emptyProfile = () => ({
   gender: '', age: '', height_cm: '', weight_kg: '', measurements: '', tags: [], about: '',
-  hourly: '', p4: '', p6: '', custom: [], loc: null, locNew: false, locVerified: false, province: '', manual: false,
+  hourly: '', p4: '', p6: '', custom: [], start: '', loc: null, locNew: false, locVerified: false, province: '', manual: false,
 })
+
+// The starting rate is kept in the form as '1h' | '@4h' | '@6h' | 'c<index of the custom row>' (custom labels can still be typed).
+const startKey = (label, customRows) => {
+  if (!label) return ''
+  if (label === '1h' || label === '@4h' || label === '@6h') return label
+  const i = customRows.findIndex((x) => x.label === label)
+  return i >= 0 ? `c${i}` : ''
+}
+const startLabel = (v) => (v.start.startsWith('c') ? v.custom[Number(v.start.slice(1))]?.label.trim() : v.start)
 
 // Row from `workers` / `worker_applications` -> form state ('@4h' / '@6h' are the fixed 4 h and 6 h price rows).
 export function profileFromRow(r) {
@@ -23,6 +32,7 @@ export function profileFromRow(r) {
     measurements: r.measurements ?? '', tags: r.tags ?? [], about: r.about ?? '',
     hourly: r.price != null ? String(r.price) : '', p4: find('@4h') != null ? String(find('@4h')) : '', p6: find('@6h') != null ? String(find('@6h')) : '',
     custom: rows.filter((x) => x.label !== '@4h' && x.label !== '@6h').map((x) => ({ label: x.label, price: String(x.price) })),
+    start: startKey(r.start_rate, rows.filter((x) => x.label !== '@4h' && x.label !== '@6h')),
     locVerified: !!r.loc_verified_at, province: r.province ?? '',
   }
 }
@@ -37,7 +47,7 @@ export function profileToPayload(v) {
     price: Number(v.hourly),
     gender: v.gender || null, age: v.age === '' ? null : Number(v.age),
     height_cm: v.height_cm === '' ? null : Number(v.height_cm), weight_kg: v.weight_kg === '' ? null : Number(v.weight_kg),
-    measurements: v.measurements.trim() || null, tags: v.tags, about: v.about.trim() || null, price_options: rows,
+    measurements: v.measurements.trim() || null, tags: v.tags, about: v.about.trim() || null, price_options: rows, start_rate: startLabel(v),
   }
   if (v.locNew && v.loc) { out.loc_lat = v.loc.lat; out.loc_lng = v.loc.lng }
   if (v.province) out.province = v.province
@@ -49,6 +59,10 @@ export function validateProfile(v) {
   if (!v.gender) return 'errGender'
   if (!(Number(v.age) >= 20)) return 'errAge'
   if (!(Number(v.hourly) > 0)) return 'errHourly'
+  if (!v.start) return 'errStartRate'
+  const filled = v.start === '1h' ? v.hourly : v.start === '@4h' ? v.p4 : v.start === '@6h' ? v.p6
+    : (v.custom[Number(v.start.slice(1))]?.label.trim() && v.custom[Number(v.start.slice(1))]?.price)
+  if (!filled) return 'errStartRate'
   if (!v.loc && !v.locVerified && !v.province) return 'errNeedLocation'
   return null
 }
@@ -61,6 +75,13 @@ export default function WorkerFields({ v, set }) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState(null)
   const num = (k) => (e) => set({ [k]: e.target.value.replace(/[^\d]/g, '') })
+  const pick = (k) => set({ start: k })
+  const Start = ({ k }) => (
+    <button type="button" aria-pressed={v.start === k} aria-label={t('startHere')} onClick={() => pick(k)}
+      className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 active:scale-95 ${v.start === k ? 'bg-amber-400 text-black ring-amber-400' : 'bg-white/10 text-neutral-300 ring-white/15'}`}>
+      {v.start === k ? `✓ ${t('startHere')}` : t('startPick')}
+    </button>
+  )
   const toggleTag = (k) => set({ tags: v.tags.includes(k) ? v.tags.filter((x) => x !== k) : [...v.tags, k] })
 
   async function locate() {
@@ -123,24 +144,28 @@ export default function WorkerFields({ v, set }) {
 
       <fieldset className="space-y-2 rounded-2xl bg-white/5 p-3">
         <legend className="px-1 text-sm font-semibold">{t('fPrices')}</legend>
-        <label className="block text-sm">{t('price1h')}
+        <p className="rounded-lg bg-amber-400/10 p-2 text-xs text-amber-200">{t('startHint')}</p>
+        <label className="block text-sm"><span className="flex items-center justify-between">{t('price1h')} <Start k="1h" /></span>
           <input inputMode="numeric" value={v.hourly} onChange={num('hourly')} className={input} />
         </label>
         <div className="grid grid-cols-2 gap-2">
-          <label className="block text-sm">{t('price4h')} <span className="text-[11px] text-neutral-500">({t('optional')})</span>
+          <label className="block text-sm"><span className="flex items-center justify-between gap-1">{t('price4h')} <Start k="@4h" /></span>
             <input inputMode="numeric" value={v.p4} onChange={num('p4')} className={input} />
           </label>
-          <label className="block text-sm">{t('price6h')} <span className="text-[11px] text-neutral-500">({t('optional')})</span>
+          <label className="block text-sm"><span className="flex items-center justify-between gap-1">{t('price6h')} <Start k="@6h" /></span>
             <input inputMode="numeric" value={v.p6} onChange={num('p6')} className={input} />
           </label>
         </div>
         {v.custom.map((c, i) => (
-          <div key={i} className="grid grid-cols-[1fr,7rem,auto] items-end gap-2">
+          <div key={i} className="space-y-1">
+          <div className="grid grid-cols-[1fr,7rem,auto] items-end gap-2">
             <label className="block text-sm">{i === 0 ? t('priceCustom') : ''}
               <input maxLength={30} value={c.label} placeholder={t('priceCustomLabel')} onChange={(e) => set({ custom: v.custom.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)) })} className={input} />
             </label>
             <input inputMode="numeric" value={c.price} placeholder="฿" onChange={(e) => set({ custom: v.custom.map((x, j) => (j === i ? { ...x, price: e.target.value.replace(/[^\d]/g, '') } : x)) })} className={`${input} !mt-0`} />
-            <button type="button" aria-label="remove" onClick={() => set({ custom: v.custom.filter((_, j) => j !== i) })} className="rounded-xl bg-white/10 px-3 py-2.5 active:scale-95">✕</button>
+            <button type="button" aria-label="remove" onClick={() => set({ custom: v.custom.filter((_, j) => j !== i), start: v.start === `c${i}` ? '' : v.start.startsWith('c') && Number(v.start.slice(1)) > i ? `c${Number(v.start.slice(1)) - 1}` : v.start })} className="rounded-xl bg-white/10 px-3 py-2.5 active:scale-95">✕</button>
+          </div>
+          <Start k={`c${i}`} />
           </div>
         ))}
         {v.custom.length < MAX_CUSTOM && (

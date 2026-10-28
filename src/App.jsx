@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from './supabaseClient'
-import { signIn, takeOpenIntent, getAgencyCode } from './lib/auth'
+import { signIn, takeOpenIntent, takeWorkerIntent, isOaFriend, getAgencyCode } from './lib/auth'
+import { LINE_OA_URL } from './config'
 import { getPosition } from './lib/geo'
 import { CATEGORIES, PLAN_META, canViewWorker, suspensionOf, tierOf } from './config'
 import { useI18n } from './i18n'
@@ -18,6 +19,7 @@ import WalletModal from './components/WalletModal'
 import SupportChat from './components/SupportChat'
 import AgencyArea from './components/agency/AgencyArea'
 import ThreadList from './components/ThreadList'
+import WorkerDetail from './components/WorkerDetail'
 
 // Mock mode only, when the workers table is empty: lets you click through the UI
 // before running seed SQL. Rank within a category = order in this list.
@@ -75,6 +77,7 @@ export default function App() {
   const [showWallet, setShowWallet] = useState(false)
   const [invitedBy, setInvitedBy] = useState(null)       // agency name when the app was opened from an agency invitation
   const [walletPaying, setWalletPaying] = useState(false)
+  const [shared, setShared] = useState(null)         // { id, friend, worker } when the app was opened from a shared profile link
   const [pay, setPay] = useState(null)               // { kind: 'membership', tier } | { kind: 'wallet_topup' }
 
   const showToast = (msg) => {
@@ -107,6 +110,8 @@ export default function App() {
           if (data?.[0]) { setInvitedBy(data[0].name); setView('worker') }   // straight to the application form
         }
         if (takeOpenIntent() === 'plans') { setView('categories'); setShowMembership(true) } // opened from a renewal reminder
+        const sharedId = takeWorkerIntent()
+        if (sharedId) { setView('categories'); setShared({ id: sharedId, friend: await isOaFriend(), worker: null }) }
         if (!cancelled) setPhase('ready')
       } catch (e) {
         console.error(e)
@@ -115,6 +120,27 @@ export default function App() {
     })()
     return () => { cancelled = true }
   }, [loadMe])
+
+  // Shared profile link: once the viewer follows the official account, fetch that provider (the DB decides what the viewer may see).
+  useEffect(() => {
+    if (!shared?.friend || shared.worker !== null) return
+    ;(async () => {
+      const { data } = await supabase.rpc('get_worker', { p_worker: shared.id })
+      const w = data?.[0]
+      if (!w) return setShared((x) => x && { ...x, worker: false })
+      let full = null
+      if (w.can_view && w.original_path) {
+        const { data: urls } = await supabase.storage.from('worker-originals').createSignedUrls([w.original_path], 3600)
+        full = urls?.[0]?.signedUrl ?? null
+      }
+      setShared((x) => x && { ...x, worker: { ...w, canView: w.can_view, image: full ?? w.profile_image } })
+    })()
+  }, [shared?.friend, shared?.worker, shared?.id])
+
+  async function recheckFriend() {
+    if (await isOaFriend()) setShared((x) => x && { ...x, friend: true })
+    else showToast(t('friendGateStill'))
+  }
 
   // ---- Realtime: wallet top-ups / membership changes appear instantly ----
   useEffect(() => {
@@ -353,6 +379,32 @@ export default function App() {
               ? <WorkerDashboard userId={me.id} onTopUp={() => setPay({ kind: 'wallet_topup' })} />
               : <WorkerApply userId={me.id} defaultName={session.profile.displayName} />}
         </>
+      )}
+
+      {shared && !shared.friend && (
+        <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/80 p-4">
+          <div className="w-full max-w-sm space-y-3 rounded-3xl bg-neutral-900 p-5 text-center shadow-2xl">
+            <img src={`${import.meta.env.BASE_URL}dekn-logo.jpg`} alt="DekN" className="mx-auto h-24 w-24 rounded-full object-cover" />
+            <h2 className="text-lg font-bold">{t('friendGateTitle')}</h2>
+            <p className="text-sm text-neutral-400">{t('friendGateBody')}</p>
+            {LINE_OA_URL && <a href={LINE_OA_URL} className="block rounded-xl bg-line py-3 font-bold text-black active:scale-95">{t('friendGateAdd')}</a>}
+            <button onClick={recheckFriend} className="w-full rounded-xl bg-white/10 py-3 font-semibold active:scale-95">{t('friendGateDone')}</button>
+            <button onClick={() => setShared(null)} className="text-xs text-neutral-500 underline">{t('close')}</button>
+          </div>
+        </div>
+      )}
+
+      {shared?.friend && shared.worker === false && (
+        <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/80 p-4" onClick={() => setShared(null)}>
+          <p className="rounded-2xl bg-neutral-900 p-5 text-center text-sm">{t('sharedGone')}</p>
+        </div>
+      )}
+
+      {shared?.friend && shared.worker && (
+        <WorkerDetail worker={shared.worker} isMe={shared.worker.user_id === me?.id} onClose={() => setShared(null)}
+          onUnlock={() => { setShared(null); setShowMembership(true) }}
+          onBook={() => { const w = shared.worker; setShared(null); setSelected(w) }}
+          onAsk={() => { const w = shared.worker; setShared(null); if (tier >= 1) askWorker(w); else setShowMembership(true) }} />
       )}
 
       {selected && (

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { FREE_RANK_LIMIT, MIN_TIER } from '../config'
 import { useI18n } from '../i18n'
 import { logoUrl } from '../lib/logo'
-import WorkerDetail, { LocBadge } from './WorkerDetail'
+import WorkerDetail, { LocBadge, priceLabel } from './WorkerDetail'
 
 /**
  * Grid of workers in one category. Mobile-first: 2 columns on phones, 3 on tablets+.
@@ -139,7 +139,8 @@ function WorkerCard({ worker: w, onUnlock, onDetail, isMe }) {
           </p>
         )}
         <p className="text-xs text-neutral-400 sm:text-sm">
-          {t('from')} <span className="font-semibold text-white">{money(w.price)}</span>
+          {t('from')} <span className="font-semibold text-white">{money(w.start_price ?? w.price)}</span>
+          {w.start_rate && w.start_rate !== '1h' && <span className="text-[10px] text-neutral-500"> / {priceLabel(w.start_rate, t)}</span>}
         </p>
         {isMe ? (
           <p className="rounded-xl bg-white/10 py-2.5 text-center text-sm font-semibold text-neutral-300">{t('ownProfile')}</p>

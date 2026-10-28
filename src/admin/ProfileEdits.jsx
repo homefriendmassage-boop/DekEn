@@ -4,7 +4,7 @@ import { baht, fmtDateTime } from './format'
 
 const LABELS = {
   display_name: 'ชื่อที่แสดง', categories: 'หมวด', gender: 'เพศ', age: 'อายุ', height_cm: 'ส่วนสูง (ซม.)', weight_kg: 'น้ำหนัก (กก.)',
-  measurements: 'สัดส่วน', tags: 'บุคลิก', about: 'แนะนำตัว', price: 'ราคาต่อชั่วโมง', price_options: 'ราคาอื่น', district: 'อำเภอ/เขต',
+  measurements: 'สัดส่วน', tags: 'บุคลิก', about: 'แนะนำตัว', price: 'ราคาต่อชั่วโมง', price_options: 'ราคาอื่น', start_rate: 'ราคาเริ่มต้น', district: 'อำเภอ/เขต',
   nearby: 'พื้นที่ใกล้เคียง', province: 'จังหวัด', loc_lat: 'พิกัดใหม่ (ยืนยันจาก GPS)', loc_lng: '',
 }
 const GENDER = { female: 'หญิง', male: 'ชาย', lgbt: 'LGBT' }
