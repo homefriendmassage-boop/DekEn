@@ -13,6 +13,7 @@ import WorkerApply from './components/WorkerApply'
 import WorkerDashboard from './components/WorkerDashboard'
 import ChatModal from './components/ChatModal'
 import PaymentModal from './components/PaymentModal'
+import WalletModal from './components/WalletModal'
 import SupportChat from './components/SupportChat'
 import ThreadList from './components/ThreadList'
 
@@ -65,6 +66,7 @@ export default function App() {
   const [chatUnread, setChatUnread] = useState(0)
   const [support, setSupport] = useState(null)       // { threadId } while the admin chat is open
   const [supportUnread, setSupportUnread] = useState(0)
+  const [showWallet, setShowWallet] = useState(false)
   const [pay, setPay] = useState(null)               // { kind: 'membership', tier } | { kind: 'wallet_topup' }
 
   const showToast = (msg) => {
@@ -225,7 +227,7 @@ export default function App() {
     expiresAt: me?.vip_expires_at,
     walletBalance: me?.wallet_balance ?? 0,
     onTierClick: () => setShowMembership(true),
-    onWalletClick: () => setPay({ kind: 'wallet_topup' }),
+    onWalletClick: () => setShowWallet(true),
     onSupportClick: openSupport,
     supportUnread,
     // chat icon only for paid members (others have no chat to show)
@@ -325,6 +327,11 @@ export default function App() {
         <MembershipModal tier={tier} onClose={() => setShowMembership(false)}
           onPay={(planTier) => { setShowMembership(false); setPay({ kind: 'membership', tier: planTier, upgrade: tier > 0 && planTier > tier }) }}
           onSupport={() => { setShowMembership(false); openSupport() }} />
+      )}
+
+      {showWallet && (
+        <WalletModal me={me} onClose={() => setShowWallet(false)} onChanged={loadMe}
+          onTopUp={() => { setShowWallet(false); setPay({ kind: 'wallet_topup' }) }} />
       )}
 
       {pay && (

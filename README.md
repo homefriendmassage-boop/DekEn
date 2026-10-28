@@ -19,6 +19,7 @@ supabase/migration_010.sql       Per-role chat lists, self-chat error, renewal n
 supabase/migration_011.sql       Payment requests are reusable (same amount when you come back); late slips go to review (run after 010)
 supabase/migration_012.sql       Upgrade by paying the difference (same expiry); admin cancel/change plan + suspend accounts (run after 011)
 supabase/migration_013.sql       Suspended providers are hidden from the feed and cannot be booked/chatted (run after 012)
+supabase/migration_014.sql       Two balances (Wallet + Bonus) and a ledger of every money movement (run after 013)
 supabase/functions/send-renewal/ Edge Function (admin only): LINE Flex renewal reminder with a button to the plan picker
 supabase/functions/verify-slip/  Edge Function: verifies the slip with Thunder, opens the plan / credits the wallet
 admin.html + src/admin/          Separate admin page (not linked from the customer app)
@@ -225,3 +226,9 @@ expired is not rejected: it goes to Admin > Slip review, linked to the customer'
 - **Admin → สมาชิก → ⚙️ จัดการ** (or search any user): set a plan + expiry date (fixes a wrong upgrade), cancel the plan now, or suspend the account for 3/7/30 days or permanently (can be lifted). A reason is required and every action is stored in `membership_events`.
 - A suspended account sees a "suspended" screen, loses membership benefits, cannot book, pay or chat with providers, but can still chat with the admin. Admin accounts cannot be suspended. Refunds are not automatic.
 - **Suspending a provider** (migration_013): same ⚙️ จัดการ button (search the provider by name). They disappear from the feed, can't be booked or messaged by customers, and stop taking a rank slot; lifting the suspension restores them.
+
+## Wallets and ledger (migration_014)
+- **Wallet** (`wallet_balance`): top-ups; pays for packages, bookings and chat; not withdrawable. **Bonus wallet** (`bonus_balance`): referral fees, commissions and chat income; moved one way into the Wallet (a withdrawal flow comes later: min 200, fee 20).
+- Every change of either balance is written to `wallet_ledger` by a trigger on `users`, so no code path can move money without a trace. Code that changes a balance sets `app.ledger_kind` / `app.ledger_ref` / `app.ledger_note` first (see `jobs_before_insert`, `apply_slip_payment`, `transfer_bonus_to_wallet`).
+- Customers see both balances and their history by tapping the 💰 chip. Admins correct a balance with `admin_adjust_balance(user, 'wallet'|'bonus', ±amount, reason)` (reason required, ledgered).
+- Existing balances get an `opening` ledger row, so the ledger always adds up to the balance.
