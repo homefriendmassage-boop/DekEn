@@ -2,7 +2,9 @@ import liff from '@line/liff'
 import { LIFF_ID, USE_MOCK_LIFF } from '../config'
 
 // Files in /public are served next to the app, so LINE can fetch them over https.
-export const assetUrl = (name) => `${window.location.origin}${import.meta.env.BASE_URL}${name}`
+// LINE caches Flex images by URL: bump ASSET_VERSION whenever a picture in /public is replaced.
+const ASSET_VERSION = 2
+export const assetUrl = (name) => `${window.location.origin}${import.meta.env.BASE_URL}${name}?v=${ASSET_VERSION}`
 
 export const canShareFlex = () => {
   if (USE_MOCK_LIFF) return false
