@@ -13,6 +13,7 @@ supabase/migration_004.sql       Multi-category providers, phone + LINE ID, edit
 supabase/migration_005.sql       Admin back office: admins, payment ledger, review/payment functions (run after 004)
 supabase/migration_006.sql       LINE profile picture + last seen; admin user list shows recent users (run after 005)
 supabase/migration_007.sql       Automatic payment: unique-amount requests, slip ledger (run after 006)
+supabase/migration_008.sql       Idempotent admin payment entry: double tap can't apply twice (run after 007)
 supabase/functions/verify-slip/  Edge Function: verifies the slip with Thunder, opens the plan / credits the wallet
 admin.html + src/admin/          Separate admin page (not linked from the customer app)
 supabase/functions/line-auth/    Edge Function: LIFF ID token -> Supabase session
@@ -173,3 +174,14 @@ Safety: the Thunder key stays server-side; amounts come from a server-side price
 (unique amount per open request + unique transfer reference); 8 attempts/hour/user protect your Thunder quota;
 every failed attempt is listed for the admin, who can still record a payment by hand.
 Only bank-transfer slips are supported (not TrueMoney wallet slips).
+
+Manual payment entry is idempotent (migration_008): every submit carries a request id; a double tap or retry is refused with
+"already recorded" and nothing changes. The form clears after a save, so the next one is a new entry. If an entry was
+recorded twice before this fix, remove the extra one by hand:
+
+```sql
+select id, created_at, amount from public.payments where user_id = '<user id>' order by created_at;
+delete from public.payments where id = '<the duplicate payment id>';
+update public.users set vip_expires_at = vip_expires_at - interval '30 days' where id = '<user id>';   -- membership duplicate
+-- wallet duplicate: update public.users set wallet_balance = wallet_balance - <amount> where id = '<user id>';
+```

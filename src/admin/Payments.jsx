@@ -1,10 +1,19 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { MEMBERSHIP_DAYS, PLAN_META, PLANS } from '../config'
 import { baht, fmtDateTime, fmtDate, ago } from './format'
 
 const METHODS = { promptpay: 'PromptPay', bank_transfer: 'โอนธนาคาร', cash: 'เงินสด', other: 'อื่นๆ' }
+// One id per form submission; the database refuses to apply the same id twice.
+const newRequestId = () =>
+  globalThis.crypto?.randomUUID?.() ??
+  'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16)
+  })
+
 const ERRORS = {
+  DUPLICATE_REQUEST: 'รายการนี้ถูกบันทึกไปแล้ว (กดซ้ำ) ระบบไม่บันทึกซ้ำ — ถ้าต้องการบันทึกอีกครั้ง ให้สร้างรายการใหม่',
   DUPLICATE_REFERENCE: 'เลขอ้างอิงนี้ถูกบันทึกแล้วในวิธีชำระเดียวกัน (กันสลิปซ้ำ)',
   USER_NOT_FOUND: 'ไม่พบผู้ใช้',
   BAD_INPUT: 'ข้อมูลไม่ถูกต้อง',
@@ -32,6 +41,8 @@ export default function Payments({ prefill, clearPrefill, onChanged, toast }) {
   const [reference, setReference] = useState('')
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
+  const submitting = useRef(false)             // synchronous guard: a second tap can't start another request
+  const [requestId, setRequestId] = useState(newRequestId)
   const [ledger, setLedger] = useState(null)
   const [failed, setFailed] = useState([])
 
@@ -68,30 +79,43 @@ export default function Payments({ prefill, clearPrefill, onChanged, toast }) {
 
   async function submit(e) {
     e.preventDefault()
+    if (submitting.current) return
     if (!user) return toast('เลือกผู้ใช้ก่อน')
     const amt = Number(amount)
     if (!(amt > 0)) return toast('จำนวนเงินต้องมากกว่า 0')
+
+    // Heads-up when the same kind of entry was just recorded for this person (the likely double entry)
+    const recent = (ledger ?? []).find((p) => p.user_id === user.id && p.kind === kind
+      && (kind !== 'membership' || p.tier === tier) && Date.now() - new Date(p.created_at) < 15 * 60000)
+    if (recent && !window.confirm(`⚠️ ${user.display_name} มีรายการแบบเดียวกันบันทึกไปแล้วเมื่อ ${ago(recent.created_at)} (${baht(recent.amount)})\n\nต้องการบันทึกซ้ำจริงหรือไม่?`)) return
     const summary = kind === 'membership'
       ? `ให้ ${user.display_name} เป็น ${PLAN_META[tier].name} เพิ่ม ${days} วัน`
       : `เติม Wallet ให้ ${user.display_name}`
     if (!window.confirm(`${summary}\nรับชำระ ${baht(amt)} (${METHODS[method]})${reference ? `\nอ้างอิง ${reference}` : ''}\n\nยืนยัน?`)) return
 
+    submitting.current = true
     setBusy(true)
     const { error } = await supabase.rpc('admin_record_payment', {
       p_user: user.id, p_kind: kind, p_tier: kind === 'membership' ? tier : null, p_days: kind === 'membership' ? Number(days) : null,
-      p_amount: amt, p_method: method, p_reference: reference || null, p_note: note || null,
+      p_amount: amt, p_method: method, p_request_id: requestId, p_reference: reference || null, p_note: note || null,
     })
     setBusy(false)
-    if (error) return toast(errText(error.message))
+    submitting.current = false
 
-    toast('บันทึกแล้ว')
-    setReference('')
-    setNote('')
-    // refresh the selected user's numbers
-    const { data } = await supabase.rpc('admin_search_users', { p_q: user.line_user_id })
-    setUser(data?.find((u) => u.id === user.id) ?? user)
-    loadLedger()
-    onChanged()
+    const saved = !error
+    const duplicate = error?.message?.includes('DUPLICATE_REQUEST')
+    if (error) toast(errText(error.message))
+    else toast('บันทึกแล้ว')
+
+    if (saved || duplicate) {
+      // The entry exists now: clear the form so the next one is a NEW entry (new request id).
+      setRequestId(newRequestId())
+      setUser(null)
+      setReference('')
+      setNote('')
+      loadLedger()
+      onChanged()
+    }
   }
 
   const input = 'w-full rounded-xl bg-white/10 px-3 py-2.5 text-base outline-none ring-1 ring-white/10 focus:ring-line'
