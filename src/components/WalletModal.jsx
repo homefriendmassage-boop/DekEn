@@ -14,6 +14,7 @@ export default function WalletModal({ me, onTopUp, onClose, onChanged }) {
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState(null)
   const [showShare, setShowShare] = useState(false)
+  const [earnings, setEarnings] = useState([])   // my_earnings(): bonus income by source
   const [rules, setRules] = useState(null)   // { bonus_sweep_at, wallet_expires_at, expiry_enabled }
 
   const load = useCallback(async () => {
@@ -22,6 +23,7 @@ export default function WalletModal({ me, onTopUp, onClose, onChanged }) {
     setRows(data ?? [])
   }, [])
   useEffect(() => { load() }, [load, wallet, bonus])
+  useEffect(() => { supabase.rpc('my_earnings').then(({ data }) => setEarnings(data ?? [])) }, [bonus])
   useEffect(() => { supabase.rpc('my_wallet_rules').then(({ data }) => setRules(data?.[0] ?? null)) }, [wallet, bonus])
   useEffect(() => {   // expired chat holds return to the Wallet when it is opened
     supabase.rpc('release_my_expired_holds').then(({ data }) => { if (data > 0) onChanged?.() })
@@ -74,6 +76,27 @@ export default function WalletModal({ me, onTopUp, onClose, onChanged }) {
           {msg && <p className="mt-2 text-xs text-amber-100">{msg}</p>}
           <button onClick={() => setShowShare(true)} className="mt-2 w-full rounded-xl bg-white/10 py-2 text-sm font-semibold active:scale-95">🎁 {t('shareButton')}</button>
         </section>
+
+        {earnings.length > 0 && (
+          <section className="rounded-2xl bg-white/5 p-3">
+            <p className="mb-1 text-sm font-semibold">{t('earningsTitle')}</p>
+            <ul className="space-y-1 text-sm">
+              {earnings.map((e) => (
+                <li key={e.kind} className="flex items-center justify-between gap-2">
+                  <span className="min-w-0 truncate">{label(e.kind)}</span>
+                  <span className="shrink-0 text-right">
+                    <span className="font-semibold text-amber-300">{money(e.total)}</span>
+                    <span className="block text-[10px] text-neutral-500">{t('earningsMonth')} {money(e.this_month)}</span>
+                  </span>
+                </li>
+              ))}
+              <li className="flex items-center justify-between border-t border-white/10 pt-1 font-bold">
+                <span>{t('earningsTotal')}</span>
+                <span className="text-amber-300">{money(earnings.reduce((a, e) => a + Number(e.total), 0))}</span>
+              </li>
+            </ul>
+          </section>
+        )}
 
         <section>
           <p className="mb-1 text-sm font-semibold">{t('walletHistory')}</p>
