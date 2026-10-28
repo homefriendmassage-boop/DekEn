@@ -311,3 +311,7 @@ Run `supabase/migration_027.sql` once, after migration_026.
 
 Run `supabase/migration_028.sql` once, after migration_027. `contact_problem(text)` returns `NUMBER`, `LINK`, `HANDLE`, `WORD` or null. It blocks 9+ digits in a row (Thai digits, full-width digits, number words in Thai/English, separators `space . - _ ( ) +`), every link except Google Maps (`maps.app.goo.gl`, `maps.google.com`, `google.com/maps`, `goo.gl/maps`; the host must end there), `@handles`, e-mail and words like line id / whatsapp / telegram / wechat / เบอร์โทร / เลขบัญชี / promptpay.
 `send_message` raises `CONTACT_BLOCKED` before any fee is held; `normalize_worker_profile` raises `CONTACT_IN_PROFILE` for the name / about / nearby / district when they are new or changed. Known limits: a number split over several messages or hidden between letters is not caught, and a list of several 4-digit prices separated only by spaces counts as a number.
+
+## migration_029 — fuzzier contact filter
+
+Run `supabase/migration_029.sql` once, after migration_028. Words are matched after removing tone marks and spaces/dots/dashes between letters, and as stems (`เบอ`, `ไอดี`, `ไลน`, `โทรหา/โทรมา`, `line`, `ig`, `fb`, `id:` …; "ออนไลน์" and "เบอร์เกอร์" are excluded). `send_message` also adds up the sender's earlier number-only messages from the last 30 minutes: the message that brings the total to 9 digits is refused (`CONTACT_BLOCKED`).
