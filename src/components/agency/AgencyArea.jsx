@@ -19,7 +19,7 @@ const fmtDate = (v) => new Date(v).toLocaleDateString('th-TH', { dateStyle: 'med
 const baht = (n) => `${Number(n ?? 0).toLocaleString('en-US')} บาท`
 
 // Back office of a modelling agency (Thai only, like the admin). Not visible to customers.
-export default function AgencyArea({ me, onBack, onTopUp, onWallet, onChanged }) {
+export default function AgencyArea({ me, embedded, onBack, onTopUp, onWallet, onChanged }) {
   const { t } = useI18n()
   const [ag, setAg] = useState(undefined)   // undefined = loading, null = no agency yet
   const [toast, setToast] = useState(null)
@@ -36,7 +36,7 @@ export default function AgencyArea({ me, onBack, onTopUp, onWallet, onChanged })
   return (
     <div className="mx-auto w-full max-w-md pb-10">
       <header className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
-        <button onClick={onBack} className="rounded-full bg-white/10 px-2.5 py-1 text-sm active:scale-95">←</button>
+        {!embedded && <button onClick={onBack} className="rounded-full bg-white/10 px-2.5 py-1 text-sm active:scale-95">←</button>}
         {ag?.logo_path && <img src={logoUrl(ag.logo_path)} alt="" className="h-8 w-8 rounded-full object-cover" />}
         <h1 className="truncate text-lg font-bold">{ag?.name ?? '🏢 สมัครเป็นโมเดลลิ่ง / สังกัด'}</h1>
       </header>
@@ -56,6 +56,7 @@ function Apply({ ag, me, onDone, flash }) {
   const [name, setName] = useState(ag?.name ?? '')
   const [contact, setContact] = useState(ag?.contact ?? '')
   const [file, setFile] = useState(null)
+  const [preview, setPreview] = useState(null)   // object URL of the chosen logo
   const [busy, setBusy] = useState(false)
   const input = 'mt-1 w-full rounded-xl bg-white/10 px-3 py-2.5 text-base outline-none ring-1 ring-white/10 focus:ring-line'
 
@@ -67,8 +68,10 @@ function Apply({ ag, me, onDone, flash }) {
     let path = null
     if (file) {
       path = `${me.id}/logo.jpg`
-      const { error } = await supabase.storage.from('agency-logos').upload(path, await logoBlob(file), { upsert: true, contentType: 'image/jpeg' })
-      if (error) { setBusy(false); return flash('อัปโหลดโลโก้ไม่สำเร็จ') }
+      let blob
+      try { blob = await logoBlob(file) } catch { setBusy(false); return flash('อ่านรูปนี้ไม่ได้ กรุณาเลือกรูป JPG หรือ PNG') }
+      const { error } = await supabase.storage.from('agency-logos').upload(path, blob, { upsert: true, contentType: 'image/jpeg' })
+      if (error) { setBusy(false); return flash(`อัปโหลดโลโก้ไม่สำเร็จ: ${error.message}`.slice(0, 140)) }
     }
     const { error } = await supabase.rpc('agency_apply', { p_name: name, p_contact: contact, p_logo_path: path })
     setBusy(false)
@@ -87,10 +90,19 @@ function Apply({ ag, me, onDone, flash }) {
       <label className="block text-sm">เบอร์โทร / LINE ID สำหรับติดต่อ
         <input maxLength={60} value={contact} onChange={(e) => setContact(e.target.value)} className={input} />
       </label>
-      <label className="block text-sm">โลโก้สังกัด (รูปสี่เหลี่ยม ใช้แสดงบนรูปน้อง)
-        <input type="file" accept="image/jpeg,image/png" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="mt-1 block w-full text-sm" />
-      </label>
-      {ag?.logo_path && !file && <img src={logoUrl(ag.logo_path)} alt="" className="h-16 w-16 rounded-full object-cover" />}
+      <div className="space-y-2 text-sm">
+        <span>โลโก้สังกัด (รูปสี่เหลี่ยม ใช้แสดงบนรูปน้อง)</span>
+        <div className="flex items-center gap-3 rounded-2xl bg-white/5 p-3">
+          {preview || ag?.logo_path
+            ? <img src={preview ?? logoUrl(ag.logo_path)} alt="logo" className="h-20 w-20 shrink-0 rounded-full object-cover ring-2 ring-white/20" />
+            : <span className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-white/10 text-3xl">🏢</span>}
+          <label className="flex-1 cursor-pointer rounded-xl bg-white/10 py-2.5 text-center font-semibold active:scale-95">
+            {preview || ag?.logo_path ? 'เปลี่ยนรูปโลโก้' : 'เลือกรูปโลโก้'}
+            <input type="file" accept="image/*" className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0] ?? null; setFile(f); setPreview((old) => { if (old) URL.revokeObjectURL(old); return f ? URL.createObjectURL(f) : null }) }} />
+          </label>
+        </div>
+      </div>
       <button disabled={busy} className="w-full rounded-xl bg-line py-3 font-bold text-black active:scale-95 disabled:opacity-50">{busy ? 'กำลังส่ง…' : 'ส่งใบสมัคร'}</button>
     </form>
   )

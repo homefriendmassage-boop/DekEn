@@ -54,6 +54,7 @@ export default function App() {
   const [session, setSession] = useState(null)  // { profile, isMock, refCode }
   const [me, setMe] = useState(null)            // row from public.users
 
+  const [workerTab, setWorkerTab] = useState('self')   // inside the provider side: self | agency
   const [view, setView] = useState('landing')   // landing | categories | feed | worker | agency
   const [category, setCategory] = useState(null)
   const [workers, setWorkers] = useState([])
@@ -304,7 +305,6 @@ export default function App() {
           role={me?.role}
           onCustomer={() => setView('categories')}
           onWorker={() => setView('worker')}
-          onAgency={() => setView('agency')}
           invitedBy={invitedBy}
         />
       )}
@@ -333,21 +333,25 @@ export default function App() {
         </>
       )}
 
-      {view === 'agency' && (
-        <AgencyArea me={me} onBack={() => setView('landing')} onChanged={loadMe}
-          onTopUp={() => setPay({ kind: 'wallet_topup' })} onWallet={() => setShowWallet(true)} />
-      )}
-
       {view === 'worker' && (
         <>
           <Header
             displayName={session.profile.displayName}
-            title={me?.role === 'worker' ? t('workerDash') : t('applyTitle')}
+            title={t('providerSide')}
             onBack={() => setView('landing')}
           />
-          {me?.role === 'worker'
-            ? <WorkerDashboard userId={me.id} />
-            : <WorkerApply userId={me.id} defaultName={session.profile.displayName} />}
+          {/* One place for everything on the provider side: on my own, or through a modelling agency */}
+          <nav className="grid grid-cols-2 gap-2 px-4 pt-3">
+            {[['self', me?.role === 'worker' ? t('tabMyProfile') : t('tabSelf')], ['agency', t('tabAgency')]].map(([id, label]) => (
+              <button key={id} onClick={() => setWorkerTab(id)} aria-pressed={workerTab === id}
+                className={`rounded-xl py-2.5 text-sm font-bold active:scale-95 ${workerTab === id ? 'bg-line text-black' : 'bg-white/10 text-neutral-200'}`}>{label}</button>
+            ))}
+          </nav>
+          {workerTab === 'agency'
+            ? <AgencyArea embedded me={me} onChanged={loadMe} onTopUp={() => setPay({ kind: 'wallet_topup' })} onWallet={() => setShowWallet(true)} />
+            : me?.role === 'worker'
+              ? <WorkerDashboard userId={me.id} onTopUp={() => setPay({ kind: 'wallet_topup' })} />
+              : <WorkerApply userId={me.id} defaultName={session.profile.displayName} />}
         </>
       )}
 

@@ -10,7 +10,7 @@ import { logoUrl } from '../lib/logo'
 import { clearAgencyCode, getAgencyCode } from '../lib/auth'
 
 // Provider home: online switch, profile edit, photo upload, live job inbox.
-export default function WorkerDashboard({ userId }) {
+export default function WorkerDashboard({ userId, onTopUp }) {
   const { t, money, catName, statusName } = useI18n()
   const [worker, setWorker] = useState(null)
   const [jobs, setJobs] = useState([])
@@ -173,8 +173,6 @@ export default function WorkerDashboard({ userId }) {
         )}
       </section>
 
-      <RankBoost worker={worker} userId={userId} />
-
       {/* Messages from members (in-app chat; no LINE push) */}
       <section>
         <h2 className="mb-2 text-base font-bold">{t('messages')}</h2>
@@ -216,6 +214,9 @@ export default function WorkerDashboard({ userId }) {
         {worker.profile_image && <img src={worker.profile_image} alt="" className="mx-auto max-h-64 rounded-xl" />}
         <PhotoUploader userId={userId} previousOriginal={worker.original_path} onUploaded={loadWorker} />
       </section>
+      {/* Buying a rank comes last: finish and save the profile first */}
+      <RankBoost worker={worker} userId={userId} onTopUp={onTopUp} />
+
       {chat && <ChatModal threadId={chat.id} title={chat.other_name} meId={userId} onClose={() => setChat(null)} />}
     </div>
   )

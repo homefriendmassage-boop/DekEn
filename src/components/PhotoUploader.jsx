@@ -43,6 +43,7 @@ function mosaicCircle(src, cx, cy, r) {
 export default function PhotoUploader({ userId, previousOriginal, onUploaded, target = 'worker' }) {
   const { t } = useI18n()
   const boxRef = useRef(null)
+  const dragging = useRef(false)
   const [src, setSrc] = useState(null)               // object URL of the chosen file
   const [circle, setCircle] = useState({ x: 0.5, y: 0.3, r: 0.18 }) // fractions of image width
   const [preview, setPreview] = useState(null)       // { orig: Blob, pub: Blob, url }
@@ -59,7 +60,8 @@ export default function PhotoUploader({ userId, previousOriginal, onUploaded, ta
     setSrc(URL.createObjectURL(f))
   }
 
-  // Tap / drag on the photo to move the circle (touch-action:none stops page scroll while dragging).
+  // Only the yellow circle is draggable (touch-action:none on the circle alone), so swiping anywhere else on the
+  // page still scrolls normally. The photo is capped to ~55% of the screen height so there is always room to scroll.
   function place(e) {
     const rect = boxRef.current.getBoundingClientRect()
     setCircle((c) => ({
@@ -133,7 +135,7 @@ export default function PhotoUploader({ userId, previousOriginal, onUploaded, ta
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 pb-24">
       <p className="text-xs text-neutral-400">{t('photoHelp')}</p>
 
       <label className="block w-full cursor-pointer rounded-xl bg-white/10 py-2.5 text-center text-sm font-semibold active:scale-95">
@@ -143,15 +145,12 @@ export default function PhotoUploader({ userId, previousOriginal, onUploaded, ta
 
       {src && !preview && (
         <>
-          <div
-            ref={boxRef}
-            className="relative w-full touch-none select-none overflow-hidden rounded-xl bg-black"
-            onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); place(e) }}
-            onPointerMove={(e) => e.buttons && place(e)}
-          >
-            <img src={src} alt="" className="block w-full" draggable={false} />
+          <div ref={boxRef} className="relative mx-auto w-fit max-w-full select-none overflow-hidden rounded-xl bg-black">
+            <img src={src} alt="" className="block max-h-[52vh] w-auto max-w-full" draggable={false} />
             <div
-              className="pointer-events-none absolute rounded-full border-2 border-amber-400 bg-amber-400/20"
+              role="slider"
+              aria-label={t('faceSize')}
+              className="absolute cursor-grab touch-none rounded-full border-2 border-amber-400 bg-amber-400/25 shadow-[0_0_0_2px_rgba(0,0,0,0.35)]"
               style={{
                 left: `${circle.x * 100}%`,
                 top: `${circle.y * 100}%`,
@@ -159,7 +158,13 @@ export default function PhotoUploader({ userId, previousOriginal, onUploaded, ta
                 aspectRatio: '1',
                 transform: 'translate(-50%, -50%)',
               }}
-            />
+              onPointerDown={(e) => { dragging.current = true; e.currentTarget.setPointerCapture(e.pointerId); e.preventDefault() }}
+              onPointerMove={(e) => { if (dragging.current) place(e) }}
+              onPointerUp={() => { dragging.current = false }}
+              onPointerCancel={() => { dragging.current = false }}
+            >
+              <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-lg opacity-80">✥</span>
+            </div>
           </div>
           <label className="block text-xs text-neutral-400">
             {t('faceSize')}
@@ -178,7 +183,7 @@ export default function PhotoUploader({ userId, previousOriginal, onUploaded, ta
       {preview && (
         <>
           <p className="text-xs text-amber-300">{t('publicPreview')}</p>
-          <img src={preview.url} alt="" className="w-full rounded-xl" />
+          <img src={preview.url} alt="" className="mx-auto block max-h-[52vh] w-auto max-w-full rounded-xl" />
           <div className="grid grid-cols-2 gap-3">
             <button onClick={() => setPreview(null)} disabled={busy} className="rounded-xl bg-white/10 py-2.5 text-sm font-semibold active:scale-95">{t('back')}</button>
             <button onClick={upload} disabled={busy} className="rounded-xl bg-line py-2.5 text-sm font-bold text-black active:scale-95 disabled:opacity-50">

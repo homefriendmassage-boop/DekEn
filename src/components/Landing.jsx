@@ -1,7 +1,8 @@
 import { LangSwitcher, useI18n } from '../i18n'
+import logo from '../assets/dekn-logo.jpg'
 
 // First screen: customer or provider.
-export default function Landing({ displayName, role, onCustomer, onWorker, onAgency, invitedBy }) {
+export default function Landing({ displayName, role, onCustomer, onWorker, invitedBy }) {
   const { t } = useI18n()
   const isWorker = role === 'worker'
 
@@ -13,6 +14,7 @@ export default function Landing({ displayName, role, onCustomer, onWorker, onAge
       </div>
 
       <div className="flex flex-1 flex-col justify-center gap-4">
+        <img src={logo} alt="DekN" className="mx-auto h-40 w-40 rounded-[2rem] object-cover shadow-lg ring-1 ring-white/10" />
         <h1 className="mb-2 text-center text-2xl font-extrabold">{t('landingTitle')}</h1>
 
         {invitedBy && (
@@ -28,7 +30,6 @@ export default function Landing({ displayName, role, onCustomer, onWorker, onAge
           sub={isWorker ? t('workerAreaSub') : t('imWorkerSub')}
           onClick={onWorker}
         />
-        {onAgency && <Choice emoji="🏢" title={t('agencyArea')} sub={t('agencyAreaSub')} onClick={onAgency} />}
       </div>
     </div>
   )

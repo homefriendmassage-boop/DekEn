@@ -7,7 +7,7 @@ const PACKS = [[1, 'rankDay1'], [3, 'rankDay3'], [7, 'rankDay7']]
 
 // "ซื้ออันดับ": a provider buys a fixed place in her category's list (positions 1-4 / 5-8 / 9-12, 4 places each).
 // Paid from the bonus wallet first, the rest from the Wallet. The server decides everything; this only asks.
-export default function RankBoost({ worker, userId }) {
+export default function RankBoost({ worker, userId, onTopUp }) {
   const { t, money, catName } = useI18n()
   const cats = worker.categories ?? []
   const [cat, setCat] = useState(cats[0] ?? null)
@@ -42,6 +42,7 @@ export default function RankBoost({ worker, userId }) {
     setBusy(false)
     if (error) {
       const code = ['INSUFFICIENT_BALANCE', 'SLOTS_FULL', 'ALREADY_BOOSTED', 'NOT_LISTED', 'SUSPENDED'].find((c) => error.message.includes(c))
+      if (code === 'INSUFFICIENT_BALANCE' && onTopUp && window.confirm(t('rankNeedTopup'))) return onTopUp()
       return setMsg(t(code ? `rankErr_${code}` : 'errGeneric'))
     }
     setMsg(t('rankBought', { date: new Date(data).toLocaleDateString() }))
@@ -56,6 +57,7 @@ export default function RankBoost({ worker, userId }) {
       <div>
         <h2 className="text-base font-bold">⭐ {t('rankTitle')}</h2>
         <p className="text-xs text-neutral-400">{t('rankHint')}</p>
+        <p className="mt-1 text-[11px] text-amber-200/80">{t('rankAfterSave')}</p>
       </div>
 
       {cats.length > 1 && (
