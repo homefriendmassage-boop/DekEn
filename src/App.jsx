@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from './supabaseClient'
-import { signIn, takeOpenIntent, takeWorkerIntent, takeChatIntent, isOaFriend, getAgencyCode } from './lib/auth'
+import { signIn, takeOpenIntent, takeWorkerIntent, takeChatIntent, takeDraftIntent, isOaFriend, getAgencyCode } from './lib/auth'
 import { LINE_OA_URL } from './config'
 import { getPosition } from './lib/geo'
 import { CATEGORIES, PLAN_META, canViewWorker, suspensionOf, tierOf } from './config'
@@ -20,6 +20,7 @@ import SupportChat from './components/SupportChat'
 import AgencyArea from './components/agency/AgencyArea'
 import ThreadList from './components/ThreadList'
 import WorkerDetail from './components/WorkerDetail'
+import ClaimDraft from './components/ClaimDraft'
 
 // Mock mode only, when the workers table is empty: lets you click through the UI
 // before running seed SQL. Rank within a category = order in this list.
@@ -78,6 +79,7 @@ export default function App() {
   const [invitedBy, setInvitedBy] = useState(null)       // agency name when the app was opened from an agency invitation
   const [walletPaying, setWalletPaying] = useState(false)
   const [termsBusy, setTermsBusy] = useState(false)
+  const [claim, setClaim] = useState(null)            // token of an application draft someone filled in for her
   const [openChat, setOpenChat] = useState(null)      // chat to open inside the provider side
   const [shared, setShared] = useState(null)         // { id, friend, worker } when the app was opened from a shared profile link
   const [pay, setPay] = useState(null)               // { kind: 'membership', tier } | { kind: 'wallet_topup' }
@@ -119,6 +121,8 @@ export default function App() {
           if (th && th.worker_id === meRow.id) { setView('worker'); setWorkerTab('self'); setOpenChat(th) }
           else if (th) { setView('categories'); setChat(th) }
         }
+        const draftTok = takeDraftIntent()     // a link an admin / modelling agency issued for her
+        if (draftTok) setClaim(draftTok)
         const sharedId = takeWorkerIntent()
         if (sharedId) { setView('categories'); setShared({ id: sharedId, friend: await isOaFriend(), worker: null }) }
         if (!cancelled) setPhase('ready')
@@ -410,6 +414,8 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {claim && <ClaimDraft token={claim} onClose={() => setClaim(null)} onDone={async () => { setClaim(null); setView('worker'); setWorkerTab('self'); await loadMe() }} />}
 
       {shared && !shared.friend && (
         <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/80 p-4">

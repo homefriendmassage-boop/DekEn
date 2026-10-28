@@ -1,3 +1,4 @@
+import DraftsPanel from '../DraftsPanel'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../../supabaseClient'
 import { logoBlob, logoUrl } from '../../lib/logo'
@@ -110,7 +111,7 @@ function Apply({ ag, me, onDone, flash }) {
 
 function Dashboard({ ag, me, reload, flash, onTopUp, onWallet, onChanged }) {
   const [tab, setTab] = useState('girls')
-  const tabs = [['girls', '👯 น้อง'], ['reqs', '⏳ รออนุมัติ'], ['chat', '💬 แชต'], ['plan', '🧾 แพ็กเกจ']]
+  const tabs = [['girls', '👯 น้อง'], ['reqs', '⏳ รออนุมัติ'], ['drafts', '📝 ร่างใบสมัคร'], ['chat', '💬 แชต'], ['plan', '🧾 แพ็กเกจ']]
   return (
     <div>
       <nav className="flex gap-2 overflow-x-auto px-4 py-3">
@@ -124,6 +125,7 @@ function Dashboard({ ag, me, reload, flash, onTopUp, onWallet, onChanged }) {
       <div className="px-4">
         {tab === 'girls' && <Girls flash={flash} reload={reload} />}
         {tab === 'reqs' && <Requests flash={flash} reload={reload} />}
+        {tab === 'drafts' && <DraftsPanel mode="agency" toast={flash} />}
         {tab === 'chat' && <AgencyChats me={me} onTopUp={onTopUp} />}
         {tab === 'plan' && <Plan ag={ag} me={me} reload={reload} flash={flash} onTopUp={onTopUp} onWallet={onWallet} onChanged={onChanged} />}
       </div>

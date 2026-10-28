@@ -49,6 +49,28 @@ export function takeWorkerIntent() {
     return v && UUID.test(v) ? v : null
   } catch { return null }
 }
+// Opened from a link an admin / modelling agency issued for her: https://liff.line.me/<id>?draft=<64 hex>
+const DRAFT = /^[0-9a-f]{64}$/i
+export function captureDraftParam() {
+  const params = new URLSearchParams(window.location.search)
+  let tok = params.get('draft')
+  if (!tok) {
+    const state = params.get('liff.state')
+    if (state) {
+      const q = state.indexOf('?')
+      tok = new URLSearchParams(q >= 0 ? state.slice(q) : state).get('draft')
+    }
+  }
+  try { if (tok && DRAFT.test(tok)) sessionStorage.setItem('open_draft', tok) } catch { /* storage blocked */ }
+}
+export function takeDraftIntent() {
+  try {
+    const v = sessionStorage.getItem('open_draft')
+    sessionStorage.removeItem('open_draft')
+    return v && DRAFT.test(v) ? v : null
+  } catch { return null }
+}
+
 // Opened from the "new message" LINE push: https://liff.line.me/<id>?chat=<thread uuid>
 export function captureChatParam() {
   const params = new URLSearchParams(window.location.search)
@@ -146,6 +168,7 @@ export async function signIn() {
   captureOpenParam()
   captureWorkerParam()
   captureChatParam()
+  captureDraftParam()
   captureAgencyCode()
 
   let profile
@@ -189,6 +212,7 @@ export async function signIn() {
   captureOpenParam()
   captureWorkerParam()
   captureChatParam()
+  captureDraftParam()
   captureAgencyCode()
   const refCode = captureRefCode() // URL is clean again after init(); re-check
   if (refCode) {

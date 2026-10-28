@@ -332,3 +332,19 @@ Run `supabase/migration_032.sql` once, after migration_031.
 - **Report a profile:** "🚩 รายงานโปรไฟล์นี้" on the details page → `report_worker`. Admin tab "🚩 ธง/รายงาน" → "🪪 รายงานโปรไฟล์": dismiss, hide (`workers.admin_hidden`, removed from every list through `worker_listed`, the provider sees a notice on her dashboard) or show again.
 - **Room notices instead of push:** suspend / unblock / close add a system message to the chat (`chat_messages.kind = sys_suspended | sys_unblocked | sys_closed`); system messages never trigger a push.
 - **Closing a chat for good:** `chat_culprit()` = the side with more refused contact attempts. Worker side → the held fee is refunded to the customer (paying the worker is refused with `WORKER_CULPRIT`). Customer side or unclear → the admin chooses "คืนเงินลูกค้า" or "จ่ายน้อง" (the held fee is captured into her Bonus wallet as chat income).
+
+## migration_033 / 034 — two application forms, drafts filled in by an admin or a modelling agency, free location change
+
+Run `supabase/migration_033.sql` and then `supabase/migration_034.sql`, once, after migration_032.
+
+**033 — groups and location**
+- `grp` on `workers` / `worker_applications`: `night` (bartender + ENT) or `spa` (masseuse + spa), derived from `categories` by `normalize_worker_profile` (`MIXED_GROUPS` if mixed). Two separate application forms (group chooser first); customers see the same lists as before.
+- Spa profiles: session prices `@60` / `@90` / `@120` (+ own rows), tags `thai_massage, oil, foot, aroma, sports, scrub, polite, punctual, experienced`, `service_mode` (`shop` / `outcall` / `both`, required), no height/weight/measurements. Default starting rate: 60 → 90 → 120.
+- `update_my_location(lat, lng, district, nearby)`: a provider moves her GPS location + district + nearby area at any time, free, no approval (max 10 per day). The edit-request form no longer contains location fields.
+- **One account still has one profile.** Two profiles per person would need `workers` (and the chat, job, rank and money paths that key on `workers.user_id`) to be re-keyed; not done.
+
+**034 — application drafts** (`application_drafts`, `draft_photos`, `draft_owner_map`)
+- Admin: tab "➕ แบบร่างให้น้อง" → fills in the form + photos → issues a link at once. The girl opens it with her own LINE, confirms her GPS location, chooses self-application or an agency code, ticks 20+ / consent / terms. A normal pending application is created (age check + approval as usual).
+- Modelling agency: tab "📝 ร่างใบสมัคร" in the agency area → submit to an admin → admin approves (link issued) or rejects with a reason → the agency sends the link. An agency draft always joins that agency when claimed (the slot is counted then: `AGENCY_FULL` otherwise). The agency may re-issue the link of an already approved draft.
+- Link = `https://liff.line.me/<LIFF_ID>?draft=<64 hex>`: works once, 3 days from issue (`link_expires_at`, cron `expire-application-drafts` hourly), then `EXPIRED`.
+- Photos live in `<draft id>/` (storage insert/delete policies allow the creator while the draft is editable); after the claim `draft_owner_map` lets the girl's clear originals be read through `photo_owner()`.

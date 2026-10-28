@@ -9,6 +9,7 @@ import Support from './Support'
 import Agencies from './Agencies'
 import ProfileEdits from './ProfileEdits'
 import Chats from './Chats'
+import DraftsPanel from '../components/DraftsPanel'
 import { baht } from './format'
 
 // Separate back office (admin.html). Access is decided by the DATABASE: every admin_* function
@@ -20,6 +21,7 @@ export default function AdminApp() {
   const [tab, setTab] = useState('apps')
   const [stats, setStats] = useState(null)
   const [editCount, setEditCount] = useState(0)   // pending profile changes + removal requests
+  const [draftCount, setDraftCount] = useState(0)    // agency drafts waiting for review
   const [chatCount, setChatCount] = useState(0)    // flagged / reported / suspended chats waiting for a decision
   const [prefill, setPrefill] = useState(null)   // { user, tier } from "renew" on the Members tab
   const [toast, setToast] = useState(null)
@@ -31,6 +33,8 @@ export default function AdminApp() {
     setStats(data?.[0] ?? null)
     const [e, d] = await Promise.all([supabase.rpc('admin_list_profile_edits', { p_status: 'pending' }), supabase.rpc('admin_list_deletions')])
     setEditCount((e.data?.length ?? 0) + (d.data?.length ?? 0))
+    const dr = await supabase.rpc('admin_drafts_list', { p_filter: 'review' })
+    setDraftCount(Array.isArray(dr.data) ? dr.data.length : 0)
     const c = await supabase.rpc('admin_chat_pending_count')
     setChatCount(typeof c.data === 'number' ? c.data : 0)
   }, [])
@@ -84,6 +88,7 @@ export default function AdminApp() {
     ['reviews', `🔎 ตรวจสลิป${stats?.pending_reviews ? ` (${stats.pending_reviews})` : ''}`],
     ['support', `💬 แชท${stats?.support_unread ? ` (${stats.support_unread})` : ''}`],
     ['pay', '💳 รับชำระเงิน'],
+    ['drafts', `➕ แบบร่างให้น้อง${draftCount ? ` (${draftCount})` : ''}`],
     ['chats', `🚩 ธง/รายงาน${chatCount ? ` (${chatCount})` : ''}`],
     ['edits', `✏️ แก้ไข/ลบโปรไฟล์${editCount ? ` (${editCount})` : ''}`],
     ['agencies', '🏢 สังกัด'],
@@ -122,6 +127,7 @@ export default function AdminApp() {
         {tab === 'reviews' && <Reviews onChanged={loadStats} toast={showToast} />}
         {tab === 'support' && <Support onChanged={loadStats} />}
         {tab === 'pay' && <Payments prefill={prefill} clearPrefill={() => setPrefill(null)} onChanged={loadStats} toast={showToast} />}
+        {tab === 'drafts' && <DraftsPanel mode="admin" toast={showToast} />}
         {tab === 'chats' && <Chats onChanged={loadStats} toast={showToast} />}
         {tab === 'edits' && <ProfileEdits onChanged={loadStats} toast={showToast} />}
         {tab === 'agencies' && <Agencies onChanged={loadStats} toast={showToast} />}

@@ -14,12 +14,12 @@ export function LocBadge({ verified }) {
   )
 }
 
-export const priceLabel = (label, t) => (label === '1h' ? t('price1h') : label === '@4h' ? t('price4h') : label === '@6h' ? t('price6h') : label)
+export const priceLabel = (label, t) => ({ '1h': t('price1h'), '@4h': t('price4h'), '@6h': t('price6h'), '@60': t('price60'), '@90': t('price90'), '@120': t('price120') }[label] ?? label)
 
 // All of a provider's rates as [key, label, price], in display order: 4 h, 6 h, hourly, then her own rows.
 export function ratesOf(w, t) {
   const rows = Array.isArray(w.price_options) ? w.price_options : []
-  const rank = (l) => (l === '@4h' ? 0 : l === '@6h' ? 1 : l === '1h' ? 2 : 3)
+  const rank = (l) => ({ '@60': 0, '@90': 1, '@120': 2, '@4h': 3, '@6h': 4, '1h': 5 }[l] ?? 9)
   const list = rows.map((o, i) => [o.label, priceLabel(o.label, t), o.price, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[3] - b[3])
   return list.length ? list.map(([k, l, p]) => [k, l, p]) : [['1h', t('price1h'), w.price]]
 }
@@ -83,6 +83,7 @@ export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlo
     w.height_cm && [t('fHeight'), `${w.height_cm}`],
     w.weight_kg && [t('fWeight'), `${w.weight_kg}`],
     w.measurements && [t('fMeasure'), w.measurements],
+    w.service_mode && [t('fServiceMode'), t(`serviceMode_${w.service_mode}`)],
     w.province && [t('fProvince'), `${w.province}${w.district ? ` · ${w.district}` : ''}`],
   ].filter(Boolean)
   const prices = ratesOf(w, t)

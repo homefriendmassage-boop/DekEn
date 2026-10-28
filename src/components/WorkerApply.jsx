@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { CATEGORIES } from '../config'
 import { useI18n } from '../i18n'
 import PhotoManager from './PhotoManager'
 import AgeProof from './AgeProof'
 import { uploadPhoto } from '../lib/photos'
-import WorkerFields, { emptyProfile, profileFromRow, profileToPayload, validateProfile } from './WorkerFields'
+import WorkerFields, { GROUP_CATEGORIES, emptyProfile, groupOf, profileFromRow, profileToPayload, validateProfile } from './WorkerFields'
 import { clearAgencyCode, getAgencyCode } from '../lib/auth'
 import { logoUrl } from '../lib/logo'
 
@@ -25,6 +24,7 @@ export default function WorkerApply({ userId, defaultName }) {
   const [form, setForm] = useState({ ...EMPTY, display_name: defaultName ?? '' })
   const [busy, setBusy] = useState(false)
   const [prof, setProf] = useState(emptyProfile)
+  const [grp, setGrp] = useState(null)          // night (bartender / ENT) or spa (masseuse / spa): two separate forms
   const [terms, setTerms] = useState(false)
   const [photos, setPhotos] = useState([])     // my_photos() rows (an existing application)
   const [local, setLocal] = useState([])       // pictures picked before the application exists
@@ -38,7 +38,7 @@ export default function WorkerApply({ userId, defaultName }) {
       .eq('user_id', userId).order('created_at', { ascending: false }).limit(1)
     const row = data?.[0] ?? null
     setApp(row)
-    if (row) { setForm(toForm(row)); setProf(profileFromRow(row)) } // pending: edit it; rejected: prefill a fresh attempt
+    if (row) { setForm(toForm(row)); setProf(profileFromRow(row)); setGrp(row.status === 'pending' ? groupOf(row.categories) : null) } // pending: edit it; rejected: prefill a fresh attempt
     if (row?.status === 'pending') { const ph = await supabase.rpc('my_photos'); setPhotos(ph.data ?? []) }
     setLoading(false)
   }, [userId])
@@ -65,7 +65,7 @@ export default function WorkerApply({ userId, defaultName }) {
     setError(null)
     setNote(null)
     if (form.categories.length === 0) return setError(t('pickCategory'))
-    const bad = validateProfile(prof)
+    const bad = validateProfile(prof, grp)
     if (bad) return setError(t(bad))
     if (app?.status !== 'pending' && !terms) return setError(t('errTerms'))
     if (app?.status !== 'pending' && local.length === 0) return setError(t('errNeedPhoto'))
@@ -75,7 +75,7 @@ export default function WorkerApply({ userId, defaultName }) {
     const payload = {
       display_name: form.display_name.trim(),
       categories: form.categories,
-      ...profileToPayload(prof),
+      ...profileToPayload(prof, grp),
       district: form.district.trim() || null,
       nearby: form.nearby.trim() || null,
       phone: form.phone.trim() || null,
@@ -88,7 +88,7 @@ export default function WorkerApply({ userId, defaultName }) {
       ? await supabase.from('worker_applications').update(payload).eq('id', app.id)
       : await supabase.from('worker_applications').insert({ user_id: userId, ...payload, accepted_terms: true, agency_code: joining ? invite : null })
     setBusy(false)
-    if (error) return setError(error.message.includes('app_contact_check') ? t('errPhone') : error.message.includes('AGENCY_NOT_FOUND') ? t('errAgencyNotFound') : error.message.includes('AGENCY_FULL') ? t('errAgencyFull') : error.message.includes('CONTACT_IN_PROFILE') ? t('errContactProfile') : t('errApply'))
+    if (error) return setError(error.message.includes('app_contact_check') ? t('errPhone') : error.message.includes('AGENCY_NOT_FOUND') ? t('errAgencyNotFound') : error.message.includes('AGENCY_FULL') ? t('errAgencyFull') : error.message.includes('CONTACT_IN_PROFILE') ? t('errContactProfile') : error.message.includes('MIXED_GROUPS') ? t('errMixedGroups') : t('errApply'))
     if (joining) clearAgencyCode()
     if (!editing && local.length > 0) {            // the application exists now: send the pictures picked earlier
       try { for (const pic of local) await uploadPhoto(userId, pic, 'application') } catch (e) { console.error(e); setError(t('errUpload')) }
@@ -101,6 +101,26 @@ export default function WorkerApply({ userId, defaultName }) {
   if (loading) return <p className="py-20 text-center text-neutral-500">{t('loading')}</p>
 
   const editing = app?.status === 'pending'
+  if (!editing && !grp) {
+    // Step 1: which kind of provider? (separate forms, same listing for customers)
+    return (
+      <div className="space-y-4 p-4">
+        <p className="text-sm text-neutral-400">{t('applySub')}</p>
+        {app?.status === 'rejected' && (
+          <p className="rounded-xl bg-red-500/10 p-2 text-sm text-red-300">{t('appRejected')}{app.reject_reason ? ` — ${app.reject_reason}` : ''}</p>
+        )}
+        <h2 className="text-base font-bold">{t('pickGroup')}</h2>
+        {[['night', '🍸', t('groupNight'), t('groupNightSub')], ['spa', '💆', t('groupSpa'), t('groupSpaSub')]].map(([g, icon, title, sub]) => (
+          <button key={g} onClick={() => { setGrp(g); setForm((f) => ({ ...f, categories: f.categories.filter((c) => GROUP_CATEGORIES[g].includes(c)) })); setProf(emptyProfile()) }}
+            className="flex w-full items-center gap-4 rounded-3xl bg-white/5 p-4 text-left ring-1 ring-white/10 active:scale-[0.98]">
+            <span className="text-4xl">{icon}</span>
+            <span><span className="block text-lg font-bold">{title}</span><span className="block text-xs text-neutral-400">{sub}</span></span>
+          </button>
+        ))}
+        <p className="text-[11px] text-neutral-500">{t('oneProfileNote')}</p>
+      </div>
+    )
+  }
   const input = 'mt-1 w-full rounded-xl bg-white/10 px-3 py-2.5 text-base outline-none ring-1 ring-white/10 focus:ring-line'
 
   return (
@@ -124,7 +144,10 @@ export default function WorkerApply({ userId, defaultName }) {
 
       {/* Promo pictures: 1-5, attached to the application so the admin can judge them together with the form */}
       <section className="space-y-3">
-        <h2 className="text-base font-bold">{t('appPhotoTitle')}</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-bold">{t('appPhotoTitle')}</h2>
+          <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold">{grp === 'spa' ? `💆 ${t('groupSpa')}` : `🍸 ${t('groupNight')}`}{!editing && <button type="button" onClick={() => setGrp(null)} className="ml-2 underline">{t('changeGroup')}</button>}</span>
+        </div>
         <PhotoManager userId={userId} state="application" photos={photos} local={editing ? undefined : local} setLocal={editing ? undefined : setLocal} onChanged={load} />
       </section>
 
@@ -159,7 +182,7 @@ export default function WorkerApply({ userId, defaultName }) {
         <fieldset>
           <legend className="text-sm">{t('fCategories')}</legend>
           <div className="mt-2 flex flex-wrap gap-2">
-            {CATEGORIES.map((c) => {
+            {GROUP_CATEGORIES[grp].map((c) => {
               const on = form.categories.includes(c)
               return (
                 <button
@@ -175,7 +198,7 @@ export default function WorkerApply({ userId, defaultName }) {
           </div>
         </fieldset>
 
-        <WorkerFields v={prof} set={(p) => setProf((x) => ({ ...x, ...p }))} />
+        <WorkerFields v={prof} set={(p) => setProf((x) => ({ ...x, ...p }))} grp={grp} />
         <label className="block text-sm">{t('fDistrict')}
           <input maxLength={60} value={form.district} onChange={set('district')} className={input} />
         </label>

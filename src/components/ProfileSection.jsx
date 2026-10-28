@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useI18n } from '../i18n'
-import WorkerFields, { profileFromRow, profileToPayload, validateProfile } from './WorkerFields'
+import WorkerFields, { groupOf, profileFromRow, profileToPayload, validateProfile } from './WorkerFields'
+import { getPosition } from '../lib/geo'
 import PhotoManager from './PhotoManager'
 import { LocBadge, ratesOf } from './WorkerDetail'
 
@@ -11,7 +12,7 @@ const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
 function diffProfile(payload, w) {
   const cur = {
     price: Number(w.price), gender: w.gender, age: w.age, height_cm: w.height_cm, weight_kg: w.weight_kg,
-    measurements: w.measurements, tags: [...(w.tags ?? [])].sort(), about: w.about, price_options: w.price_options ?? [], start_rate: w.start_rate ?? '1h',
+    measurements: w.measurements, tags: [...(w.tags ?? [])].sort(), about: w.about, price_options: w.price_options ?? [], start_rate: w.start_rate ?? '1h', service_mode: w.service_mode ?? null,
     district: w.district, nearby: w.nearby, province: w.province, display_name: w.display_name,
   }
   const out = {}
@@ -27,12 +28,11 @@ function diffProfile(payload, w) {
 // profile stays as it is until then. First approved request is free, later ones cost money (refunded if not approved).
 export default function ProfileSection({ worker, userId, onChanged, onTopUp }) {
   const { t, money, catName } = useI18n()
+  const grp = worker.grp ?? groupOf(worker.categories)
   const [mode, setMode] = useState('view')            // view | edit
   const [photos, setPhotos] = useState([])
   const [status, setStatus] = useState(null)          // my_edit_status()
   const [name, setName] = useState('')
-  const [district, setDistrict] = useState('')
-  const [nearby, setNearby] = useState('')
   const [prof, setProf] = useState(null)
   const [removeIds, setRemoveIds] = useState([])
   const [busy, setBusy] = useState(false)
@@ -48,8 +48,6 @@ export default function ProfileSection({ worker, userId, onChanged, onTopUp }) {
 
   function startEdit() {
     setName(worker.display_name ?? '')
-    setDistrict(worker.district ?? '')
-    setNearby(worker.nearby ?? '')
     setProf(profileFromRow(worker))
     setRemoveIds([])
     setError(null)
@@ -59,9 +57,9 @@ export default function ProfileSection({ worker, userId, onChanged, onTopUp }) {
 
   async function submit() {
     setError(null)
-    const bad = validateProfile(prof)
+    const bad = validateProfile(prof, grp, { needLocation: false })
     if (bad) return setError(t(bad))
-    const payload = { display_name: name.trim(), ...profileToPayload(prof), district: district.trim() || null, nearby: nearby.trim() || null }
+    const payload = { display_name: name.trim(), ...profileToPayload(prof, grp) }
     const changes = diffProfile(payload, worker)
     const fee = status && status.free_left <= 0 ? Number(status.fee) : 0
     if (!window.confirm(fee > 0 ? t('editConfirmFee', { fee: money(fee) }) : t('editConfirmFree'))) return
@@ -69,7 +67,7 @@ export default function ProfileSection({ worker, userId, onChanged, onTopUp }) {
     const { error } = await supabase.rpc('submit_profile_edit', { p_changes: changes, p_remove: removeIds })
     setBusy(false)
     if (error) {
-      const code = ['NOTHING_TO_CHANGE', 'REQUEST_PENDING', 'INSUFFICIENT_BALANCE', 'TOO_MANY_PHOTOS', 'NO_PHOTO', 'BAD_AGE', 'CONTACT_IN_PROFILE', 'SUSPENDED'].find((c) => error.message.includes(c))
+      const code = ['NOTHING_TO_CHANGE', 'REQUEST_PENDING', 'INSUFFICIENT_BALANCE', 'TOO_MANY_PHOTOS', 'NO_PHOTO', 'BAD_AGE', 'CONTACT_IN_PROFILE', 'BAD_START_RATE', 'SUSPENDED'].find((c) => error.message.includes(c))
       if (code === 'INSUFFICIENT_BALANCE' && onTopUp && window.confirm(t('editNeedTopup', { fee: money(fee) }))) return onTopUp()
       return setError(t(code ? `editErr_${code}` : 'errGeneric'))
     }
@@ -115,13 +113,8 @@ export default function ProfileSection({ worker, userId, onChanged, onTopUp }) {
         <label className="block text-sm">{t('fName')}
           <input value={name} maxLength={40} onChange={(e) => setName(e.target.value)} className={input} />
         </label>
-        <WorkerFields v={prof} set={(p) => setProf((x) => ({ ...x, ...p }))} />
-        <label className="block text-sm">{t('fDistrict')}
-          <input value={district} maxLength={60} onChange={(e) => setDistrict(e.target.value)} className={input} />
-        </label>
-        <label className="block text-sm">{t('fNearby')}
-          <input value={nearby} maxLength={120} onChange={(e) => setNearby(e.target.value)} className={input} />
-        </label>
+        <WorkerFields v={prof} set={(p) => setProf((x) => ({ ...x, ...p }))} grp={grp} hideLocation />
+        <p className="rounded-xl bg-white/5 p-3 text-xs text-neutral-400">📍 {t('locChangeInfo')}</p>
         <PhotoManager userId={userId} state="pending_add" photos={photos} removeIds={removeIds} setRemoveIds={setRemoveIds} onChanged={load} />
         {error && <p className="rounded-lg bg-red-500/10 p-2 text-sm text-red-300">{error}</p>}
         <div className="grid grid-cols-2 gap-2">
@@ -136,6 +129,7 @@ export default function ProfileSection({ worker, userId, onChanged, onTopUp }) {
     worker.gender && [t('fGender'), t(`gender_${worker.gender}`)], worker.age && [t('fAge'), worker.age],
     worker.height_cm && [t('fHeight'), worker.height_cm], worker.weight_kg && [t('fWeight'), worker.weight_kg],
     worker.measurements && [t('fMeasure'), worker.measurements],
+    worker.service_mode && [t('fServiceMode'), t(`serviceMode_${worker.service_mode}`)],
   ].filter(Boolean)
   const prices = ratesOf(worker, t)
 
@@ -183,6 +177,8 @@ export default function ProfileSection({ worker, userId, onChanged, onTopUp }) {
         </ul>
       </div>
 
+      <LocationChange worker={worker} onChanged={onChanged} />
+
       <div className="space-y-2">
         <h3 className="text-sm font-bold">{t('photosTitle', { n: live.length, max: 5 })}</h3>
         {live.length === 0 ? <p className="text-xs text-neutral-500">{t('noPhotos')}</p> : (
@@ -200,6 +196,68 @@ export default function ProfileSection({ worker, userId, onChanged, onTopUp }) {
       {!status?.delete_requested_at && (
         <button onClick={deleteProfile} className="w-full rounded-xl bg-red-500/10 py-2.5 text-sm font-semibold text-red-300 active:scale-95">🗑 {t('deleteStart')}</button>
       )}
+    </section>
+  )
+}
+
+// Free and instant: she moves (GPS) and updates district / nearby area; everything else stays locked behind edit requests.
+function LocationChange({ worker, onChanged }) {
+  const { t } = useI18n()
+  const [step, setStep] = useState('idle')          // idle | form
+  const [pos, setPos] = useState(null)
+  const [province, setProvince] = useState('')
+  const [district, setDistrict] = useState('')
+  const [nearby, setNearby] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState(null)
+  const [done, setDone] = useState(false)
+  const input = 'mt-1 w-full rounded-xl bg-white/10 px-3 py-2.5 text-base outline-none ring-1 ring-white/10 focus:ring-line'
+
+  async function start() {
+    setBusy(true); setErr(null); setDone(false)
+    try {
+      const p = await getPosition()
+      const { data } = await supabase.rpc('province_for', { p_lat: p.lat, p_lng: p.lng })
+      if (!data) { setErr(t('locOutside')); return }
+      setPos(p); setProvince(data); setDistrict(''); setNearby('')       // she moved: the old district / area no longer applies
+      setStep('form')
+    } catch { setErr(t('locDenied')) } finally { setBusy(false) }
+  }
+
+  async function save() {
+    setBusy(true); setErr(null)
+    const { error } = await supabase.rpc('update_my_location', { p_lat: pos.lat, p_lng: pos.lng, p_district: district, p_nearby: nearby })
+    setBusy(false)
+    if (error) return setErr(t(error.message.includes('CONTACT_IN_PROFILE') ? 'errContactProfile' : error.message.includes('RATE_LIMIT') ? 'locRate' : 'errGeneric'))
+    setStep('idle'); setDone(true)
+    onChanged?.()
+  }
+
+  return (
+    <section className="space-y-2 rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
+      <h3 className="text-sm font-bold">📍 {t('locChangeTitle')}</h3>
+      {step === 'idle' ? (
+        <>
+          <p className="text-xs text-neutral-400">{t('locChangeHint')}</p>
+          <button onClick={start} disabled={busy} className="w-full rounded-xl bg-line py-2.5 font-bold text-black active:scale-95 disabled:opacity-50">{busy ? t('locDetecting') : t('locChangeBtn')}</button>
+          {done && <p className="text-sm text-green-400">✓ {t('locChangeDone')}</p>}
+        </>
+      ) : (
+        <>
+          <p className="rounded-lg bg-green-500/10 p-2 text-sm text-green-300">✓ {t('locDetected', { province })}</p>
+          <label className="block text-sm">{t('fDistrict')}
+            <input autoFocus maxLength={60} value={district} onChange={(e) => setDistrict(e.target.value)} className={input} />
+          </label>
+          <label className="block text-sm">{t('fNearby')}
+            <input maxLength={120} value={nearby} onChange={(e) => setNearby(e.target.value)} className={input} />
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={() => setStep('idle')} disabled={busy} className="rounded-xl bg-white/10 py-2.5 font-semibold active:scale-95">{t('back')}</button>
+            <button onClick={save} disabled={busy} className="rounded-xl bg-line py-2.5 font-bold text-black active:scale-95 disabled:opacity-50">{busy ? t('submitting') : t('locChangeSave')}</button>
+          </div>
+        </>
+      )}
+      {err && <p className="rounded-lg bg-red-500/10 p-2 text-xs text-red-300">{err}</p>}
     </section>
   )
 }
