@@ -138,12 +138,12 @@ Deno.serve(async (req) => {
       return json({ ok: false, code: 'UPSTREAM_ERROR' })
     }
 
-    if (status === 401 || status === 403) { // our key is wrong / out of quota: not the customer's fault
-      await log('UPSTREAM_AUTH', null, { status, body: body?.error ?? body?.message ?? null })
-      return json({ ok: false, code: 'UPSTREAM_ERROR' })
-    }
-    if (status === 429 || status >= 500) {
-      await log('UPSTREAM_ERROR', null, { status })
+    // What Thunder said, trimmed, so the admin can see the real reason (no secrets in it).
+    const snippet = JSON.stringify(body)?.slice(0, 1000) ?? null
+
+    // Our key / credit / rate problem: not the customer's fault, so don't blame the slip.
+    if (status === 401 || status === 402 || status === 403 || status === 429 || status >= 500) {
+      await log('UPSTREAM_ERROR', null, { status, response: snippet })
       return json({ ok: false, code: 'UPSTREAM_ERROR' })
     }
 
@@ -155,7 +155,7 @@ Deno.serve(async (req) => {
     })
     const receiverInfo = body?.data?.receiver ?? null   // our own receiving account as Thunder reads it (for tuning the checks)
     if (!check.ok) {
-      await log(check.code, null, { status, receiver: receiverInfo, thunder: body?.error ?? body?.message ?? null })
+      await log(check.code, null, { status, receiver: receiverInfo, response: snippet })
       return json({ ok: false, code: check.code })
     }
 

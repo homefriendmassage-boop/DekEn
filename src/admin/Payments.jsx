@@ -262,6 +262,12 @@ export default function Payments({ prefill, clearPrefill, onChanged, toast }) {
                   {f.detail?.expected ? ` · ต้องโอน ${f.detail.expected.map(baht).join(' / ')}` : ''}
                   {f.detail?.receiver ? ` · ผู้รับที่ Thunder อ่านได้: ${f.detail.receiver.account?.name?.th ?? '?'} (${f.detail.receiver.bank?.short ?? '?'})` : ''}
                 </p>
+                {(f.detail?.status != null || f.detail?.response || f.detail?.thunder) && (
+                  <details className="mt-1">
+                    <summary className="cursor-pointer text-[11px] text-amber-300">คำตอบจาก Thunder{f.detail?.status != null ? ` (HTTP ${f.detail.status})` : ''}</summary>
+                    <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-black/40 p-2 text-[10px] text-neutral-300">{f.detail.response ?? JSON.stringify(f.detail.thunder)}</pre>
+                  </details>
+                )}
               </li>
             ))}
           </ul>
