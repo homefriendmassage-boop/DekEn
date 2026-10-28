@@ -1,7 +1,7 @@
 import { LangSwitcher, useI18n } from '../i18n'
 
 // Sticky top bar shared by every screen: back button, language switcher, tier + wallet chips.
-export default function Header({ title, onBack, displayName, tier, expiresAt, walletBalance, onTierClick }) {
+export default function Header({ title, onBack, displayName, tier, expiresAt, walletBalance, onTierClick, onChatClick, chatUnread }) {
   const { t, money, fmtDate } = useI18n()
 
   return (
@@ -19,6 +19,12 @@ export default function Header({ title, onBack, displayName, tier, expiresAt, wa
         </div>
         {walletBalance !== undefined && (
           <div className="flex shrink-0 items-center gap-2">
+            {onChatClick && (
+              <button onClick={onChatClick} aria-label="chat" className="relative rounded-full bg-white/10 px-2.5 py-1 text-sm active:scale-95">
+                💬
+                {chatUnread > 0 && <span className="absolute -right-1 -top-1 rounded-full bg-red-500 px-1.5 text-[10px] font-bold">{chatUnread}</span>}
+              </button>
+            )}
             <button
               onClick={onTierClick}
               className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${

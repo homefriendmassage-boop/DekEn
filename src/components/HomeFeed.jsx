@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { FREE_RANK_LIMIT, MIN_TIER } from '../config'
 import { useI18n } from '../i18n'
 
@@ -9,9 +10,13 @@ import { useI18n } from '../i18n'
  *  - !can_view : public teaser (the worker's own face-mosaicked photo) + lock + Unlock button
  * The browser never receives the full photo of a worker it isn't allowed to see.
  */
-export default function HomeFeed({ workers, category, tier, loading, onBook, onUnlock }) {
+export default function HomeFeed({ workers, category, tier, loading, onBook, onUnlock, onAsk }) {
   const { t } = useI18n()
   const freeCategory = MIN_TIER[category] === 0
+  const [province, setProvince] = useState('')
+  const provinces = [...new Set(workers.map((w) => w.province).filter(Boolean))].sort()
+  const shown = province ? workers.filter((w) => w.province === province) : workers
+  const canChat = tier >= 1 // paid members only: keeps casual chatting (and its cost) out
 
   return (
     <div>
@@ -21,14 +26,26 @@ export default function HomeFeed({ workers, category, tier, loading, onBook, onU
         </div>
       )}
 
+      {provinces.length > 0 && (
+        <div className="px-3 pt-3">
+          <select
+            value={province} onChange={(e) => setProvince(e.target.value)}
+            className="w-full rounded-xl bg-white/10 px-3 py-2 text-sm outline-none ring-1 ring-white/10"
+          >
+            <option value="" className="text-black">📍 {t('allProvinces')}</option>
+            {provinces.map((p) => <option key={p} value={p} className="text-black">{p}</option>)}
+          </select>
+        </div>
+      )}
+
       {loading ? (
         <p className="py-20 text-center text-neutral-500">{t('loading')}</p>
-      ) : workers.length === 0 ? (
+      ) : shown.length === 0 ? (
         <p className="py-20 text-center text-neutral-500">{t('noWorkers')}</p>
       ) : (
         <ul className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3 sm:gap-4">
-          {workers.map((w) => (
-            <WorkerCard key={w.user_id} worker={w} onBook={onBook} onUnlock={onUnlock} />
+          {shown.map((w) => (
+            <WorkerCard key={w.user_id} worker={w} onBook={onBook} onUnlock={onUnlock} onAsk={canChat ? onAsk : null} />
           ))}
         </ul>
       )}
@@ -36,7 +53,7 @@ export default function HomeFeed({ workers, category, tier, loading, onBook, onU
   )
 }
 
-function WorkerCard({ worker: w, onBook, onUnlock }) {
+function WorkerCard({ worker: w, onBook, onUnlock, onAsk }) {
   const { t, money, catName } = useI18n()
   const locked = !w.canView
 
@@ -86,6 +103,12 @@ function WorkerCard({ worker: w, onBook, onUnlock }) {
           <h2 className="truncate text-sm font-bold sm:text-base">{w.display_name}</h2>
           <span className="mt-1 inline-block rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-neutral-300 sm:text-xs">{catName(w.category)}</span>
         </div>
+        {w.province && (
+          <p className="truncate text-[11px] text-neutral-400 sm:text-xs">
+            📍 {w.province}{w.district ? ` · ${w.district}` : ''}
+            {w.nearby ? ` (${t('nearbyLabel')}: ${w.nearby})` : ''}
+          </p>
+        )}
         <p className="text-xs text-neutral-400 sm:text-sm">
           {t('from')} <span className="font-semibold text-white">{money(w.price)}</span>
         </p>
@@ -100,6 +123,12 @@ function WorkerCard({ worker: w, onBook, onUnlock }) {
             className="w-full rounded-xl bg-line py-2.5 text-sm font-bold text-black transition active:scale-95 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-400"
           >
             {w.is_online ? t('book') : t('unavailable')}
+          </button>
+        )}
+        {/* Chat: shown to paid members only, and only for providers they may view */}
+        {!locked && onAsk && (
+          <button onClick={() => onAsk(w)} className="w-full rounded-xl bg-white/10 py-2 text-sm font-semibold transition active:scale-95">
+            {t('ask')}
           </button>
         )}
       </div>

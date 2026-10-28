@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { CATEGORIES } from '../config'
+import { PROVINCES } from '../provinces'
 import { useI18n } from '../i18n'
 
 // Application form. An admin approves it with: select public.approve_worker('<application id>');
@@ -8,7 +9,7 @@ export default function WorkerApply({ userId, defaultName }) {
   const { t, catName } = useI18n()
   const [status, setStatus] = useState(null) // latest application status, or null
   const [loading, setLoading] = useState(true)
-  const [form, setForm] = useState({ display_name: defaultName ?? '', category: CATEGORIES[0], price: '', contact: '', note: '' })
+  const [form, setForm] = useState({ display_name: defaultName ?? '', category: CATEGORIES[0], price: '', province: '', district: '', nearby: '', contact: '', note: '' })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
 
@@ -29,6 +30,9 @@ export default function WorkerApply({ userId, defaultName }) {
       display_name: form.display_name.trim(),
       category: form.category,
       price: Number(form.price),
+      province: form.province,
+      district: form.district.trim() || null,
+      nearby: form.nearby.trim() || null,
       contact: form.contact.trim() || null,
       note: form.note.trim() || null,
     })
@@ -57,6 +61,18 @@ export default function WorkerApply({ userId, defaultName }) {
       </label>
       <label className="block text-sm">{t('fPrice')}
         <input required type="number" min="0" inputMode="numeric" value={form.price} onChange={set('price')} className={input} />
+      </label>
+      <label className="block text-sm">{t('fProvince')}
+        <select required value={form.province} onChange={set('province')} className={input}>
+          <option value="" className="text-black">{t('chooseProvince')}</option>
+          {PROVINCES.map((p) => <option key={p} value={p} className="text-black">{p}</option>)}
+        </select>
+      </label>
+      <label className="block text-sm">{t('fDistrict')}
+        <input maxLength={60} value={form.district} onChange={set('district')} className={input} />
+      </label>
+      <label className="block text-sm">{t('fNearby')}
+        <input maxLength={120} value={form.nearby} onChange={set('nearby')} className={input} />
       </label>
       <label className="block text-sm">{t('fContact')}
         <input value={form.contact} onChange={set('contact')} className={input} />

@@ -1,7 +1,7 @@
 import { CATEGORIES, MIN_TIER } from '../config'
 import { useI18n } from '../i18n'
 
-const EMOJI = { bartender: '🍸', ent: '🎤', ent_hard: '🔥', masseuse: '💆', spa_vip: '👑' }
+const EMOJI = { bartender: '🍸', ent: '🎤', masseuse: '💆', spa: '🧖' }
 
 // Category tiles. Free categories (min tier 0) are open; the rest show a lock
 // until the member's tier is high enough. Tapping a locked tile opens the membership sheet.

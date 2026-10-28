@@ -8,6 +8,7 @@ supabase/schema.sql              Tables, triggers, RLS, column grants   (Part 1)
 supabase/seed.sql                Dev-only demo workers
 supabase/migration_002.sql       Categories, membership tiers, photo storage, worker apps (run after schema.sql)
 supabase/seed2.sql               Dev-only: 21 more demo workers (tests the top-10 free limit)
+supabase/migration_003.sql       Remove ENT Plus, rename Spa, service area, members-only chat (run after migration_002)
 supabase/functions/line-auth/    Edge Function: LIFF ID token -> Supabase session
 src/lib/auth.js                  LIFF init, ?ref capture, mock login    (Part 2)
 src/App.jsx                      App shell, data loading, realtime      (Part 2)
@@ -70,14 +71,14 @@ src/components/BookingModal.jsx  Deposit explainer + Confirm Booking    (Part 3)
 
 ## Categories, membership, providers (migration_002)
 
-Run `supabase/migration_002.sql` once after `schema.sql` (and optionally `seed2.sql`).
+Run `supabase/migration_002.sql` once after `schema.sql`, then `migration_003.sql` (and optionally `seed2.sql`).
 
 | Plan | Sees |
 |---|---|
 | Free | Bartender + ENT, only the top 10 of each category |
 | VIP 100 | Bartender + ENT, everyone |
 | VIP 200 | + Masseuse |
-| VIP 300 | Everything (incl. ENT Plus, VIP Spa) |
+| VIP 300 | Everything (incl. Spa) |
 
 Each plan lasts 30 days. Payment is manual for now; activate / extend from the SQL Editor:
 
@@ -99,3 +100,12 @@ which only members allowed to see that provider can read (signed URL). Optional 
 
 A pending job that is declined or cancelled is refunded to the customer's wallet; an accepted job
 that is cancelled is not (handle manually).
+
+## Service area and chat (migration_003)
+
+- Providers choose a province (+ district and nearby areas) when applying; customers can filter the feed by province.
+- **Chat is in-app and members-only** (paid, unexpired VIP, and only with providers that member may view).
+  It deliberately does not push to LINE: a LINE OA *push* message counts against the OA's monthly
+  quota (reply messages are free but need a recent message from that user), so per-message LINE alerts
+  would cost money. Providers see unread counts when they open the app. Limits: 500 chars/message,
+  10 messages/minute. A lapsed member can read old chats but not send.

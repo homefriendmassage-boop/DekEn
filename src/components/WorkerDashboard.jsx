@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useI18n } from '../i18n'
+import { PROVINCES } from '../provinces'
 import PhotoUploader from './PhotoUploader'
+import ThreadList from './ThreadList'
+import ChatModal from './ChatModal'
 
 // Provider home: online switch, profile edit, photo upload, live job inbox.
 export default function WorkerDashboard({ userId }) {
   const { t, money, catName, statusName } = useI18n()
   const [worker, setWorker] = useState(null)
   const [jobs, setJobs] = useState([])
-  const [form, setForm] = useState({ display_name: '', price: '' })
+  const [form, setForm] = useState({ display_name: '', price: '', province: '', district: '', nearby: '' })
+  const [chat, setChat] = useState(null)
   const [note, setNote] = useState(null)
   const [error, setError] = useState(null)
 
@@ -16,7 +20,7 @@ export default function WorkerDashboard({ userId }) {
     const { data, error } = await supabase.from('workers').select('*').eq('user_id', userId).single()
     if (error) return setError(t('errGeneric'))
     setWorker(data)
-    setForm({ display_name: data.display_name, price: String(data.price) })
+    setForm({ display_name: data.display_name, price: String(data.price), province: data.province ?? '', district: data.district ?? '', nearby: data.nearby ?? '' })
   }, [userId]) // eslint-disable-line
 
   const loadJobs = useCallback(async () => {
@@ -107,6 +111,12 @@ export default function WorkerDashboard({ userId }) {
         )}
       </section>
 
+      {/* Messages from members (in-app chat; no LINE push) */}
+      <section>
+        <h2 className="mb-2 text-base font-bold">{t('messages')}</h2>
+        <ThreadList onOpen={(th) => setChat(th)} />
+      </section>
+
       {/* Profile */}
       <section className="space-y-3">
         <h2 className="text-base font-bold">{t('profile')} · <span className="text-sm font-normal text-neutral-400">{catName(worker.category)}</span></h2>
@@ -116,8 +126,23 @@ export default function WorkerDashboard({ userId }) {
         <label className="block text-sm">{t('priceLabel')}
           <input type="number" min="0" inputMode="numeric" value={form.price} onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))} className={input} />
         </label>
+        <label className="block text-sm">{t('fProvince')}
+          <select value={form.province} onChange={(e) => setForm((f) => ({ ...f, province: e.target.value }))} className={input}>
+            <option value="" className="text-black">{t('chooseProvince')}</option>
+            {PROVINCES.map((p) => <option key={p} value={p} className="text-black">{p}</option>)}
+          </select>
+        </label>
+        <label className="block text-sm">{t('fDistrict')}
+          <input value={form.district} maxLength={60} onChange={(e) => setForm((f) => ({ ...f, district: e.target.value }))} className={input} />
+        </label>
+        <label className="block text-sm">{t('fNearby')}
+          <input value={form.nearby} maxLength={120} onChange={(e) => setForm((f) => ({ ...f, nearby: e.target.value }))} className={input} />
+        </label>
         <button
-          onClick={() => update({ display_name: form.display_name.trim(), price: Number(form.price) })}
+          onClick={() => update({
+            display_name: form.display_name.trim(), price: Number(form.price),
+            province: form.province || null, district: form.district.trim() || null, nearby: form.nearby.trim() || null,
+          })}
           className="w-full rounded-xl bg-white/10 py-2.5 text-sm font-semibold active:scale-95"
         >
           {t('save')}
@@ -131,6 +156,7 @@ export default function WorkerDashboard({ userId }) {
         {worker.profile_image && <img src={worker.profile_image} alt="" className="mx-auto max-h-64 rounded-xl" />}
         <PhotoUploader userId={userId} previousOriginal={worker.original_path} onUploaded={loadWorker} />
       </section>
+      {chat && <ChatModal threadId={chat.id} title={chat.other_name} meId={userId} onClose={() => setChat(null)} />}
     </div>
   )
 }

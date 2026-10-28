@@ -11,6 +11,8 @@ import BookingModal from './components/BookingModal'
 import MembershipModal from './components/MembershipModal'
 import WorkerApply from './components/WorkerApply'
 import WorkerDashboard from './components/WorkerDashboard'
+import ChatModal from './components/ChatModal'
+import ThreadList from './components/ThreadList'
 
 // Mock mode only, when the workers table is empty: lets you click through the UI
 // before running seed SQL. Rank within a category = order in this list.
@@ -24,6 +26,8 @@ const DEMO_WORKERS = CATEGORIES.flatMap((category, ci) =>
     is_online: i % 4 !== 3,
     is_boosted: i === 0,
     rank: i + 1,
+    province: i % 2 ? 'เชียงใหม่' : 'กรุงเทพมหานคร',
+    district: i % 2 ? 'เมือง' : 'บางรัก',
     demo: true,
   })),
 )
@@ -53,6 +57,9 @@ export default function App() {
   const [showMembership, setShowMembership] = useState(false)
   const [toast, setToast] = useState(null)
   const [previewTier, setPreviewTier] = useState(null) // mock-mode UI override (null = real)
+  const [chat, setChat] = useState(null)              // { id, other_name } of the open chat
+  const [showThreads, setShowThreads] = useState(false)
+  const [chatUnread, setChatUnread] = useState(0)
 
   const showToast = (msg) => {
     setToast(msg)
@@ -125,6 +132,16 @@ export default function App() {
     setFeedLoading(false)
   }, [session?.isMock]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Open (or create) the chat with a provider. The DB enforces: paid member + may view that provider.
+  async function askWorker(w) {
+    const { data, error } = await supabase.rpc('open_thread', { p_worker: w.user_id })
+    if (error) {
+      if (error.message.includes('MEMBERS_ONLY') || error.message.includes('LOCKED')) return setShowMembership(true)
+      return showToast(t('errGeneric'))
+    }
+    setChat({ id: data, other_name: w.display_name })
+  }
+
   function openCategory(cat) {
     setCategory(cat)
     setView('feed')
@@ -162,6 +179,9 @@ export default function App() {
     expiresAt: me?.vip_expires_at,
     walletBalance: me?.wallet_balance ?? 0,
     onTierClick: () => setShowMembership(true),
+    // chat icon only for paid members (others have no chat to show)
+    onChatClick: tier >= 1 ? () => setShowThreads(true) : undefined,
+    chatUnread,
   }
 
   return (
@@ -206,6 +226,7 @@ export default function App() {
             loading={feedLoading}
             onBook={setSelected}
             onUnlock={() => setShowMembership(true)}
+            onAsk={askWorker}
           />
         </>
       )}
@@ -236,6 +257,18 @@ export default function App() {
           }}
         />
       )}
+
+      {showThreads && (
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 sm:items-center sm:p-4" onClick={() => setShowThreads(false)}>
+          <div onClick={(e) => e.stopPropagation()} className="max-h-[80vh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-neutral-900 p-5 sm:rounded-3xl">
+            <h2 className="mb-3 text-lg font-bold">💬 {t('messages')}</h2>
+            <ThreadList onOpen={(th) => { setShowThreads(false); setChat(th) }} onChange={(rows) => setChatUnread(rows.reduce((n, r) => n + r.unread, 0))} />
+            <button onClick={() => setShowThreads(false)} className="mt-4 w-full rounded-xl bg-white/10 py-3 font-semibold active:scale-95">{t('close')}</button>
+          </div>
+        </div>
+      )}
+
+      {chat && view !== 'worker' && <ChatModal threadId={chat.id} title={chat.other_name} meId={me.id} onClose={() => setChat(null)} />}
 
       {showMembership && <MembershipModal tier={tier} onClose={() => setShowMembership(false)} />}
 
