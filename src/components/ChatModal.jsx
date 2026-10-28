@@ -34,7 +34,7 @@ export default function ChatModal({ threadId, title, meId, onClose, onTopUp }) {
 
   const load = useCallback(async () => {
     const { data } = await supabase.from('chat_messages')
-      .select('id, sender_id, body, created_at')
+      .select('id, sender_id, body, created_at, kind')
       .eq('thread_id', threadId).order('created_at', { ascending: true }).limit(200)
     setMsgs(data ?? [])
     supabase.rpc('mark_read', { p_thread: threadId }) // fire and forget
@@ -108,6 +108,9 @@ export default function ChatModal({ threadId, title, meId, onClose, onTopUp }) {
 
         <div className="flex-1 space-y-2 overflow-y-auto px-4 py-3">
           {msgs.map((m) => {
+            if (m.kind && m.kind !== 'user') {      // room notice from the administrator
+              return <p key={m.id} className="mx-auto max-w-[90%] rounded-xl bg-red-500/15 px-3 py-1.5 text-center text-xs font-semibold text-red-200">🛡️ {t(m.kind) === m.kind ? m.body : t(m.kind)}</p>
+            }
             const mine = m.sender_id === meId
             return (
               <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>

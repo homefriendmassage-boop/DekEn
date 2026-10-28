@@ -84,7 +84,7 @@ export default function AdminApp() {
     ['reviews', `🔎 ตรวจสลิป${stats?.pending_reviews ? ` (${stats.pending_reviews})` : ''}`],
     ['support', `💬 แชท${stats?.support_unread ? ` (${stats.support_unread})` : ''}`],
     ['pay', '💳 รับชำระเงิน'],
-    ['chats', `🚩 แชตที่ติดธง${chatCount ? ` (${chatCount})` : ''}`],
+    ['chats', `🚩 ธง/รายงาน${chatCount ? ` (${chatCount})` : ''}`],
     ['edits', `✏️ แก้ไข/ลบโปรไฟล์${editCount ? ` (${editCount})` : ''}`],
     ['agencies', '🏢 สังกัด'],
     ['members', '👑 สมาชิก'],

@@ -324,3 +324,11 @@ Run `supabase/migration_030.sql` once, after migration_029.
 - **Reports:** `report_thread(thread, reason, note)` (button in the chat window).
 - **Admin tab "🚩 แชตที่ติดธง":** queue of flagged / reported / suspended chats; `admin_open_chat` only opens those, needs a written reason and logs every opening (`chat_admin_views`); `admin_chat_action` = suspend / unblock (flag reset, held-fee deadline extended by the frozen time) / close for good (held fee refunded to the customer).
 - **Terms:** customers accept the customer terms once (`users.customer_terms_at`, `accept_customer_terms()`); the provider terms and the chat window state that chats may be reviewed only after a complaint, fraud or a suspected rule breach.
+
+## migration_032 — profile reports, room notices in the chat, settlement by culprit
+
+Run `supabase/migration_032.sql` once, after migration_031.
+
+- **Report a profile:** "🚩 รายงานโปรไฟล์นี้" on the details page → `report_worker`. Admin tab "🚩 ธง/รายงาน" → "🪪 รายงานโปรไฟล์": dismiss, hide (`workers.admin_hidden`, removed from every list through `worker_listed`, the provider sees a notice on her dashboard) or show again.
+- **Room notices instead of push:** suspend / unblock / close add a system message to the chat (`chat_messages.kind = sys_suspended | sys_unblocked | sys_closed`); system messages never trigger a push.
+- **Closing a chat for good:** `chat_culprit()` = the side with more refused contact attempts. Worker side → the held fee is refunded to the customer (paying the worker is refused with `WORKER_CULPRIT`). Customer side or unclear → the admin chooses "คืนเงินลูกค้า" or "จ่ายน้อง" (the held fee is captured into her Bonus wallet as chat income).

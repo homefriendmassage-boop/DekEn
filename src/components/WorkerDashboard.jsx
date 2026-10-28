@@ -111,6 +111,7 @@ export default function WorkerDashboard({ userId, onTopUp, me, onWallet, openCha
         </span>
       </button>
 
+      {worker.admin_hidden && <p className="rounded-xl bg-red-500/15 p-3 text-sm font-semibold text-red-200">🛡️ {t('profileHiddenByAdmin')}</p>}
       {error && <p className="rounded-lg bg-red-500/10 p-2 text-sm text-red-300">{error}</p>}
       {note && <p className="rounded-lg bg-green-500/10 p-2 text-sm text-green-300">{note}</p>}
 

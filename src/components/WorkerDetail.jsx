@@ -45,6 +45,15 @@ export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlo
     return () => { alive = false }
   }, [w.user_id, w.canView])
   const [shareNote, setShareNote] = useState(null)
+  const [reporting, setReporting] = useState(false)
+  const [rep, setRep] = useState({ reason: 'fake_photo', note: '' })
+  const [repMsg, setRepMsg] = useState(null)
+
+  async function sendReport() {
+    const { error } = await supabase.rpc('report_worker', { p_worker: w.user_id, p_reason: rep.reason, p_note: rep.note })
+    if (error) return setRepMsg(t(error.message.includes('ALREADY_REPORTED') ? 'reportAlready' : 'errGeneric'))
+    setRepMsg(t('reportSent'))
+  }
 
   // Flex only: the public photo + details, no price and no location. The button brings the friend back to this profile.
   async function shareWorker() {
@@ -154,6 +163,8 @@ export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlo
           )}
           {shareNote && <p className="text-xs text-amber-200">{shareNote}</p>}
 
+          {!isMe && <button onClick={() => { setReporting(true); setRepMsg(null) }} className="text-[11px] text-neutral-500 underline">🚩 {t('reportProfile')}</button>}
+
           {isMe ? (
             <p className="rounded-xl bg-white/10 py-2.5 text-center text-sm font-semibold text-neutral-300">{t('ownProfile')}</p>
           ) : (
@@ -171,6 +182,24 @@ export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlo
           )}
         </div>
       </div>
+
+      {reporting && (
+        <div onClick={(e) => { e.stopPropagation(); setReporting(false) }} className="absolute inset-0 z-10 flex items-center justify-center bg-black/60 p-6">
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm space-y-3 rounded-2xl bg-neutral-800 p-4 shadow-xl">
+            <h3 className="text-base font-bold">🚩 {t('reportProfile')}</h3>
+            <p className="text-xs text-neutral-400">{t('reportProfileHint')}</p>
+            <select value={rep.reason} onChange={(e) => setRep((r) => ({ ...r, reason: e.target.value }))} className="w-full rounded-xl bg-white/10 px-3 py-2 text-sm">
+              {['fake_photo', 'underage', 'contact', 'fraud', 'other'].map((k) => <option key={k} value={k} className="text-black">{t(`reportP_${k}`)}</option>)}
+            </select>
+            <textarea rows={3} maxLength={500} value={rep.note} onChange={(e) => setRep((r) => ({ ...r, note: e.target.value }))} placeholder={t('reportNote')} className="w-full rounded-xl bg-white/10 px-3 py-2 text-sm" />
+            {repMsg && <p className="text-xs text-amber-200">{repMsg}</p>}
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => setReporting(false)} className="rounded-xl bg-white/10 py-2 font-semibold active:scale-95">{t('close')}</button>
+              <button onClick={sendReport} className="rounded-xl bg-red-500 py-2 font-bold active:scale-95">{t('reportSend')}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
