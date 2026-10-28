@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useI18n } from '../i18n'
+import ShareModal from './ShareModal'
 
 // Two balances: Wallet (top-ups, pays for packages / chat / booking, not withdrawable) and
 // Bonus (referral + commission + chat income; moves one way into the Wallet).
@@ -12,6 +13,7 @@ export default function WalletModal({ me, onTopUp, onClose, onChanged }) {
   const [amount, setAmount] = useState('')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState(null)
+  const [showShare, setShowShare] = useState(false)
 
   const load = useCallback(async () => {
     const { data } = await supabase.from('wallet_ledger').select('id, wallet, amount, balance_after, kind, note, created_at')
@@ -63,6 +65,7 @@ export default function WalletModal({ me, onTopUp, onClose, onChanged }) {
             </div>
           )}
           {msg && <p className="mt-2 text-xs text-amber-100">{msg}</p>}
+          <button onClick={() => setShowShare(true)} className="mt-2 w-full rounded-xl bg-white/10 py-2 text-sm font-semibold active:scale-95">🎁 {t('shareButton')}</button>
         </section>
 
         <section>
@@ -88,6 +91,7 @@ export default function WalletModal({ me, onTopUp, onClose, onChanged }) {
 
         <button onClick={onClose} className="w-full rounded-xl bg-white/10 py-3 font-semibold active:scale-95">{t('close')}</button>
       </div>
+      {showShare && <ShareModal onClose={() => setShowShare(false)} />}
     </div>
   )
 }

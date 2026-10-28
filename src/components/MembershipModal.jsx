@@ -3,8 +3,8 @@ import { useI18n } from '../i18n'
 
 // Plan comparison. Payment is handled manually by an admin for now
 // (select public.set_membership(user_id, tier, 30) in the SQL editor).
-export default function MembershipModal({ tier, onClose, onPay, onSupport }) {
-  const { t } = useI18n()
+export default function MembershipModal({ tier, walletBalance = 0, onClose, onPay, onPayWallet, onSupport }) {
+  const { t, money } = useI18n()
   const curPrice = PLANS.find((p) => p.tier === tier)?.price ?? 0
 
   return (
@@ -38,6 +38,16 @@ export default function MembershipModal({ tier, onClose, onPay, onSupport }) {
                       {tier === p.tier ? t('renew') : tier > 0 ? t('upgrade') : t('pay')} · {tier > 0 && p.tier > tier ? p.price - curPrice : p.price} {t('currency')}
                     </button>
                     {tier > 0 && p.tier > tier && <p className="mt-1 text-center text-[11px] text-neutral-400">{t('upgradeNote')}</p>}
+                    {onPayWallet && (() => {
+                      const price = tier > 0 && p.tier > tier ? p.price - curPrice : p.price
+                      const enough = walletBalance >= price
+                      return (
+                        <button disabled={!enough} onClick={() => onPayWallet(p.tier, price)}
+                          className="mt-2 w-full rounded-xl bg-white/10 py-2 text-sm font-semibold active:scale-95 disabled:opacity-40">
+                          💰 {t('payWallet')} · {price} {t('currency')}{!enough && ` (${t('payWalletShort')} · ${money(walletBalance)})`}
+                        </button>
+                      )
+                    })()}
                   </>
                 )}
               </li>

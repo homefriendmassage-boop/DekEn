@@ -20,6 +20,7 @@ supabase/migration_011.sql       Payment requests are reusable (same amount when
 supabase/migration_012.sql       Upgrade by paying the difference (same expiry); admin cancel/change plan + suspend accounts (run after 011)
 supabase/migration_013.sql       Suspended providers are hidden from the feed and cannot be booked/chatted (run after 012)
 supabase/migration_014.sql       Two balances (Wallet + Bonus) and a ledger of every money movement (run after 013)
+supabase/migration_015.sql       Share links (link/Flex/QR), sales attribution, 20% membership referral reward, pay packages from the Wallet (run after 014)
 supabase/functions/send-renewal/ Edge Function (admin only): LINE Flex renewal reminder with a button to the plan picker
 supabase/functions/verify-slip/  Edge Function: verifies the slip with Thunder, opens the plan / credits the wallet
 admin.html + src/admin/          Separate admin page (not linked from the customer app)
@@ -232,3 +233,9 @@ expired is not rejected: it goes to Admin > Slip review, linked to the customer'
 - Every change of either balance is written to `wallet_ledger` by a trigger on `users`, so no code path can move money without a trace. Code that changes a balance sets `app.ledger_kind` / `app.ledger_ref` / `app.ledger_note` first (see `jobs_before_insert`, `apply_slip_payment`, `transfer_bonus_to_wallet`).
 - Customers see both balances and their history by tapping the 💰 chip. Admins correct a balance with `admin_adjust_balance(user, 'wallet'|'bonus', ±amount, reason)` (reason required, ledgered).
 - Existing balances get an `opening` ledger row, so the ledger always adds up to the balance.
+
+## Sharing, sales and referral rewards (migration_015)
+- Everyone has a share code (`my_share_code()`); the link is `https://liff.line.me/<LIFF_ID>?ref=<code>`. 💰 → "ชวนเพื่อน" offers copy, QR and a LINE Flex message (share target picker; enable it in the LIFF settings).
+- **Whose customer is this?** (`users.referred_by` = the customer's *sales*). Registering through a link makes that person the sales at once. A later click on another link (`referral_clicks`) takes over only if the customer pays for a package (or books) within **24 hours** of the click; otherwise it is forgotten. Top-ups never change it, existing accounts are not re-attributed retroactively. The latest link wins.
+- **Reward:** every membership payment (slip, admin, wallet) pays 20% to the sales' bonus wallet (`referral_rewards`, one per payment, rate in `referral_membership_rate()`), unlimited renewals.
+- **Pay from the Wallet:** `buy_membership_with_wallet(tier)` — new, renew or upgrade (difference, same expiry). Always allowed while the Wallet has enough money.

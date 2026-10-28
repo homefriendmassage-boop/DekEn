@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import { signIn, takeOpenIntent } from './lib/auth'
-import { CATEGORIES, canViewWorker, suspensionOf, tierOf } from './config'
+import { CATEGORIES, PLAN_META, canViewWorker, suspensionOf, tierOf } from './config'
 import { useI18n } from './i18n'
 import Header from './components/Header'
 import Landing from './components/Landing'
@@ -46,7 +46,7 @@ function resetAndRetry() {
 }
 
 export default function App() {
-  const { t, catName } = useI18n()
+  const { t, catName, money } = useI18n()
   const [phase, setPhase] = useState('loading') // loading | ready | error
   const [error, setError] = useState(null)
   const [session, setSession] = useState(null)  // { profile, isMock, refCode }
@@ -67,6 +67,7 @@ export default function App() {
   const [support, setSupport] = useState(null)       // { threadId } while the admin chat is open
   const [supportUnread, setSupportUnread] = useState(0)
   const [showWallet, setShowWallet] = useState(false)
+  const [walletPaying, setWalletPaying] = useState(false)
   const [pay, setPay] = useState(null)               // { kind: 'membership', tier } | { kind: 'wallet_topup' }
 
   const showToast = (msg) => {
@@ -126,6 +127,23 @@ export default function App() {
       .subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [me?.id, loadSupportUnread])
+
+  async function payWithWallet(planTier, price) {
+    if (walletPaying) return
+    if (!window.confirm(t('payWalletConfirm', { plan: PLAN_META[planTier].name, amount: money(price) }))) return
+    setWalletPaying(true)
+    const { error } = await supabase.rpc('buy_membership_with_wallet', { p_tier: planTier })
+    setWalletPaying(false)
+    if (error) {
+      if (error.message.includes('DUPLICATE_REQUEST')) return
+      const code = ['INSUFFICIENT_BALANCE', 'ALREADY_HIGHER', 'SUSPENDED'].find((c) => error.message.includes(c))
+      return showToast(t(code ? `payErr_${code}` : 'errGeneric'))
+    }
+    setShowMembership(false)
+    showToast(t('paySuccessMembership', { plan: PLAN_META[planTier].name }))
+    await loadMe()
+    if (view === 'feed') loadFeed(category)
+  }
 
   async function openSupport() {
     const { data, error } = await supabase.rpc('support_open')
@@ -324,7 +342,7 @@ export default function App() {
       {chat && view !== 'worker' && <ChatModal threadId={chat.id} title={chat.other_name} meId={me.id} onClose={() => setChat(null)} />}
 
       {showMembership && (
-        <MembershipModal tier={tier} onClose={() => setShowMembership(false)}
+        <MembershipModal tier={tier} walletBalance={Number(me?.wallet_balance ?? 0)} onPayWallet={payWithWallet} onClose={() => setShowMembership(false)}
           onPay={(planTier) => { setShowMembership(false); setPay({ kind: 'membership', tier: planTier, upgrade: tier > 0 && planTier > tier }) }}
           onSupport={() => { setShowMembership(false); openSupport() }} />
       )}

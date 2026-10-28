@@ -28,11 +28,12 @@ export function takeOpenIntent() {
 }
 
 /**
- * Read the partner code from the URL, e.g. https://liff.line.me/<id>?ref=sales01
+ * Read the share code from the URL, e.g. https://liff.line.me/<id>?ref=k3m9x2ab
  *
  * Gotcha: on first open LINE rewrites the URL and tucks the original query into
- * `liff.state` (e.g. "?ref=sales01"), so we check both. Call this before AND
- * after liff.init(). First-touch wins: a stored code is never overwritten.
+ * `liff.state` (e.g. "?ref=k3m9x2ab"), so we check both. Call this before AND
+ * after liff.init(). The LATEST link wins (it overwrites a stored one); the stored copy only
+ * survives the login redirect and is consumed by signIn() once it has been reported to the server.
  */
 export function captureRefCode() {
   const params = new URLSearchParams(window.location.search)
@@ -47,7 +48,7 @@ export function captureRefCode() {
   }
 
   try {
-    if (ref && REF_PATTERN.test(ref) && !localStorage.getItem(REF_KEY)) {
+    if (ref && REF_PATTERN.test(ref)) {
       localStorage.setItem(REF_KEY, ref)
     }
     return localStorage.getItem(REF_KEY)
@@ -103,8 +104,9 @@ export async function signIn() {
   captureOpenParam()
   const refCode = captureRefCode() // URL is clean again after init(); re-check
   if (refCode) {
-    // Idempotent + first-touch enforced server-side. Failure must not block login.
-    try { await supabase.rpc('attribute_referrer', { p_code: refCode }) } catch { /* ignore */ }
+    // The server decides who counts as this customer's sales (see migration_015). Failure must not block login.
+    try { await supabase.rpc('register_referral_click', { p_code: refCode }) } catch { /* ignore */ }
+    try { localStorage.removeItem(REF_KEY) } catch { /* storage blocked */ }
   }
 
   return { profile, isMock: USE_MOCK_LIFF, refCode }
