@@ -37,16 +37,43 @@ export type SlipCheck =
 const norm = (s: unknown) =>
   String(s ?? '').toLowerCase().replace(/[\s.*\-_,]/g, '')
 
-// Collect every digit string found inside an object (account numbers may be masked, e.g. "xxx-x-x1234-x").
+// Collect every string holding digits found inside an object (account numbers are masked, e.g. "045-3-xxx109").
 function digitStrings(v: unknown, out: string[] = []): string[] {
   if (v == null) return out
   if (typeof v === 'string' || typeof v === 'number') {
-    const d = String(v).replace(/\D/g, '')
-    if (d) out.push(d)
+    const s = String(v)
+    if (/\d/.test(s)) out.push(s)
   } else if (typeof v === 'object') {
     for (const x of Object.values(v as object)) digitStrings(x, out)
   }
   return out
+}
+
+// Compare our account digits (full number or the last few) with a masked number: x / * are wildcards,
+// digits are aligned from the END, and at least 3 real digits must agree so an all-masked value never passes.
+function accountMatches(account: unknown, want: string): boolean {
+  return digitStrings(account).some((s) => {
+    const p = s.toLowerCase().replace(/[^0-9x*]/g, '')
+    if (p.length < want.length) return false
+    const tail = p.slice(p.length - want.length)
+    let real = 0
+    for (let i = 0; i < want.length; i++) {
+      if (tail[i] === 'x' || tail[i] === '*') continue
+      if (tail[i] !== want[i]) return false
+      real++
+    }
+    return real >= Math.min(3, want.length)
+  })
+}
+
+// Thunder may shorten the receiver name ("นาง สำราญ อ" = first name + surname initial): ignore the title and
+// accept when one side contains the other (min 3 chars so a stray letter never matches).
+const TITLE = /^(นางสาว|นส|นาง|นาย|mrs|mr|ms|miss)/
+function nameMatches(slipName: unknown, want: string): boolean {
+  const s = norm(slipName).replace(TITLE, '')
+  const w = norm(want).replace(TITLE, '')
+  if (s.length < 3 || w.length < 3) return false
+  return s.includes(w) || w.includes(s)
 }
 
 // The slip fields may sit directly under `data` or one level deeper (e.g. data.rawSlip): find the object holding transRef.
@@ -84,11 +111,12 @@ export function evaluateSlip(
   if (cfg.receiverBank && norm(receiverBank) !== norm(cfg.receiverBank)) {
     return { ok: false, code: 'WRONG_RECEIVER', receiverBank, receiverName, receiver }
   }
-  if (cfg.receiverNameContains && !norm(receiverName).includes(norm(cfg.receiverNameContains))) {
+  const names = [d.receiver?.account?.name?.th, d.receiver?.account?.name?.en]
+  if (cfg.receiverNameContains && !names.some((n) => nameMatches(n, cfg.receiverNameContains!))) {
     return { ok: false, code: 'WRONG_RECEIVER', receiverBank, receiverName, receiver }
   }
   const wantDigits = String(cfg.receiverAccountDigits ?? '').replace(/\D/g, '')
-  if (wantDigits && !digitStrings(d.receiver?.account).some((x) => x.includes(wantDigits))) {
+  if (wantDigits && !accountMatches(d.receiver?.account, wantDigits)) {
     return { ok: false, code: 'WRONG_RECEIVER', receiverBank, receiverName, receiver }
   }
   return { ok: true, transRef, amount: Math.round(amount * 100) / 100, receiverBank, receiverName, receiver }
