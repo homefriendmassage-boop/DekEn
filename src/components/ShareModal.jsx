@@ -5,7 +5,7 @@ import { LIFF_ID, USE_MOCK_LIFF } from '../config'
 import { useI18n } from '../i18n'
 import { inviteBubble } from '../lib/flex'
 
-const APP_NAME = 'DekN'
+const APP_NAME = 'DekEn'
 
 // Share my link: copy, LINE Flex message (share target picker) or QR code.
 // Whoever opens the link and registers / pays through it counts as my customer (server-side rules, migration_015).

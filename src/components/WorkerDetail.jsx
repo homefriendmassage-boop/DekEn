@@ -51,10 +51,10 @@ export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlo
       ].filter(Boolean).join(' · ')
       await liff.shareTargetPicker([{
         type: 'flex',
-        altText: t('shareWorkerAlt', { name: w.display_name, app: 'DekN' }),
+        altText: t('shareWorkerAlt', { name: w.display_name, app: 'DekEn' }),
         contents: workerBubble({
           w, facts: lines, tags: (w.tags ?? []).map((k) => `#${t(`tag_${k}`)}`).join(' '), about: w.about,
-          button: t('shareWorkerBtn'), uri, logoLabel: 'DekN',
+          button: t('shareWorkerBtn'), uri, logoLabel: 'DekEn',
         }),
       }])
     } catch { setShareNote(t('shareFailed')) }

@@ -384,7 +384,7 @@ export default function App() {
       {shared && !shared.friend && (
         <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/80 p-4">
           <div className="w-full max-w-sm space-y-3 rounded-3xl bg-neutral-900 p-5 text-center shadow-2xl">
-            <img src={`${import.meta.env.BASE_URL}dekn-logo.jpg`} alt="DekN" className="mx-auto h-24 w-24 rounded-full object-cover" />
+            <img src={`${import.meta.env.BASE_URL}dekn-logo.jpg`} alt="DekEn" className="mx-auto h-24 w-24 rounded-full object-cover" />
             <h2 className="text-lg font-bold">{t('friendGateTitle')}</h2>
             <p className="text-sm text-neutral-400">{t('friendGateBody')}</p>
             {LINE_OA_URL && <a href={LINE_OA_URL} className="block rounded-xl bg-line py-3 font-bold text-black active:scale-95">{t('friendGateAdd')}</a>}
