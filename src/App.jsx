@@ -13,6 +13,15 @@ const DEMO_WORKERS = [
   { user_id: 'demo-4', display_name: 'Nook', service_types: ['dancer'], price: 2500, is_online: true, is_boosted: true, profile_image: 'https://picsum.photos/seed/w4/600/800' },
 ]
 
+// A plain reload would reuse the stale ?code=/&state= in the URL and the broken
+// cached LIFF token. Wipe both and restart from the clean app URL.
+function resetAndRetry() {
+  try {
+    Object.keys(localStorage).filter((k) => k.startsWith('LIFF_STORE')).forEach((k) => localStorage.removeItem(k))
+  } catch { /* storage blocked */ }
+  window.location.replace(window.location.origin + window.location.pathname)
+}
+
 export default function App() {
   const [phase, setPhase] = useState('loading') // loading | ready | error
   const [error, setError] = useState(null)
@@ -91,7 +100,7 @@ export default function App() {
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 p-6 text-center">
         <p className="text-lg font-semibold">Couldn't start the app</p>
         <p className="max-w-sm break-words text-sm text-neutral-400">{error}</p>
-        <button onClick={() => location.reload()} className="rounded-full bg-line px-5 py-2 font-semibold text-black">Retry</button>
+        <button onClick={resetAndRetry} className="rounded-full bg-line px-5 py-2 font-semibold text-black">Retry</button>
       </div>
     )
   }
