@@ -15,6 +15,8 @@ supabase/migration_006.sql       LINE profile picture + last seen; admin user li
 supabase/migration_007.sql       Automatic payment: unique-amount requests, slip ledger (run after 006)
 supabase/migration_008.sql       Idempotent admin payment entry: double tap can't apply twice (run after 007)
 supabase/migration_009.sql       Slip review (amount mismatch -> admin) + support chat with admin (run after 008)
+supabase/migration_010.sql       Per-role chat lists, self-chat error, renewal notice ledger (run after 009)
+supabase/functions/send-renewal/ Edge Function (admin only): LINE Flex renewal reminder with a button to the plan picker
 supabase/functions/verify-slip/  Edge Function: verifies the slip with Thunder, opens the plan / credits the wallet
 admin.html + src/admin/          Separate admin page (not linked from the customer app)
 supabase/functions/line-auth/    Edge Function: LIFF ID token -> Supabase session
@@ -199,3 +201,11 @@ A slip under review can never also be auto-approved (its transfer reference is r
 plan/days or a wallet credit; the slip amount is what is recorded) or rejects with a reason; the customer gets a message in
 their support chat either way. Support chat is in-app (Realtime), open to every user (a free user paying for the first
 time needs it) and does not push to LINE. Redeploy `verify-slip` after this migration: it now routes mismatches to review.
+
+## Renewal reminders (migration_010 + `send-renewal`)
+
+Admin > Members > **📣 แจ้งต่ออายุ** sends the customer a LINE Flex Message ("your Gold plan ends in N days") whose
+button opens `https://liff.line.me/<LIFF_ID>?open=plans` (the app opens the plan picker). There is also a bulk button for
+everyone ending within 7 days. This is a LINE **push** message: it uses the OA's monthly message quota, and only reaches
+users who added the OA as a friend and haven't blocked it. Duplicates are suppressed (24 h single, 3 days bulk).
+Secrets for the function: `LINE_CHANNEL_ACCESS_TOKEN` (Messaging API channel of the OA, same LINE provider as the LIFF app) and `LIFF_ID`.

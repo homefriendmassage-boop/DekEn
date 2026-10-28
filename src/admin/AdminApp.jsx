@@ -104,7 +104,7 @@ export default function AdminApp() {
         {tab === 'reviews' && <Reviews onChanged={loadStats} toast={showToast} />}
         {tab === 'support' && <Support onChanged={loadStats} />}
         {tab === 'pay' && <Payments prefill={prefill} clearPrefill={() => setPrefill(null)} onChanged={loadStats} toast={showToast} />}
-        {tab === 'members' && <Members onRenew={(user) => { setPrefill({ user, tier: user.vip_tier }); setTab('pay') }} />}
+        {tab === 'members' && <Members toast={showToast} onRenew={(user) => { setPrefill({ user, tier: user.vip_tier }); setTab('pay') }} />}
       </main>
 
       {toast && (

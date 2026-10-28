@@ -5,6 +5,28 @@ import { LIFF_ID, USE_MOCK_LIFF } from '../config'
 const REF_KEY = 'partner_ref'
 const REF_PATTERN = /^[A-Za-z0-9_-]{1,32}$/ // reject anything odd before it reaches the DB
 
+// Deep link from the renewal reminder: https://liff.line.me/<id>?open=plans  ->  open the plan picker once.
+// LINE tucks the query into `liff.state` on first open, so look there too, and remember it across the login redirect.
+export function captureOpenParam() {
+  const params = new URLSearchParams(window.location.search)
+  let open = params.get('open')
+  if (!open) {
+    const state = params.get('liff.state')
+    if (state) {
+      const q = state.indexOf('?')
+      open = new URLSearchParams(q >= 0 ? state.slice(q) : state).get('open')
+    }
+  }
+  try { if (open === 'plans') sessionStorage.setItem('open_intent', 'plans') } catch { /* storage blocked */ }
+}
+export function takeOpenIntent() {
+  try {
+    const v = sessionStorage.getItem('open_intent')
+    sessionStorage.removeItem('open_intent')
+    return v
+  } catch { return null }
+}
+
 /**
  * Read the partner code from the URL, e.g. https://liff.line.me/<id>?ref=sales01
  *
@@ -42,6 +64,7 @@ export function captureRefCode() {
  */
 export async function signIn() {
   captureRefCode()
+  captureOpenParam()
 
   let profile
   if (USE_MOCK_LIFF) {
@@ -77,6 +100,7 @@ export async function signIn() {
   // Cosmetic: lets providers see who booked them. Failure must not block login.
   try { await supabase.rpc('touch_profile', { p_name: profile.displayName, p_picture: profile.pictureUrl ?? null }) } catch { /* ignore */ }
 
+  captureOpenParam()
   const refCode = captureRefCode() // URL is clean again after init(); re-check
   if (refCode) {
     // Idempotent + first-touch enforced server-side. Failure must not block login.

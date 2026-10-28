@@ -114,7 +114,7 @@ export default function WorkerDashboard({ userId }) {
       {/* Messages from members (in-app chat; no LINE push) */}
       <section>
         <h2 className="mb-2 text-base font-bold">{t('messages')}</h2>
-        <ThreadList onOpen={(th) => setChat(th)} />
+        <ThreadList role="worker" onOpen={(th) => setChat(th)} />
       </section>
 
       {/* Profile */}

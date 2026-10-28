@@ -10,7 +10,7 @@ import { useI18n } from '../i18n'
  *  - !can_view : public teaser (the worker's own face-mosaicked photo) + lock + Unlock button
  * The browser never receives the full photo of a worker it isn't allowed to see.
  */
-export default function HomeFeed({ workers, category, tier, loading, onBook, onUnlock, onAsk }) {
+export default function HomeFeed({ workers, category, tier, loading, onBook, onUnlock, onAsk, meId }) {
   const { t } = useI18n()
   const freeCategory = MIN_TIER[category] === 0
   const [province, setProvince] = useState('')
@@ -45,7 +45,7 @@ export default function HomeFeed({ workers, category, tier, loading, onBook, onU
       ) : (
         <ul className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3 sm:gap-4">
           {shown.map((w) => (
-            <WorkerCard key={w.user_id} worker={w} onBook={onBook} onUnlock={onUnlock} onAsk={canChat ? onAsk : null} />
+            <WorkerCard key={w.user_id} worker={w} onBook={onBook} onUnlock={onUnlock} onAsk={canChat ? onAsk : null} isMe={w.user_id === meId} />
           ))}
         </ul>
       )}
@@ -53,7 +53,7 @@ export default function HomeFeed({ workers, category, tier, loading, onBook, onU
   )
 }
 
-function WorkerCard({ worker: w, onBook, onUnlock, onAsk }) {
+function WorkerCard({ worker: w, onBook, onUnlock, onAsk, isMe }) {
   const { t, money, catName } = useI18n()
   const locked = !w.canView
 
@@ -116,7 +116,9 @@ function WorkerCard({ worker: w, onBook, onUnlock, onAsk }) {
         <p className="text-xs text-neutral-400 sm:text-sm">
           {t('from')} <span className="font-semibold text-white">{money(w.price)}</span>
         </p>
-        {locked ? (
+        {isMe ? (
+          <p className="rounded-xl bg-white/10 py-2.5 text-center text-sm font-semibold text-neutral-300">{t('ownProfile')}</p>
+        ) : locked ? (
           <button onClick={onUnlock} className="w-full rounded-xl bg-amber-400 py-2.5 text-sm font-bold text-black transition active:scale-95">
             👑 {t('unlock')}
           </button>
@@ -130,7 +132,7 @@ function WorkerCard({ worker: w, onBook, onUnlock, onAsk }) {
           </button>
         )}
         {/* Chat: shown to paid members only, and only for providers they may view */}
-        {!locked && onAsk && (
+        {!isMe && !locked && onAsk && (
           <button onClick={() => onAsk(w)} className="w-full rounded-xl bg-white/10 py-2 text-sm font-semibold transition active:scale-95">
             {t('ask')}
           </button>

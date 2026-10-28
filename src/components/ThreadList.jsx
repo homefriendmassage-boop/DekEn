@@ -4,15 +4,15 @@ import { useI18n } from '../i18n'
 
 // List of my chats (works for both customers and providers; the DB returns the other party's name).
 // `onChange` lets the parent refresh its unread badge.
-export default function ThreadList({ onOpen, refreshKey, onChange }) {
+export default function ThreadList({ onOpen, refreshKey, onChange, role }) {
   const { t } = useI18n()
   const [threads, setThreads] = useState(null)
 
   const load = useCallback(async () => {
-    const { data } = await supabase.rpc('my_threads')
+    const { data } = await supabase.rpc('my_threads', { p_role: role ?? null })
     setThreads(data ?? [])
     onChange?.(data ?? [])
-  }, [onChange])
+  }, [onChange, role])
 
   useEffect(() => { load() }, [load, refreshKey])
 

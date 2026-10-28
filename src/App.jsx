@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
-import { signIn } from './lib/auth'
+import { signIn, takeOpenIntent } from './lib/auth'
 import { CATEGORIES, canViewWorker, tierOf } from './config'
 import { useI18n } from './i18n'
 import Header from './components/Header'
@@ -90,6 +90,7 @@ export default function App() {
         if (cancelled) return
         setSession(s)
         await loadMe()
+        if (takeOpenIntent() === 'plans') { setView('categories'); setShowMembership(true) } // opened from a renewal reminder
         if (!cancelled) setPhase('ready')
       } catch (e) {
         console.error(e)
@@ -162,7 +163,9 @@ export default function App() {
   async function askWorker(w) {
     const { data, error } = await supabase.rpc('open_thread', { p_worker: w.user_id })
     if (error) {
-      if (error.message.includes('MEMBERS_ONLY') || error.message.includes('LOCKED')) return setShowMembership(true)
+      if (error.message.includes('MEMBERS_ONLY')) return setShowMembership(true)      // not a paid member
+      if (error.message.includes('SELF_CHAT')) return showToast(t('errSelfChat'))
+      if (error.message.includes('LOCKED')) return showToast(t('errLocked'))
       return showToast(t('errGeneric'))
     }
     setChat({ id: data, other_name: w.display_name })
@@ -256,6 +259,7 @@ export default function App() {
             onBook={setSelected}
             onUnlock={() => setShowMembership(true)}
             onAsk={askWorker}
+            meId={me?.id}
           />
         </>
       )}
@@ -292,7 +296,7 @@ export default function App() {
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 sm:items-center sm:p-4" onClick={() => setShowThreads(false)}>
           <div onClick={(e) => e.stopPropagation()} className="max-h-[80vh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-neutral-900 p-5 sm:rounded-3xl">
             <h2 className="mb-3 text-lg font-bold">💬 {t('messages')}</h2>
-            <ThreadList onOpen={(th) => { setShowThreads(false); setChat(th) }} onChange={(rows) => setChatUnread(rows.reduce((n, r) => n + r.unread, 0))} />
+            <ThreadList role="customer" onOpen={(th) => { setShowThreads(false); setChat(th) }} onChange={(rows) => setChatUnread(rows.reduce((n, r) => n + r.unread, 0))} />
             <button onClick={() => setShowThreads(false)} className="mt-4 w-full rounded-xl bg-white/10 py-3 font-semibold active:scale-95">{t('close')}</button>
           </div>
         </div>
