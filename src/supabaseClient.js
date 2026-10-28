@@ -1,6 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 
-const url = import.meta.env.VITE_SUPABASE_URL
+// Keep only the origin: pasting ".../rest/v1" (from the Data API page) would
+// otherwise produce broken paths like /rest/v1/functions/v1/line-auth.
+const rawUrl = import.meta.env.VITE_SUPABASE_URL
+const url = rawUrl ? new URL(rawUrl).origin : rawUrl
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 if (!url || !anonKey) {
