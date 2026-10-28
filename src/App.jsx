@@ -77,6 +77,7 @@ export default function App() {
   const [showWallet, setShowWallet] = useState(false)
   const [invitedBy, setInvitedBy] = useState(null)       // agency name when the app was opened from an agency invitation
   const [walletPaying, setWalletPaying] = useState(false)
+  const [termsBusy, setTermsBusy] = useState(false)
   const [openChat, setOpenChat] = useState(null)      // chat to open inside the provider side
   const [shared, setShared] = useState(null)         // { id, friend, worker } when the app was opened from a shared profile link
   const [pay, setPay] = useState(null)               // { kind: 'membership', tier } | { kind: 'wallet_topup' }
@@ -190,6 +191,14 @@ export default function App() {
     showToast(t('paySuccessMembership', { plan: PLAN_META[planTier].name }))
     await loadMe()
     if (view === 'feed') loadFeed(category)
+  }
+
+  // Customers accept the terms once (20+, no contact exchange, chats may be reviewed after a complaint)
+  async function acceptTerms() {
+    setTermsBusy(true)
+    await supabase.rpc('accept_customer_terms')
+    await loadMe()
+    setTermsBusy(false)
   }
 
   async function openSupport() {
@@ -387,6 +396,19 @@ export default function App() {
               ? <WorkerDashboard userId={me.id} me={me} openChat={openChat} onWallet={() => setShowWallet(true)} onTopUp={() => setPay({ kind: 'wallet_topup' })} />
               : <WorkerApply userId={me.id} defaultName={session.profile.displayName} />}
         </>
+      )}
+
+      {me && !me.customer_terms_at && (view === 'categories' || view === 'feed') && (
+        <div className="fixed inset-0 z-[58] flex items-end justify-center bg-black/85 sm:items-center sm:p-4">
+          <div className="max-h-[92vh] w-full max-w-md space-y-3 overflow-y-auto rounded-t-3xl bg-neutral-900 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl sm:rounded-3xl">
+            <h2 className="text-xl font-bold">📜 {t('custTermsTitle')}</h2>
+            <ul className="space-y-2 text-sm text-neutral-200">
+              {[1, 2, 3, 4].map((n) => <li key={n} className="flex gap-2 rounded-xl bg-white/5 p-3"><span>✓</span><span>{t(`custTerms${n}`)}</span></li>)}
+            </ul>
+            <button onClick={acceptTerms} disabled={termsBusy} className="w-full rounded-xl bg-line py-3 font-bold text-black active:scale-95 disabled:opacity-50">{t('custTermsOk')}</button>
+            <button onClick={() => setView('landing')} className="w-full text-center text-xs text-neutral-500 underline">{t('back')}</button>
+          </div>
+        </div>
       )}
 
       {shared && !shared.friend && (

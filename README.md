@@ -315,3 +315,12 @@ Run `supabase/migration_028.sql` once, after migration_027. `contact_problem(tex
 ## migration_029 — fuzzier contact filter
 
 Run `supabase/migration_029.sql` once, after migration_028. Words are matched after removing tone marks and spaces/dots/dashes between letters, and as stems (`เบอ`, `ไอดี`, `ไลน`, `โทรหา/โทรมา`, `line`, `ig`, `fb`, `id:` …; "ออนไลน์" and "เบอร์เกอร์" are excluded). `send_message` also adds up the sender's earlier number-only messages from the last 30 minutes: the message that brings the total to 9 digits is refused (`CONTACT_BLOCKED`).
+
+## migration_030 — chat moderation (flags, reports, admin review, suspension)
+
+Run `supabase/migration_030.sql` once, after migration_029.
+
+- **Flags:** every refused contact attempt (`chat_flag_events`, with the refused text) raises the thread's flag per sender: 1 noted, 2 yellow, 3 orange, 4 red. Red suspends the thread (`chat_threads.status = 'suspended'`): nobody can send, `notify_chat_message` sends no push, and held chat fees are frozen (`release_chat_holds` skips non-open threads). `send_message` now returns text (`OK`, `CONTACT_BLOCKED:<n>`, `THREAD_SUSPENDED`) because a refusal that raised an error would roll the log back.
+- **Reports:** `report_thread(thread, reason, note)` (button in the chat window).
+- **Admin tab "🚩 แชตที่ติดธง":** queue of flagged / reported / suspended chats; `admin_open_chat` only opens those, needs a written reason and logs every opening (`chat_admin_views`); `admin_chat_action` = suspend / unblock (flag reset, held-fee deadline extended by the frozen time) / close for good (held fee refunded to the customer).
+- **Terms:** customers accept the customer terms once (`users.customer_terms_at`, `accept_customer_terms()`); the provider terms and the chat window state that chats may be reviewed only after a complaint, fraud or a suspected rule breach.
