@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from './supabaseClient'
 import { signIn, takeOpenIntent, getAgencyCode } from './lib/auth'
+import { getPosition } from './lib/geo'
 import { CATEGORIES, PLAN_META, canViewWorker, suspensionOf, tierOf } from './config'
 import { useI18n } from './i18n'
 import Header from './components/Header'
@@ -58,6 +59,9 @@ export default function App() {
   const [workers, setWorkers] = useState([])
   const [signedUrls, setSignedUrls] = useState({})     // original_path -> signed URL
   const [feedLoading, setFeedLoading] = useState(false)
+  const nearRef = useRef(null)                            // { lat, lng } while "near me" is on (used for this query only, never stored)
+  const [nearOn, setNearOn] = useState(false)
+  const [nearBusy, setNearBusy] = useState(false)
   const [selected, setSelected] = useState(null)       // worker being booked
   const [showMembership, setShowMembership] = useState(false)
   const [toast, setToast] = useState(null)
@@ -167,10 +171,13 @@ export default function App() {
     setFeedLoading(true)
     setWorkers([])
     try {
-      const { data, error } = await supabase.rpc('list_workers', { p_category: cat })
+      const pos = nearRef.current
+      const { data, error } = pos
+        ? await supabase.rpc('list_workers_near', { p_lat: pos.lat, p_lng: pos.lng, p_radius_km: 50, p_category: cat })
+        : await supabase.rpc('list_workers', { p_category: cat })
       if (error) throw error
       let rows = data ?? []
-      if (rows.length === 0 && session?.isMock) rows = DEMO_WORKERS.filter((w) => w.category === cat)
+      if (rows.length === 0 && session?.isMock && !pos) rows = DEMO_WORKERS.filter((w) => w.category === cat)
 
       const paths = rows.filter((w) => w.can_view && w.original_path).map((w) => w.original_path)
       const signed = {}
@@ -186,6 +193,20 @@ export default function App() {
     }
     setFeedLoading(false)
   }, [session?.isMock]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function toggleNear() {
+    if (nearOn) { nearRef.current = null; setNearOn(false); return loadFeed(category) }
+    setNearBusy(true)
+    try {
+      nearRef.current = await getPosition()
+      setNearOn(true)
+      await loadFeed(category)
+    } catch {
+      nearRef.current = null
+      showToast(t('nearDenied'))
+    }
+    setNearBusy(false)
+  }
 
   // Open (or create) the chat with a provider. The DB enforces: paid member + may view that provider.
   async function askWorker(w) {
@@ -305,6 +326,7 @@ export default function App() {
             loading={feedLoading}
             onBook={setSelected}
             onUnlock={() => setShowMembership(true)}
+            nearOn={nearOn} nearBusy={nearBusy} onToggleNear={toggleNear}
             onAsk={askWorker}
             meId={me?.id}
           />

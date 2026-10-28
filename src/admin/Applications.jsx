@@ -75,6 +75,11 @@ function Card({ a, onReview }) {
         <dt className="text-neutral-400">เบอร์โทร</dt><dd>{a.phone ? <a className="text-line underline" href={`tel:${a.phone}`}>{a.phone}</a> : '—'}</dd>
         <dt className="text-neutral-400">LINE ID</dt><dd>{a.line_id ?? '—'}</dd>
         {a.note && <><dt className="text-neutral-400">หมายเหตุ</dt><dd className="whitespace-pre-wrap break-words">{a.note}</dd></>}
+        {a.gender && <><dt className="text-neutral-400">ข้อมูล</dt><dd>{{ female: 'หญิง', male: 'ชาย', lgbt: 'LGBT' }[a.gender]} · อายุ {a.age ?? '—'} · สูง {a.height_cm ?? '—'} ซม. · หนัก {a.weight_kg ?? '—'} กก. · สัดส่วน {a.measurements ?? '—'}</dd></>}
+        {a.tags?.length > 0 && <><dt className="text-neutral-400">บุคลิก</dt><dd>{a.tags.join(', ')}</dd></>}
+        {a.about && <><dt className="text-neutral-400">แนะนำตัว</dt><dd className="whitespace-pre-wrap break-words">{a.about}</dd></>}
+        {a.price_options?.length > 0 && <><dt className="text-neutral-400">ราคาอื่น</dt><dd>{a.price_options.map((o) => `${o.label === '@4h' ? '4 ชม.' : o.label === '@6h' ? '6 ชม.' : o.label} ${baht(o.price)}`).join(' · ')}</dd></>}
+        <dt className="text-neutral-400">พิกัด</dt><dd className={a.loc_verified ? 'text-green-300' : 'text-amber-300'}>{a.loc_verified ? 'ยืนยันพิกัดจากโทรศัพท์แล้ว' : 'ไม่ได้ยืนยันพิกัด (เลือกจังหวัดเอง)'}</dd>
         {a.agency_name && <><dt className="text-neutral-400">สังกัด</dt><dd>{a.agency_name} · <span className={a.agency_status === 'accepted' ? 'text-green-300' : 'text-amber-300'}>{a.agency_status === 'accepted' ? 'โมเดลลิ่งยืนยันแล้ว' : a.agency_status === 'rejected' ? 'โมเดลลิ่งปฏิเสธ' : 'รอโมเดลลิ่งยืนยัน'}</span></dd></>}
         <dt className="text-neutral-400">ส่งเมื่อ</dt><dd>{fmtDateTime(a.created_at)}</dd>
         {a.reject_reason && <><dt className="text-neutral-400">เหตุผลที่ไม่ผ่าน</dt><dd className="text-red-300">{a.reject_reason}</dd></>}

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useI18n } from '../i18n'
-import { PROVINCES } from '../provinces'
 import PhotoUploader from './PhotoUploader'
 import ThreadList from './ThreadList'
 import ChatModal from './ChatModal'
 import RankBoost from './RankBoost'
+import WorkerFields, { profileFromRow, profileToPayload, validateProfile } from './WorkerFields'
 import { logoUrl } from '../lib/logo'
 import { clearAgencyCode, getAgencyCode } from '../lib/auth'
 
@@ -16,6 +16,7 @@ export default function WorkerDashboard({ userId }) {
   const [jobs, setJobs] = useState([])
   const [form, setForm] = useState({ display_name: '', price: '', province: '', district: '', nearby: '' })
   const [chat, setChat] = useState(null)
+  const [prof, setProf] = useState(null)   // details / prices / location (WorkerFields)
   const [note, setNote] = useState(null)
   const [invite, setInvite] = useState(() => getAgencyCode())      // invitation link opened earlier
   const [inviteAgency, setInviteAgency] = useState(null)
@@ -26,6 +27,7 @@ export default function WorkerDashboard({ userId }) {
     const { data, error } = await supabase.from('workers').select('*').eq('user_id', userId).single()
     if (error) return setError(t('errGeneric'))
     setWorker(data)
+    setProf(profileFromRow(data))
     setForm({ display_name: data.display_name, price: String(data.price), province: data.province ?? '', district: data.district ?? '', nearby: data.nearby ?? '' })
   }, [userId]) // eslint-disable-line
 
@@ -185,15 +187,7 @@ export default function WorkerDashboard({ userId }) {
         <label className="block text-sm">{t('fName')}
           <input value={form.display_name} maxLength={40} onChange={(e) => setForm((f) => ({ ...f, display_name: e.target.value }))} className={input} />
         </label>
-        <label className="block text-sm">{t('priceLabel')}
-          <input type="number" min="0" inputMode="numeric" value={form.price} onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))} className={input} />
-        </label>
-        <label className="block text-sm">{t('fProvince')}
-          <select value={form.province} onChange={(e) => setForm((f) => ({ ...f, province: e.target.value }))} className={input}>
-            <option value="" className="text-black">{t('chooseProvince')}</option>
-            {PROVINCES.map((p) => <option key={p} value={p} className="text-black">{p}</option>)}
-          </select>
-        </label>
+        {prof && <WorkerFields v={prof} set={(p) => setProf((x) => ({ ...x, ...p }))} />}
         <label className="block text-sm">{t('fDistrict')}
           <input value={form.district} maxLength={60} onChange={(e) => setForm((f) => ({ ...f, district: e.target.value }))} className={input} />
         </label>
@@ -201,10 +195,14 @@ export default function WorkerDashboard({ userId }) {
           <input value={form.nearby} maxLength={120} onChange={(e) => setForm((f) => ({ ...f, nearby: e.target.value }))} className={input} />
         </label>
         <button
-          onClick={() => update({
-            display_name: form.display_name.trim(), price: Number(form.price),
-            province: form.province || null, district: form.district.trim() || null, nearby: form.nearby.trim() || null,
-          })}
+          onClick={() => {
+            const bad = prof && validateProfile(prof)
+            if (bad) return setError(t(bad))
+            update({
+              display_name: form.display_name.trim(), ...profileToPayload(prof),
+              district: form.district.trim() || null, nearby: form.nearby.trim() || null,
+            })
+          }}
           className="w-full rounded-xl bg-white/10 py-2.5 text-sm font-semibold active:scale-95"
         >
           {t('save')}

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { CATEGORIES } from '../config'
-import { PROVINCES } from '../provinces'
 import { useI18n } from '../i18n'
 import PhotoUploader from './PhotoUploader'
+import WorkerFields, { emptyProfile, profileFromRow, profileToPayload, validateProfile } from './WorkerFields'
 import { clearAgencyCode, getAgencyCode } from '../lib/auth'
 import { logoUrl } from '../lib/logo'
 
@@ -22,6 +22,8 @@ export default function WorkerApply({ userId, defaultName }) {
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState({ ...EMPTY, display_name: defaultName ?? '' })
   const [busy, setBusy] = useState(false)
+  const [prof, setProf] = useState(emptyProfile)
+  const [terms, setTerms] = useState(false)
   const [error, setError] = useState(null)
   const [note, setNote] = useState(null)
   const [invite, setInvite] = useState(() => getAgencyCode())   // code from the agency's own link, if any
@@ -32,7 +34,7 @@ export default function WorkerApply({ userId, defaultName }) {
       .eq('user_id', userId).order('created_at', { ascending: false }).limit(1)
     const row = data?.[0] ?? null
     setApp(row)
-    if (row) setForm(toForm(row)) // pending: edit it; rejected: prefill a fresh attempt
+    if (row) { setForm(toForm(row)); setProf(profileFromRow(row)) } // pending: edit it; rejected: prefill a fresh attempt
     setLoading(false)
   }, [userId])
 
@@ -58,14 +60,16 @@ export default function WorkerApply({ userId, defaultName }) {
     setError(null)
     setNote(null)
     if (form.categories.length === 0) return setError(t('pickCategory'))
+    const bad = validateProfile(prof)
+    if (bad) return setError(t(bad))
+    if (app?.status !== 'pending' && !terms) return setError(t('errTerms'))
     if (!form.phone.trim() && !form.line_id.trim()) return setError(t('contactHint'))
     const joining = app?.status !== 'pending' && !!invite && !!agency
 
     const payload = {
       display_name: form.display_name.trim(),
       categories: form.categories,
-      price: Number(form.price),
-      province: form.province,
+      ...profileToPayload(prof),
       district: form.district.trim() || null,
       nearby: form.nearby.trim() || null,
       phone: form.phone.trim() || null,
@@ -76,7 +80,7 @@ export default function WorkerApply({ userId, defaultName }) {
     const editing = app?.status === 'pending'
     const { error } = editing
       ? await supabase.from('worker_applications').update(payload).eq('id', app.id)
-      : await supabase.from('worker_applications').insert({ user_id: userId, ...payload, agency_code: joining ? invite : null })
+      : await supabase.from('worker_applications').insert({ user_id: userId, ...payload, accepted_terms: true, agency_code: joining ? invite : null })
     setBusy(false)
     if (error) return setError(error.message.includes('app_contact_check') ? t('errPhone') : error.message.includes('AGENCY_NOT_FOUND') ? t('errAgencyNotFound') : error.message.includes('AGENCY_FULL') ? t('errAgencyFull') : t('errApply'))
     if (joining) clearAgencyCode()
@@ -164,15 +168,7 @@ export default function WorkerApply({ userId, defaultName }) {
           </div>
         </fieldset>
 
-        <label className="block text-sm">{t('fPrice')}
-          <input required type="number" min="0" inputMode="numeric" value={form.price} onChange={set('price')} className={input} />
-        </label>
-        <label className="block text-sm">{t('fProvince')}
-          <select required value={form.province} onChange={set('province')} className={input}>
-            <option value="" className="text-black">{t('chooseProvince')}</option>
-            {PROVINCES.map((p) => <option key={p} value={p} className="text-black">{p}</option>)}
-          </select>
-        </label>
+        <WorkerFields v={prof} set={(p) => setProf((x) => ({ ...x, ...p }))} />
         <label className="block text-sm">{t('fDistrict')}
           <input maxLength={60} value={form.district} onChange={set('district')} className={input} />
         </label>
@@ -194,6 +190,12 @@ export default function WorkerApply({ userId, defaultName }) {
           <textarea rows={3} value={form.note} onChange={set('note')} className={input} />
         </label>
 
+        {!editing && (
+          <label className="flex items-start gap-2 rounded-xl bg-white/5 p-3 text-xs text-neutral-300">
+            <input type="checkbox" checked={terms} onChange={(e) => setTerms(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{t('termsLabel')}</span>
+          </label>
+        )}
         {error && <p className="rounded-lg bg-red-500/10 p-2 text-sm text-red-300">{error}</p>}
         {note && <p className="text-sm text-green-400">{note}</p>}
         <button disabled={busy} className="w-full rounded-xl bg-line py-3 font-bold text-black active:scale-95 disabled:opacity-50">
