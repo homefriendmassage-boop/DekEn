@@ -22,6 +22,7 @@ supabase/migration_013.sql       Suspended providers are hidden from the feed an
 supabase/migration_014.sql       Two balances (Wallet + Bonus) and a ledger of every money movement (run after 013)
 supabase/migration_015.sql       Share links (link/Flex/QR), sales attribution, 20% membership referral reward, pay packages from the Wallet (run after 014)
 supabase/migration_016.sql       Paid chat: 40 THB hold -> 30 to the provider / 10 platform when they reply, refund after 3 h (run after 015)
+supabase/migration_017.sql       Bonus -> Wallet after 30 inactive days; optional 6-month Wallet expiry (off by default) (run after 016)
 supabase/functions/send-renewal/ Edge Function (admin only): LINE Flex renewal reminder with a button to the plan picker
 supabase/functions/verify-slip/  Edge Function: verifies the slip with Thunder, opens the plan / credits the wallet
 admin.html + src/admin/          Separate admin page (not linked from the customer app)
@@ -246,3 +247,8 @@ expired is not rejected: it goes to Admin > Slip review, linked to the customer'
 - No valid reply within 3 hours: the 40 THB returns to the Wallet. This happens when either side opens the chat, when the wallet or app is opened, and every 10 minutes if **pg_cron** is enabled (Supabase: Database > Extensions > pg_cron, then run migration_016 again or `select cron.schedule('release-chat-holds','*/10 * * * *','select public.release_expired_chat_holds()')`).
 - A booking the provider accepts opens the chat for 72 hours at no charge (a pending hold counts as settled by the acceptance).
 - All amounts and hours live in the small `chat_*()` functions at the top of the migration.
+
+## Inactivity rules (migration_017)
+- **Bonus -> Wallet:** a customer whose membership has expired and who has not renewed or paid in for 30 days (counted from the later of the expiry date and the last payment; from sign-up if there is no history) has the whole bonus balance moved into the Wallet by a daily job (`sweep_inactive_bonus`). Providers are exempt. The app warns with the date.
+- **Wallet expiry (OFF by default):** after 6 months with no top-up / package / booking / chat fee / payment the Wallet balance is written off as `wallet_expired` in the ledger (`expire_inactive_wallets`). Have a lawyer review the terms first, then enable with `update public.app_settings set value = 'true' where key = 'wallet_expiry_enabled';` (also exposed as `admin_set_setting`). Turning it on shows the terms next to top-ups and the expiry date in the wallet screen.
+- Both jobs are scheduled with pg_cron when it is enabled (Database > Extensions); otherwise call the functions from any scheduler.

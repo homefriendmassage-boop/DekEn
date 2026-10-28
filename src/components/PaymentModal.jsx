@@ -87,6 +87,8 @@ export default function PaymentModal({ kind, tier, upgrade, onClose, onPaid, onO
   const [error, setError] = useState(null)
   const [now, setNow] = useState(Date.now())
   const [result, setResult] = useState(null)
+  const [expiryOn, setExpiryOn] = useState(false)   // wallet expiry rule active -> show the terms next to top-ups
+  useEffect(() => { if (kind === 'wallet_topup') supabase.rpc('my_wallet_rules').then(({ data }) => setExpiryOn(!!data?.[0]?.expiry_enabled)) }, [kind])
   const [review, setReview] = useState(null) // { paid, expected } when the slip was sent to the admin
 
   const create = useCallback(async () => {
@@ -168,6 +170,7 @@ export default function PaymentModal({ kind, tier, upgrade, onClose, onPaid, onO
         ) : step === 'choose' ? (
           <div className="mt-4 space-y-4">
             <p className="text-sm text-neutral-400">{t('chooseTopup')}</p>
+            {expiryOn && <p className="rounded-lg bg-amber-400/10 p-2 text-xs text-amber-200">{t('walletExpiryTerms')}</p>}
             <div className="grid grid-cols-4 gap-2">
               {TOPUP_CHOICES.map((n) => (
                 <button key={n} onClick={() => setTopup(n)}

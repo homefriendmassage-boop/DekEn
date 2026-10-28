@@ -14,6 +14,7 @@ export default function WalletModal({ me, onTopUp, onClose, onChanged }) {
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState(null)
   const [showShare, setShowShare] = useState(false)
+  const [rules, setRules] = useState(null)   // { bonus_sweep_at, wallet_expires_at, expiry_enabled }
 
   const load = useCallback(async () => {
     const { data } = await supabase.from('wallet_ledger').select('id, wallet, amount, balance_after, kind, note, created_at')
@@ -21,6 +22,7 @@ export default function WalletModal({ me, onTopUp, onClose, onChanged }) {
     setRows(data ?? [])
   }, [])
   useEffect(() => { load() }, [load, wallet, bonus])
+  useEffect(() => { supabase.rpc('my_wallet_rules').then(({ data }) => setRules(data?.[0] ?? null)) }, [wallet, bonus])
   useEffect(() => {   // expired chat holds return to the Wallet when it is opened
     supabase.rpc('release_my_expired_holds').then(({ data }) => { if (data > 0) onChanged?.() })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -51,6 +53,7 @@ export default function WalletModal({ me, onTopUp, onClose, onChanged }) {
           <p className="text-xs text-neutral-400">{t('walletMain')}</p>
           <p className="text-2xl font-extrabold">{money(wallet)}</p>
           <p className="text-[11px] text-neutral-500">{t('walletMainHint')}</p>
+          {rules?.wallet_expires_at && <p className="mt-1 text-[11px] text-amber-200">{t('walletExpiryWarn', { date: new Date(rules.wallet_expires_at).toLocaleDateString() })}</p>}
           <button onClick={onTopUp} className="mt-2 w-full rounded-xl bg-line py-2 text-sm font-bold text-black active:scale-95">{t('topUp')}</button>
         </section>
 
@@ -58,6 +61,7 @@ export default function WalletModal({ me, onTopUp, onClose, onChanged }) {
           <p className="text-xs text-amber-200">{t('walletBonus')}</p>
           <p className="text-2xl font-extrabold text-amber-300">{money(bonus)}</p>
           <p className="text-[11px] text-neutral-400">{t('walletBonusHint')}</p>
+          {rules?.bonus_sweep_at && <p className="mt-1 text-[11px] text-amber-100">{t('bonusSweepWarn', { date: new Date(rules.bonus_sweep_at).toLocaleDateString() })}</p>}
           {bonus > 0 && (
             <div className="mt-2 flex gap-2">
               <input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ''))} inputMode="decimal" placeholder={t('amountLabel')}
