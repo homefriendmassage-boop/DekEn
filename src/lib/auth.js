@@ -75,7 +75,7 @@ export async function signIn() {
   }
 
   // Cosmetic: lets providers see who booked them. Failure must not block login.
-  try { await supabase.rpc('touch_profile', { p_name: profile.displayName }) } catch { /* ignore */ }
+  try { await supabase.rpc('touch_profile', { p_name: profile.displayName, p_picture: profile.pictureUrl ?? null }) } catch { /* ignore */ }
 
   const refCode = captureRefCode() // URL is clean again after init(); re-check
   if (refCode) {

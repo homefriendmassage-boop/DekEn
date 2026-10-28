@@ -11,6 +11,7 @@ supabase/seed2.sql               Dev-only: 21 more demo workers (tests the top-1
 supabase/migration_003.sql       Remove ENT Plus, rename Spa, service area, members-only chat (run after migration_002)
 supabase/migration_004.sql       Multi-category providers, phone + LINE ID, editable applications, promo photo (run after 003)
 supabase/migration_005.sql       Admin back office: admins, payment ledger, review/payment functions (run after 004)
+supabase/migration_006.sql       LINE profile picture + last seen; admin user list shows recent users (run after 005)
 admin.html + src/admin/          Separate admin page (not linked from the customer app)
 supabase/functions/line-auth/    Edge Function: LIFF ID token -> Supabase session
 src/lib/auth.js                  LIFF init, ?ref capture, mock login    (Part 2)

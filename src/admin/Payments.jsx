@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { MEMBERSHIP_DAYS, PLAN_META, PLANS } from '../config'
-import { baht, fmtDateTime, fmtDate } from './format'
+import { baht, fmtDateTime, fmtDate, ago } from './format'
 
 const METHODS = { promptpay: 'PromptPay', bank_transfer: 'โอนธนาคาร', cash: 'เงินสด', other: 'อื่นๆ' }
 const ERRORS = {
@@ -14,6 +14,12 @@ const errText = (m = '') => Object.entries(ERRORS).find(([k]) => m.includes(k))?
 
 // Record a payment you verified (slip / bank statement). One click applies it:
 // membership => extends or starts the plan; wallet top-up => credits the wallet. Every entry is kept in the ledger.
+function Avatar({ u }) {
+  return u.picture_url
+    ? <img src={u.picture_url} alt="" referrerPolicy="no-referrer" className="h-10 w-10 shrink-0 rounded-full object-cover" />
+    : <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-sm font-bold">{(u.display_name ?? '?').slice(0, 1)}</span>
+}
+
 export default function Payments({ prefill, clearPrefill, onChanged, toast }) {
   const [q, setQ] = useState('')
   const [results, setResults] = useState([])
@@ -45,11 +51,10 @@ export default function Payments({ prefill, clearPrefill, onChanged, toast }) {
 
   // Debounced user search
   useEffect(() => {
-    if (q.trim().length < 2) return setResults([])
     const h = setTimeout(async () => {
       const { data } = await supabase.rpc('admin_search_users', { p_q: q })
       setResults(data ?? [])
-    }, 300)
+    }, q ? 300 : 0)
     return () => clearTimeout(h)
   }, [q])
 
@@ -96,7 +101,8 @@ export default function Payments({ prefill, clearPrefill, onChanged, toast }) {
         {/* 1) who */}
         {user ? (
           <div className="flex items-center justify-between gap-3 rounded-xl bg-line/15 p-3 ring-1 ring-line/40">
-            <div className="min-w-0 text-sm">
+            <Avatar u={user} />
+            <div className="min-w-0 flex-1 text-sm">
               <p className="truncate font-bold">{user.display_name ?? '—'}</p>
               <p className="truncate text-[11px] text-neutral-400">{user.line_user_id}</p>
               <p className="text-xs">
@@ -109,14 +115,23 @@ export default function Payments({ prefill, clearPrefill, onChanged, toast }) {
           </div>
         ) : (
           <div>
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหาชื่อ LINE หรือ LINE user id (อย่างน้อย 2 ตัวอักษร)" className={input} />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหาชื่อ LINE หรือ LINE user id" className={input} />
+            <p className="mt-2 text-[11px] text-neutral-500">{q ? 'ผลการค้นหา' : 'ผู้ใช้ที่เข้าแอปล่าสุด — แตะเพื่อเลือก'}</p>
             {results.length > 0 && (
-              <ul className="mt-2 divide-y divide-white/10 overflow-hidden rounded-xl bg-neutral-900 ring-1 ring-white/10">
+              <ul className="mt-1 max-h-72 divide-y divide-white/10 overflow-y-auto rounded-xl bg-neutral-900 ring-1 ring-white/10">
                 {results.map((u) => (
                   <li key={u.id}>
-                    <button type="button" onClick={() => { setUser(u); setQ(''); setResults([]) }} className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-white/5">
-                      <span className="truncate font-semibold">{u.display_name ?? '—'}</span>
-                      <span className="ml-2 shrink-0 text-[11px] text-neutral-500">{u.role}</span>
+                    <button type="button" onClick={() => { setUser(u); setQ('') }} className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-white/5">
+                      <Avatar u={u} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-semibold">{u.display_name ?? '—'}</span>
+                        <span className="block truncate text-[11px] text-neutral-500">
+                          {u.role} · …{u.line_user_id.slice(-6)} · {u.last_seen_at ? `เข้าล่าสุด ${ago(u.last_seen_at)}` : 'ไม่ทราบเวลาเข้า'}
+                        </span>
+                      </span>
+                      {u.vip_tier > 0 && new Date(u.vip_expires_at) > new Date() && (
+                        <span className="shrink-0 text-[11px]">{PLAN_META[u.vip_tier].icon}</span>
+                      )}
                     </button>
                   </li>
                 ))}
