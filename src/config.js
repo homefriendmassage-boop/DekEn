@@ -9,6 +9,12 @@ export const LINE_OA_URL = import.meta.env.VITE_LINE_OA_URL
 // PromptPay ID that receives payments: mobile number, 13-digit national/tax ID, or 15-digit e-wallet ID.
 // It is a public receiving address (customers see it in their banking app anyway).
 export const PROMPTPAY_ID = import.meta.env.VITE_PROMPTPAY_ID
+// Optional: show your bank account for manual transfer (works without PromptPay; also shown beside the QR).
+export const BANK = {
+  name: import.meta.env.VITE_BANK_NAME,          // e.g. กสิกรไทย
+  no: import.meta.env.VITE_BANK_ACCOUNT_NO,      // e.g. 123-4-56789-0
+  holder: import.meta.env.VITE_BANK_ACCOUNT_NAME // account holder name
+}
 
 export const CATEGORIES = ['bartender', 'ent', 'masseuse', 'spa']
 

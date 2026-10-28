@@ -160,9 +160,13 @@ the plan opens (or the wallet is credited) in one database transaction.
 Setup:
 1. Run `supabase/migration_007.sql`.
 2. Deploy the function `verify-slip` (Edge Functions > Via Editor, paste `supabase/functions/verify-slip/index.ts`, turn **off** Verify JWT).
-3. Edge Functions > Secrets: `THUNDER_API_KEY`, and `RECEIVER_NAME_CONTAINS` and/or `RECEIVER_BANK`
-   (the function refuses to approve anything until at least one receiver check is set).
-4. GitHub secrets: `VITE_PROMPTPAY_ID` (your PromptPay phone / 13-digit ID / e-wallet ID) and optionally `VITE_LINE_OA_URL`.
+3. Edge Functions > Secrets: `THUNDER_API_KEY`, plus `RECEIVER_NAME_CONTAINS` (text that must appear in the receiver
+   name on the slip) and/or `RECEIVER_ACCOUNT_DIGITS` (visible digits of your account number); optionally `RECEIVER_BANK`
+   (e.g. `KBANK`). The bank code alone is refused: it would accept a slip paid to any account at that bank.
+4. GitHub secrets: `VITE_PROMPTPAY_ID` (PromptPay phone / 13-digit ID / e-wallet ID; gives a QR with the amount filled in) and/or
+   `VITE_BANK_NAME`, `VITE_BANK_ACCOUNT_NO`, `VITE_BANK_ACCOUNT_NAME` (shows your account with copy buttons for manual transfer).
+   A bank account number alone cannot make a PromptPay QR; register the account with PromptPay (phone / ID) to get one.
+   Optional: `VITE_LINE_OA_URL`.
 5. Make one small real test payment, then check **Admin > Payments > failed slips** to tune the receiver check.
 
 Safety: the Thunder key stays server-side; amounts come from a server-side price list; a slip can't be replayed

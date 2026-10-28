@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { LINE_OA_URL, MEMBERSHIP_DAYS, PLAN_META, PROMPTPAY_ID } from '../config'
+import { BANK, LINE_OA_URL, MEMBERSHIP_DAYS, PLAN_META, PROMPTPAY_ID } from '../config'
 import { promptPayPayload } from '../lib/promptpay'
 import { useI18n } from '../i18n'
 
@@ -38,6 +38,27 @@ async function decodeSlipQr(file) {
   }
 }
 
+const HAS_QR = Boolean(PROMPTPAY_ID)
+const HAS_BANK = Boolean(BANK.no)
+const READY = HAS_QR || HAS_BANK
+
+function CopyRow({ label, value }) {
+  const { t } = useI18n()
+  const [done, setDone] = useState(false)
+  return (
+    <div className="flex items-center justify-between gap-2 text-sm">
+      <span className="min-w-0">
+        <span className="block text-[11px] text-neutral-500">{label}</span>
+        <span className="block truncate font-semibold">{value}</span>
+      </span>
+      <button type="button" className="shrink-0 rounded-lg bg-white/10 px-3 py-1 text-xs active:scale-95"
+        onClick={async () => { try { await navigator.clipboard.writeText(String(value)); setDone(true); setTimeout(() => setDone(false), 1500) } catch { /* ignore */ } }}>
+        {done ? t('copied') : t('copy')}
+      </button>
+    </div>
+  )
+}
+
 const mmss = (ms) => {
   const s = Math.max(0, Math.floor(ms / 1000))
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
@@ -72,13 +93,15 @@ export default function PaymentModal({ kind, tier, onClose, onPaid }) {
       return setStep(kind === 'membership' ? 'error' : 'choose')
     }
     const amount = Number(row.intent_amount)
-    const QR = await import('qrcode')
-    setQr(await QR.toDataURL(promptPayPayload(PROMPTPAY_ID, amount), { width: 320, margin: 1 }))
+    if (HAS_QR) {
+      const QR = await import('qrcode')
+      setQr(await QR.toDataURL(promptPayPayload(PROMPTPAY_ID, amount), { width: 320, margin: 1 }))
+    }
     setIntent({ amount, expires: new Date(row.intent_expires_at).getTime() })
     setStep('pay')
   }, [kind, tier, topup, t])
 
-  useEffect(() => { if (kind === 'membership' && PROMPTPAY_ID) create() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (kind === 'membership' && READY) create() }, []) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (step !== 'pay') return
     const h = setInterval(() => setNow(Date.now()), 1000)
@@ -122,7 +145,7 @@ export default function PaymentModal({ kind, tier, onClose, onPaid }) {
         <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-white/20 sm:hidden" />
         <h2 className="text-xl font-bold">{kind === 'membership' ? PLAN_META[tier].icon : '💰'} {title}</h2>
 
-        {!PROMPTPAY_ID ? (
+        {!READY ? (
           <div className="mt-4 space-y-3">
             <p className="rounded-xl bg-amber-400/10 p-3 text-sm text-amber-200">{t('payNotConfigured')}</p>
             {LINE_OA_URL && <a href={LINE_OA_URL} target="_blank" rel="noreferrer" className="block rounded-xl bg-line py-3 text-center font-bold text-black">{t('contactAdmin')}</a>}
@@ -166,8 +189,17 @@ export default function PaymentModal({ kind, tier, onClose, onPaid }) {
               </div>
             ) : (
               <>
-                <img src={qr} alt="PromptPay QR" className="mx-auto w-56 rounded-xl bg-white p-2" />
-                <p className="text-center text-xs text-neutral-400">{t('payExactHint')}</p>
+                {HAS_QR && <img src={qr} alt="PromptPay QR" className="mx-auto w-56 rounded-xl bg-white p-2" />}
+                <p className="text-center text-xs text-neutral-400">{HAS_QR ? t('payExactHint') : t('payExactHintBank')}</p>
+                {HAS_BANK && (
+                  <div className="space-y-2 rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
+                    <p className="text-xs font-semibold text-neutral-300">{HAS_QR ? t('orBank') : t('bankTransfer')}</p>
+                    {BANK.name && <CopyRow label={t('bankName')} value={BANK.name} />}
+                    <CopyRow label={t('accountNo')} value={BANK.no} />
+                    {BANK.holder && <CopyRow label={t('accountName')} value={BANK.holder} />}
+                    <CopyRow label={t('amountLabel')} value={intent.amount.toFixed(2)} />
+                  </div>
+                )}
                 <p className="text-center text-xs text-neutral-500">{t('payExpires', { time: mmss(intent.expires - now) })}</p>
 
                 <label className={`block w-full cursor-pointer rounded-xl py-3 text-center font-bold active:scale-95 ${step === 'verifying' ? 'bg-neutral-700 text-neutral-300' : 'bg-line text-black'}`}>

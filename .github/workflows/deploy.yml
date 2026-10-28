@@ -33,6 +33,9 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_LIFF_ID: ${{ secrets.VITE_LIFF_ID }}
           VITE_PROMPTPAY_ID: ${{ secrets.VITE_PROMPTPAY_ID }}
+          VITE_BANK_NAME: ${{ secrets.VITE_BANK_NAME }}
+          VITE_BANK_ACCOUNT_NO: ${{ secrets.VITE_BANK_ACCOUNT_NO }}
+          VITE_BANK_ACCOUNT_NAME: ${{ secrets.VITE_BANK_ACCOUNT_NAME }}
           VITE_LINE_OA_URL: ${{ secrets.VITE_LINE_OA_URL }}
           VITE_USE_MOCK_LIFF: 'false'
       - uses: actions/upload-pages-artifact@v3
