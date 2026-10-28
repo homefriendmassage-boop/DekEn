@@ -34,6 +34,7 @@ export default function WorkerJobs({ jobs, reload, highlightId, onError }) {
               <p className="font-semibold">{t('customer')}: {j.customer_name ?? '—'}</p>
               <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${BADGE[j.status]}`}>{t(`bkStatus_${j.status}`)}</span>
             </div>
+            {j.source_label && <p className="mt-1 text-xs font-semibold text-amber-300">🏪 {t('jobFrom', { name: j.source_label })}</p>}
             <p className="mt-1 text-xs text-neutral-300">
               {j.rate_label ? `${t(`rate_${j.rate_label}`) === `rate_${j.rate_label}` ? j.rate_label : t(`rate_${j.rate_label}`)} · ` : ''}{t('cashLabel')}: <b className="text-white">{money(j.service_price)}</b>
             </p>

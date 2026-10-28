@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
     // 2) Who to remind
     const { user_id, expiring_days } = await req.json().catch(() => ({}))
     const nowIso = new Date().toISOString()
-    let q = admin.from('users').select('id, line_user_id, vip_tier, vip_expires_at').gt('vip_tier', 0)
+    let q = admin.from('users').select('id, line_user_id, vendor_id, vip_tier, vip_expires_at').gt('vip_tier', 0)
     let dedupeMs = 24 * 3600_000
     if (user_id) {
       q = q.eq('id', user_id)
@@ -97,18 +97,26 @@ Deno.serve(async (req) => {
     // 3) Send, one by one
     const results: { user_id: string; status: string; detail?: string }[] = []
     for (const u of targets) {
-      if (!u.vip_expires_at || !u.line_user_id || !/^U[0-9a-f]{32}$/.test(u.line_user_id)) {
+      if (!u.vip_expires_at || !u.line_user_id || !/^U[0-9a-f]{32}$/.test(String(u.line_user_id).split(':').pop() ?? '')) {
         results.push({ user_id: u.id, status: 'NO_LINE_ID' }); continue   // mock / anonymous accounts
       }
       const { count } = await admin.from('renewal_notices').select('id', { count: 'exact', head: true })
         .eq('user_id', u.id).eq('result', 'SENT').gte('created_at', new Date(Date.now() - dedupeMs).toISOString())
       if ((count ?? 0) > 0) { results.push({ user_id: u.id, status: 'SKIPPED_RECENT' }); continue }
 
-      const message = buildRenewalFlex({ tier: u.vip_tier, expiresAt: u.vip_expires_at, liffId })
+      // a vendor's customer is reminded by the vendor's own OA (his token and LIFF)
+      let pushToken = token, pushLiff = liffId, pushTo = u.line_user_id as string
+      if (u.vendor_id) {
+        const { data: vt } = await admin.rpc('vendor_token', { p_vendor: u.vendor_id })
+        const { data: vv } = await admin.from('vendors').select('liff_id').eq('id', u.vendor_id).maybeSingle()
+        if (!vt || !vv) { results.push({ user_id: u.id, status: 'NO_VENDOR_TOKEN' }); continue }
+        pushToken = vt as string; pushLiff = vv.liff_id as string; pushTo = pushTo.split(':').pop() as string
+      }
+      const message = buildRenewalFlex({ tier: u.vip_tier, expiresAt: u.vip_expires_at, liffId: pushLiff })
       const r = await fetch('https://api.line.me/v2/bot/message/push', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'X-Line-Retry-Key': crypto.randomUUID() },
-        body: JSON.stringify({ to: u.line_user_id, messages: [message] }),
+        headers: { Authorization: `Bearer ${pushToken}`, 'Content-Type': 'application/json', 'X-Line-Retry-Key': crypto.randomUUID() },
+        body: JSON.stringify({ to: pushTo, messages: [message] }),
       })
       if (r.ok) {
         await admin.from('renewal_notices').insert({ user_id: u.id, sent_by: auth.user.id, result: 'SENT' })

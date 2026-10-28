@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import liff from '@line/liff'
 import { supabase } from '../supabaseClient'
-import { LIFF_ID, USE_MOCK_LIFF } from '../config'
+import { USE_MOCK_LIFF } from '../config'
+import { getActiveLiffId } from '../lib/vendor'
 import { useI18n } from '../i18n'
 import { inviteBubble } from '../lib/flex'
 
@@ -23,9 +24,9 @@ export default function ShareModal({ onClose, agencyCode }) {
 
   const param = agencyCode ? 'agency' : 'ref'
   const link = stats?.code
-    ? USE_MOCK_LIFF || !LIFF_ID
+    ? USE_MOCK_LIFF || !getActiveLiffId()
       ? `${window.location.origin}${window.location.pathname}?${param}=${stats.code}`
-      : `https://liff.line.me/${LIFF_ID}?${param}=${stats.code}`
+      : `https://liff.line.me/${getActiveLiffId()}?${param}=${stats.code}`
     : null
 
   const canFlex = !USE_MOCK_LIFF && (() => { try { return liff.isApiAvailable('shareTargetPicker') } catch { return false } })()

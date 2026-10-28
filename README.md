@@ -368,3 +368,16 @@ Run `supabase/migration_036.sql` once, after migration_035.
 - Customers see the profile with the badge "รอยืนยันตัวตน"; `create_booking` and `open_thread` refuse it (`UNCLAIMED`); the card and details hide the book / chat buttons.
 - `worker_listed()` hides an unclaimed profile after its deadline; re-issuing the link adds 14 days. Editing the draft (text and photos) keeps the live profile in sync until it is claimed; cancelling the draft deletes the profile.
 - The girl opens the link with her own LINE: `claim_draft` moves the profile to her account (`workers.user_id` is re-keyed; all foreign keys to `workers(user_id)` were switched to ON UPDATE CASCADE), deletes the placeholder, sets her GPS location, her booking contact and (optionally) the agency, and leaves her offline until she switches "Online" on.
+
+## migration_037 — sellers with their own LINE OA ("vendors"), phase 1: customers
+
+Run `supabase/migration_037.sql` once, after migration_036. Needs Supabase Vault (Database → Extensions → `supabase_vault`; the file tries to enable it). **Redeploy the Edge Functions** `line-auth`, `notify-chat`, `send-renewal` and **deploy the new** `vendor-admin` (all with "Verify JWT" OFF; no new secrets).
+
+How a seller is connected (admin tab "🏪 เซลล์/OA"):
+1. The seller creates his own LINE Provider with his OA (Messaging API) and a LINE Login channel + LIFF app in it. LIFF endpoint URL = `https://<our site>/?vendor=<vendor id>` (shown by the admin tab), scope openid + profile, Bot link feature Normal with his OA, channel status Published.
+2. He gives us the LIFF ID (public) and the OA's long-lived channel access token. The admin enters both in the tab; the token goes into Vault (`vendor_token()` reads it, only the service role can).
+3. Customers open `https://liff.line.me/<his LIFF ID>`: the app reads `vendor` (URL, `liff.state`, or the `liffClientId` fallback), runs `liff.init` with HIS LIFF ID and `line-auth` verifies the ID token against HIS channel (the first part of the LIFF ID). The account is `users.vendor_id = <vendor>`, `line_user_id = '<vendor>:<LINE id>'`: separate Wallet / membership per seller. Providers stay central (the provider entrance is hidden inside a seller's LIFF).
+4. Pushes to a vendor customer (booking events, chat, membership reminders) are sent with the vendor's token and his LIFF links; pushes to providers stay with our OA. Cost of the customer-side pushes therefore sits with the seller's OA.
+5. `resolve_sales()` returns the vendor's owner for every vendor customer (no 24-hour takeover), so every booking / membership of his customers pays his share.
+6. `jobs.source_label` ("customer from <vendor name>", or the seller whose link a central customer used — `users.seller_label`, set in the admin user controls, else his LINE name) is shown in the booking Flex and the provider's inbox.
+- The forced "add our OA as a friend" gate for customers is gone; providers must follow our OA before switching Online.

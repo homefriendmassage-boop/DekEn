@@ -54,12 +54,11 @@ const baht = (n: number) => `${Number(n).toLocaleString('en-US')} บาท`
 const when = (v: string) => new Date(v).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', dateStyle: 'medium', timeStyle: 'short' })
 
 // One booking event -> { to: 'worker' | 'customer', flex } (null when nobody needs to hear about it)
-export function buildBookingFlex(o: { event: string; jobId: string; liffId: string; customer: string; worker: string; rate: string; price: number; at: string; place?: string; logo?: string }) {
-  const url = `https://liff.line.me/${o.liffId}?job=${o.jobId}`
+export function buildBookingFlex(o: { event: string; jobId: string; liffId: { worker: string; customer: string }; customer: string; worker: string; rate: string; price: number; at: string; place?: string; source?: string; logo?: string }) {
   const rate = RATE[o.rate] ?? o.rate
   const line = (text: string, extra: Record<string, unknown> = {}) => ({ type: 'text', text, wrap: true, size: 'sm', color: '#DDDDDD', ...extra })
   const card = (to: 'worker' | 'customer', head: string, title: string, lines: string[], button: string, color = '#EC4899') => ({
-    to,
+    to, url: `https://liff.line.me/${o.liffId[to]}?job=${o.jobId}`,
     flex: {
       type: 'flex', altText: `${head} ${title}`,
       contents: {
@@ -73,13 +72,13 @@ export function buildBookingFlex(o: { event: string; jobId: string; liffId: stri
           { type: 'text', text: title, weight: 'bold', size: 'lg', color: '#FFFFFF', wrap: true },
           ...lines.map((l) => line(l)),
         ] },
-        footer: { type: 'box', layout: 'vertical', paddingAll: 'lg', contents: [{ type: 'button', style: 'primary', color, height: 'md', action: { type: 'uri', label: button, uri: url } }] },
+        footer: { type: 'box', layout: 'vertical', paddingAll: 'lg', contents: [{ type: 'button', style: 'primary', color, height: 'md', action: { type: 'uri', label: button, uri: `https://liff.line.me/${o.liffId[to]}?job=${o.jobId}` } }] },
       },
     },
   })
   const when1 = `นัด: ${when(o.at)}`
   switch (o.event) {
-    case 'new': return card('worker', '🔔 มีการจองใหม่', `${o.customer} จอง ${rate}`, [when1, `ค่าบริการที่คุณได้รับ (เงินสด): ${baht(o.price)}`, ...(o.place ? [`สถานที่: ${o.place}`] : []), 'ตอบรับภายใน 30 นาที ไม่เช่นนั้นงานจะถูกยกเลิก', 'เบอร์และตำแหน่งลูกค้าจะแสดงหลังคุณกดรับงาน'], 'เปิดดูและตอบรับ')
+    case 'new': return card('worker', '🔔 มีการจองใหม่', `${o.customer} จอง ${rate}`, [...(o.source ? [`ลูกค้าจาก: ${o.source}`] : []), when1, `ค่าบริการที่คุณได้รับ (เงินสด): ${baht(o.price)}`, ...(o.place ? [`สถานที่: ${o.place}`] : []), 'ตอบรับภายใน 30 นาที ไม่เช่นนั้นงานจะถูกยกเลิก', 'เบอร์และตำแหน่งลูกค้าจะแสดงหลังคุณกดรับงาน'], 'เปิดดูและตอบรับ')
     case 'accepted': return card('customer', '✅ น้องรับงานแล้ว', `${o.worker} รับงานของคุณแล้ว`, [when1, `เรท: ${rate}`, `จ่ายตรงให้น้องเมื่อพบกัน: ${baht(o.price)}`, 'ดูเบอร์ติดต่อและสถานะได้ที่หน้าการจอง'], 'ดูรายละเอียดการจอง', '#06C755')
     case 'declined': return card('customer', '❌ น้องปฏิเสธงาน', `${o.worker} ไม่สะดวกรับงานนี้`, ['ค่าธรรมเนียมแพลตฟอร์ม 500 บาท คืนเข้า Wallet ของคุณแล้ว'], 'ดูการจอง', '#F59E0B')
     case 'expired': return card('customer', '⏰ งานถูกยกเลิก', `${o.worker} ไม่ได้ตอบภายใน 30 นาที`, ['ค่าธรรมเนียมแพลตฟอร์ม 500 บาท คืนเข้า Wallet ของคุณแล้ว', 'เลือกคนใหม่ได้เลย'], 'ดูการจอง', '#F59E0B')
@@ -92,6 +91,17 @@ export function buildBookingFlex(o: { event: string; jobId: string; liffId: stri
   }
 }
 // ---- END pure rules -----------------------------------------------------------------------------
+
+// Who gets the push and through which OA: a vendor's customer is reached by the vendor's OA (his token and LIFF), everybody else by ours.
+async function recipient(admin: ReturnType<typeof createClient>, userId: string, central: { token: string; liffId: string }) {
+  const { data: u } = await admin.from('users').select('line_user_id, vendor_id').eq('id', userId).maybeSingle()
+  if (!u?.line_user_id) return null
+  if (!u.vendor_id) return { lineId: u.line_user_id as string, token: central.token, liffId: central.liffId }
+  const { data: tok } = await admin.rpc('vendor_token', { p_vendor: u.vendor_id })
+  const { data: v } = await admin.from('vendors').select('liff_id').eq('id', u.vendor_id).maybeSingle()
+  if (!tok || !v) return null
+  return { lineId: String(u.line_user_id).split(':').pop() as string, token: tok as string, liffId: v.liff_id as string }
+}
 
 Deno.serve(async (req) => {
   const secret = Deno.env.get('CHAT_NOTIFY_SECRET')
@@ -108,32 +118,34 @@ Deno.serve(async (req) => {
 
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
+  const central = { token, liffId }
   if (isBooking) {
-    const { data: job } = await admin.from('jobs').select('id, customer_id, worker_id, rate_label, service_price, scheduled_at, place_note').eq('id', input.job_id).maybeSingle()
+    const { data: job } = await admin.from('jobs').select('id, customer_id, worker_id, rate_label, service_price, scheduled_at, place_note, source_label').eq('id', input.job_id).maybeSingle()
     if (!job) return json({ ok: false, code: 'NOT_FOUND' }, 404)
-    const { data: cu } = await admin.from('users').select('display_name, line_user_id').eq('id', job.customer_id).maybeSingle()
-    const { data: wu } = await admin.from('users').select('line_user_id').eq('id', job.worker_id).maybeSingle()
+    const { data: cu } = await admin.from('users').select('display_name').eq('id', job.customer_id).maybeSingle()
     const { data: ww } = await admin.from('workers').select('display_name').eq('user_id', job.worker_id).maybeSingle()
+    const rw = await recipient(admin, job.worker_id, central)
+    const rc = await recipient(admin, job.customer_id, central)
     const appUrl = Deno.env.get('APP_URL')?.replace(/\/$/, '')
     const results: unknown[] = []
     // a missed / expired booking tells both sides
     const events = input.event === 'expired' ? ['expired', 'missed'] : [input.event]
     for (const ev of events) {
-      const card = buildBookingFlex({ event: ev, jobId: job.id, liffId, customer: cu?.display_name ?? 'ลูกค้า', worker: ww?.display_name ?? 'น้อง', rate: job.rate_label ?? '', price: Number(job.service_price), at: job.scheduled_at, place: job.place_note ?? undefined, logo: appUrl ? `${appUrl}/dekn-logo.jpg?v=2` : undefined })
+      const card = buildBookingFlex({ event: ev, jobId: job.id, liffId: { worker: rw?.liffId ?? liffId, customer: rc?.liffId ?? liffId }, customer: cu?.display_name ?? 'ลูกค้า', worker: ww?.display_name ?? 'น้อง', rate: job.rate_label ?? '', price: Number(job.service_price), at: job.scheduled_at, place: job.place_note ?? undefined, source: job.source_label ?? undefined, logo: appUrl ? `${appUrl}/dekn-logo.jpg?v=2` : undefined })
       if (!card) { results.push({ event: ev, status: 'SKIPPED' }); continue }
-      const lineId = card.to === 'worker' ? wu?.line_user_id : cu?.line_user_id
-      if (!lineId || !/^U[0-9a-f]{32}$/.test(lineId)) { results.push({ event: ev, status: 'NO_LINE_ID' }); continue }
+      const rcp = card.to === 'worker' ? rw : rc
+      if (!rcp || !/^U[0-9a-f]{32}$/.test(rcp.lineId)) { results.push({ event: ev, status: 'NO_LINE_ID' }); continue }
       const r = await fetch('https://api.line.me/v2/bot/message/push', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'X-Line-Retry-Key': crypto.randomUUID() },
-        body: JSON.stringify({ to: lineId, messages: [card.flex] }),
+        headers: { Authorization: `Bearer ${rcp.token}`, 'Content-Type': 'application/json', 'X-Line-Retry-Key': crypto.randomUUID() },
+        body: JSON.stringify({ to: rcp.lineId, messages: [card.flex] }),
       })
       results.push({ event: ev, status: r.ok ? 'SENT' : 'FAILED' })
     }
     return json({ ok: true, results })
   }
-  const { data: to } = await admin.from('users').select('line_user_id').eq('id', recipient_id).maybeSingle()
-  if (!to?.line_user_id || !/^U[0-9a-f]{32}$/.test(to.line_user_id)) return json({ ok: true, status: 'NO_LINE_ID' })   // mock / anonymous accounts
+  const to = await recipient(admin, recipient_id, central)
+  if (!to || !/^U[0-9a-f]{32}$/.test(to.lineId)) return json({ ok: true, status: 'NO_LINE_ID' })   // mock / anonymous accounts
 
   // Providers are known by their stage name, customers by their LINE name
   const { data: w } = await admin.from('workers').select('display_name').eq('user_id', sender_id).maybeSingle()
@@ -141,11 +153,11 @@ Deno.serve(async (req) => {
   const senderName = String(w?.display_name ?? u?.display_name ?? 'สมาชิก').slice(0, 40)
 
   const appUrl = Deno.env.get('APP_URL')?.replace(/\/$/, '')
-  const message = buildChatFlex({ senderName, liffId, threadId: thread_id, logo: appUrl ? `${appUrl}/dekn-logo.jpg?v=2` : undefined })
+  const message = buildChatFlex({ senderName, liffId: to.liffId, threadId: thread_id, logo: appUrl ? `${appUrl}/dekn-logo.jpg?v=2` : undefined })
   const r = await fetch('https://api.line.me/v2/bot/message/push', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'X-Line-Retry-Key': crypto.randomUUID() },
-    body: JSON.stringify({ to: to.line_user_id, messages: [message] }),
+    headers: { Authorization: `Bearer ${to.token}`, 'Content-Type': 'application/json', 'X-Line-Retry-Key': crypto.randomUUID() },
+    body: JSON.stringify({ to: to.lineId, messages: [message] }),
   })
   if (r.ok) return json({ ok: true, status: 'SENT' })
   const body = await r.json().catch(() => null)

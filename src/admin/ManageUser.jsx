@@ -77,6 +77,8 @@ export default function ManageUser({ userId, onClose, onChanged, toast }) {
           )}
         </div>
 
+        <SellerLabel userId={u.id} toast={toast} />
+
         <label className="block text-sm">
           <span className="text-neutral-300">เหตุผล (จำเป็น · เก็บเป็นประวัติ)</span>
           <input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} placeholder="เช่น ลูกค้ากดอัปเกรดผิด / สแปมแชต"
@@ -132,5 +134,25 @@ export default function ManageUser({ userId, onClose, onChanged, toast }) {
         <button onClick={onClose} className="w-full rounded-xl bg-white/10 py-3 font-semibold active:scale-95">ปิด</button>
       </div>
     </div>
+  )
+}
+
+// The name the providers see in "customer from <seller>" when a customer came through this person's link.
+function SellerLabel({ userId, toast }) {
+  const [label, setLabel] = useState('')
+  useEffect(() => { supabase.rpc('admin_get_seller_label', { p_user: userId }).then(({ data }) => setLabel(data ?? '')) }, [userId])
+  async function save() {
+    const { error } = await supabase.rpc('admin_set_seller_label', { p_user: userId, p_label: label })
+    toast(error ? 'บันทึกไม่สำเร็จ' : 'บันทึกชื่อเรียกเซลล์แล้ว')
+  }
+  return (
+    <section className="space-y-2 rounded-2xl bg-white/5 p-3">
+      <p className="text-sm font-semibold">🏪 ชื่อเรียกเซลล์</p>
+      <p className="text-[11px] text-neutral-400">ถ้าบัญชีนี้เป็นเซลล์ น้องจะเห็นชื่อนี้ใน Flex และหน้างานว่า "ลูกค้าจาก: …" (ไม่ตั้ง = ใช้ชื่อ LINE)</p>
+      <div className="flex gap-2">
+        <input value={label} onChange={(e) => setLabel(e.target.value)} maxLength={40} placeholder="เช่น เซลล์เอ / ทีมโอ๋" className="min-w-0 flex-1 rounded-xl bg-white/10 px-3 py-2 text-sm" />
+        <button onClick={save} className="rounded-xl bg-white/10 px-4 text-sm font-semibold active:scale-95">บันทึก</button>
+      </div>
+    </section>
   )
 }

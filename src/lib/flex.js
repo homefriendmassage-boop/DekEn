@@ -1,5 +1,6 @@
 import liff from '@line/liff'
-import { LIFF_ID, USE_MOCK_LIFF } from '../config'
+import { USE_MOCK_LIFF } from '../config'
+import { getActiveLiffId } from './vendor'
 
 // Files in /public are served next to the app, so LINE can fetch them over https.
 // LINE caches Flex images by URL: bump ASSET_VERSION whenever a picture in /public is replaced.
@@ -14,7 +15,8 @@ export const canShareFlex = () => {
 // https://liff.line.me/<id>?ref=<my code>&worker=<provider id>   (mock mode: the page itself)
 export function appLink(params) {
   const q = new URLSearchParams(params).toString()
-  return USE_MOCK_LIFF || !LIFF_ID ? `${window.location.origin}${window.location.pathname}?${q}` : `https://liff.line.me/${LIFF_ID}?${q}`
+  const id = getActiveLiffId()      // inside a seller's LIFF a shared link stays in that seller's LIFF
+  return USE_MOCK_LIFF || !id ? `${window.location.origin}${window.location.pathname}?${q}` : `https://liff.line.me/${id}?${q}`
 }
 
 const PINK = '#ec4899'

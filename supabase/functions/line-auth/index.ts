@@ -4,6 +4,10 @@
 // auth.uid(). We verify the ID token with LINE, then create/sign-in a Supabase
 // user whose password is an HMAC only this function can compute.
 //
+// Vendors (sellers with their own LINE OA): the browser also sends { vendor: '<vendor id>' }; the token is then verified
+// against THAT vendor's LINE Login channel (the first part of its LIFF ID) and the account is scoped to the vendor:
+// users.line_user_id = '<vendor>:<LINE id>', users.vendor_id = '<vendor>'.
+//
 // Deploy:
 //   supabase functions deploy line-auth --no-verify-jwt
 //   supabase secrets set LINE_CHANNEL_ID=<LINE Login channel id> PASSWORD_PEPPER=<long random string>
@@ -26,25 +30,37 @@ async function hmacHex(key: string, msg: string) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
   try {
-    const { idToken } = await req.json()
+    const { idToken, vendor } = await req.json()
     if (!idToken) throw new Error('idToken required')
+
+    const url = Deno.env.get('SUPABASE_URL')!
+    const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+    const anon = createClient(url, Deno.env.get('SUPABASE_ANON_KEY')!)
+
+    // Which LINE Login channel issued the token: ours, or a vendor's
+    let channelId = Deno.env.get('LINE_CHANNEL_ID')!
+    let vendorId: string | null = null
+    if (vendor) {
+      if (!/^[a-z0-9]{4,16}$/.test(String(vendor))) throw new Error('Unknown vendor')
+      const { data: v } = await admin.from('vendors').select('id, liff_id, status').eq('id', vendor).maybeSingle()
+      if (!v || v.status !== 'active') throw new Error('Unknown vendor')
+      channelId = String(v.liff_id).split('-')[0]
+      vendorId = v.id
+    }
 
     // 1) Let LINE verify the token (signature, expiry, audience).
     const verify = await fetch('https://api.line.me/oauth2/v2.1/verify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ id_token: idToken, client_id: Deno.env.get('LINE_CHANNEL_ID')! }),
+      body: new URLSearchParams({ id_token: idToken, client_id: channelId }),
     })
     if (!verify.ok) throw new Error('Invalid LINE token')
-    const { sub: lineUserId, name } = await verify.json()
+    const { sub, name } = await verify.json()
 
-    // 2) Deterministic credentials per LINE user.
-    const email = `${lineUserId}@line.invalid`
+    // 2) Deterministic credentials per LINE user (a vendor's users are separate accounts: LINE ids differ per Provider).
+    const lineUserId = vendorId ? `${vendorId}:${sub}` : sub
+    const email = vendorId ? `v-${vendorId}-${sub}@line.invalid` : `${sub}@line.invalid`
     const password = await hmacHex(Deno.env.get('PASSWORD_PEPPER')!, lineUserId)
-
-    const url = Deno.env.get('SUPABASE_URL')!
-    const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
-    const anon = createClient(url, Deno.env.get('SUPABASE_ANON_KEY')!)
 
     // 3) Sign in; on first visit create the user then sign in.
     let { data, error } = await anon.auth.signInWithPassword({ email, password })
@@ -56,6 +72,7 @@ Deno.serve(async (req) => {
       if (created.error) throw created.error
       ;({ data, error } = await anon.auth.signInWithPassword({ email, password }))
       if (error) throw error
+      if (vendorId) await admin.from('users').update({ vendor_id: vendorId }).eq('line_user_id', lineUserId)
     }
 
     return new Response(JSON.stringify({ session: data.session }), {

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from './supabaseClient'
-import { signIn, takeOpenIntent, takeWorkerIntent, takeChatIntent, takeDraftIntent, takeJobIntent, isOaFriend, getAgencyCode } from './lib/auth'
-import { LINE_OA_URL } from './config'
+import { signIn, takeOpenIntent, takeWorkerIntent, takeChatIntent, takeDraftIntent, takeJobIntent, getAgencyCode } from './lib/auth'
 import { getPosition } from './lib/geo'
 import { CATEGORIES, PLAN_META, canViewWorker, suspensionOf, tierOf } from './config'
 import { useI18n } from './i18n'
@@ -135,7 +134,7 @@ export default function App() {
         const draftTok = takeDraftIntent()     // a link an admin / modelling agency issued for her
         if (draftTok) setClaim(draftTok)
         const sharedId = takeWorkerIntent()
-        if (sharedId) { setView('categories'); setShared({ id: sharedId, friend: await isOaFriend(), worker: null }) }
+        if (sharedId) { setView('categories'); setShared({ id: sharedId, friend: true, worker: null }) }   // no forced friend-adding for customers
         if (!cancelled) setPhase('ready')
       } catch (e) {
         console.error(e)
@@ -147,7 +146,7 @@ export default function App() {
 
   // Shared profile link: once the viewer follows the official account, fetch that provider (the DB decides what the viewer may see).
   useEffect(() => {
-    if (!shared?.friend || shared.worker !== null) return
+    if (!shared || shared.worker !== null) return
     ;(async () => {
       const { data } = await supabase.rpc('get_worker', { p_worker: shared.id })
       const w = data?.[0]
@@ -159,12 +158,7 @@ export default function App() {
       }
       setShared((x) => x && { ...x, worker: { ...w, canView: w.can_view, image: full ?? w.profile_image } })
     })()
-  }, [shared?.friend, shared?.worker, shared?.id])
-
-  async function recheckFriend() {
-    if (await isOaFriend()) setShared((x) => x && { ...x, friend: true })
-    else showToast(t('friendGateStill'))
-  }
+  }, [shared?.worker, shared?.id])
 
   // ---- Realtime: wallet top-ups / membership changes appear instantly ----
   useEffect(() => {
@@ -365,6 +359,7 @@ export default function App() {
           onCustomer={() => setView('categories')}
           onWorker={() => setView('worker')}
           invitedBy={invitedBy}
+          vendor={session.vendor}
         />
       )}
 
@@ -429,26 +424,13 @@ export default function App() {
 
       {claim && <ClaimDraft token={claim} onClose={() => setClaim(null)} onDone={async () => { setClaim(null); setView('worker'); setWorkerTab('self'); await loadMe() }} />}
 
-      {shared && !shared.friend && (
-        <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/80 p-4">
-          <div className="w-full max-w-sm space-y-3 rounded-3xl bg-neutral-900 p-5 text-center shadow-2xl">
-            <img src={`${import.meta.env.BASE_URL}dekn-logo.jpg`} alt="DekEn" className="mx-auto h-24 w-24 rounded-full object-cover" />
-            <h2 className="text-lg font-bold">{t('friendGateTitle')}</h2>
-            <p className="text-sm text-neutral-400">{t('friendGateBody')}</p>
-            {LINE_OA_URL && <a href={LINE_OA_URL} className="block rounded-xl bg-line py-3 font-bold text-black active:scale-95">{t('friendGateAdd')}</a>}
-            <button onClick={recheckFriend} className="w-full rounded-xl bg-white/10 py-3 font-semibold active:scale-95">{t('friendGateDone')}</button>
-            <button onClick={() => setShared(null)} className="text-xs text-neutral-500 underline">{t('close')}</button>
-          </div>
-        </div>
-      )}
-
-      {shared?.friend && shared.worker === false && (
+      {shared && shared.worker === false && (
         <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/80 p-4" onClick={() => setShared(null)}>
           <p className="rounded-2xl bg-neutral-900 p-5 text-center text-sm">{t('sharedGone')}</p>
         </div>
       )}
 
-      {shared?.friend && shared.worker && (
+      {shared?.worker && (
         <WorkerDetail worker={shared.worker} isMe={shared.worker.user_id === me?.id} onClose={() => setShared(null)}
           onUnlock={() => { setShared(null); setShowMembership(true) }}
           onBook={() => { const w = shared.worker; setShared(null); setSelected(w) }}

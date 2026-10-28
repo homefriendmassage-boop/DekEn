@@ -7,7 +7,8 @@ import RankBoost from './RankBoost'
 import ProfileSection from './ProfileSection'
 import WorkerJobs from './WorkerJobs'
 import { logoUrl } from '../lib/logo'
-import { clearAgencyCode, getAgencyCode } from '../lib/auth'
+import { clearAgencyCode, getAgencyCode, isOaFriend } from '../lib/auth'
+import { LINE_OA_URL } from '../config'
 
 // Provider home: online switch, profile edit, photo upload, live job inbox.
 export default function WorkerDashboard({ userId, onTopUp, me, onWallet, openChat, highlightJob }) {
@@ -16,6 +17,7 @@ export default function WorkerDashboard({ userId, onTopUp, me, onWallet, openCha
   const [jobs, setJobs] = useState([])
   const [chat, setChat] = useState(openChat ?? null)      // openChat: arrived from a "new message" LINE push
   const [wdNote, setWdNote] = useState(false)
+  const [friendGate, setFriendGate] = useState(false)   // she must follow the OA to receive job notifications
   const [note, setNote] = useState(null)
   const [invite, setInvite] = useState(() => getAgencyCode())      // invitation link opened earlier
   const [inviteAgency, setInviteAgency] = useState(null)
@@ -96,7 +98,7 @@ export default function WorkerDashboard({ userId, onTopUp, me, onWallet, openCha
 
       {/* Online switch */}
       <button
-        onClick={() => update({ is_online: !worker.is_online })}
+        onClick={async () => { if (!worker.is_online && !(await isOaFriend())) return setFriendGate(true); update({ is_online: !worker.is_online }) }}
         className={`flex w-full items-center justify-between rounded-2xl p-4 text-left ${worker.is_online ? 'bg-green-500/15 ring-1 ring-green-400' : 'bg-white/5 ring-1 ring-white/10'}`}
       >
         <span className="text-sm font-semibold">{worker.is_online ? t('onlineNow') : t('offlineNow')}</span>
@@ -106,6 +108,15 @@ export default function WorkerDashboard({ userId, onTopUp, me, onWallet, openCha
       </button>
 
       {worker.admin_hidden && <p className="rounded-xl bg-red-500/15 p-3 text-sm font-semibold text-red-200">🛡️ {t('profileHiddenByAdmin')}</p>}
+      {friendGate && (
+        <div className="space-y-2 rounded-2xl bg-amber-400/10 p-3 ring-1 ring-amber-400/30">
+          <p className="text-sm font-semibold text-amber-200">{t('onlineNeedFriend')}</p>
+          <div className="grid grid-cols-2 gap-2">
+            {LINE_OA_URL && <a href={LINE_OA_URL} className="rounded-xl bg-line py-2 text-center text-sm font-bold text-black active:scale-95">{t('friendGateAdd')}</a>}
+            <button onClick={async () => { if (await isOaFriend()) { setFriendGate(false); update({ is_online: true }) } else setError(t('friendGateStill')) }} className="rounded-xl bg-white/10 py-2 text-sm font-semibold active:scale-95">{t('friendAdded')}</button>
+          </div>
+        </div>
+      )}
       {error && <p className="rounded-lg bg-red-500/10 p-2 text-sm text-red-300">{error}</p>}
       {note && <p className="rounded-lg bg-green-500/10 p-2 text-sm text-green-300">{note}</p>}
 

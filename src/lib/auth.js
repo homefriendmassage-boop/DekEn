@@ -1,6 +1,7 @@
 import liff from '@line/liff'
 import { supabase } from '../supabaseClient'
 import { LIFF_ID, USE_MOCK_LIFF } from '../config'
+import { getVendor, getActiveLiffId, resolveVendor, sessionMatches } from './vendor'
 
 const REF_KEY = 'partner_ref'
 const AGENCY_KEY = 'agency_code'
@@ -204,17 +205,22 @@ export async function signIn() {
       if (error) throw error
     }
   } else {
-    await liff.init({ liffId: LIFF_ID })
+    await resolveVendor()                          // a seller's own LIFF, or ours
+    await liff.init({ liffId: getActiveLiffId() })
     if (!liff.isLoggedIn()) {
       liff.login({ redirectUri: window.location.href }) // leaves the page
       return new Promise(() => {})                       // never resolves; page reloads
     }
     try { profile = await liff.getProfile() } catch (e) { if (isExpired(e)) return relogin(); throw e }
 
-    const { data: existing } = await supabase.auth.getSession()
+    let { data: existing } = await supabase.auth.getSession()
+    if (existing.session && !sessionMatches(existing.session)) {   // a session of another vendor / the central app: start fresh
+      await supabase.auth.signOut()
+      existing = { session: null }
+    }
     if (!existing.session) {
       const { data, error } = await supabase.functions.invoke('line-auth', {
-        body: { idToken: liff.getIDToken() },
+        body: { idToken: liff.getIDToken(), vendor: getVendor()?.id ?? null },
       })
       if (error || !data?.session) {
         const detail = `${error?.message ?? ''} ${await (error?.context?.text?.().catch(() => '') ?? '')}`
@@ -244,5 +250,5 @@ export async function signIn() {
     try { localStorage.removeItem(REF_KEY) } catch { /* storage blocked */ }
   }
 
-  return { profile, isMock: USE_MOCK_LIFF, refCode }
+  return { profile, isMock: USE_MOCK_LIFF, refCode, vendor: getVendor() }
 }

@@ -2,7 +2,7 @@ import { LangSwitcher, useI18n } from '../i18n'
 import logo from '../assets/dekn-logo.jpg'
 
 // First screen: customer or provider.
-export default function Landing({ displayName, role, onCustomer, onWorker, invitedBy }) {
+export default function Landing({ displayName, role, onCustomer, onWorker, invitedBy, vendor }) {
   const { t } = useI18n()
   const isWorker = role === 'worker'
 
@@ -17,19 +17,21 @@ export default function Landing({ displayName, role, onCustomer, onWorker, invit
         <img src={logo} alt="DekEn" className="mx-auto h-40 w-40 rounded-[2rem] object-cover shadow-lg ring-1 ring-white/10" />
         <h1 className="mb-2 text-center text-2xl font-extrabold">{t('landingTitle')}</h1>
 
-        {invitedBy && (
+        {vendor && <p className="text-center text-xs font-semibold text-amber-300">🏪 {t('viaVendor', { name: vendor.name })}</p>}
+
+        {invitedBy && !vendor && (
           <button onClick={onWorker} className="flex w-full items-center gap-3 rounded-3xl bg-amber-400 p-4 text-left text-black active:scale-[0.98]">
             <span className="text-3xl">🏢</span>
             <span><span className="block font-bold">{t('invitedBy', { name: invitedBy })}</span><span className="block text-sm text-black/70">{t('invitedApply')}</span></span>
           </button>
         )}
         <Choice emoji="🛍️" title={t('imCustomer')} sub={t('imCustomerSub')} onClick={onCustomer} primary={!invitedBy} />
-        <Choice
+        {!vendor && <Choice
           emoji={isWorker ? '💼' : '📝'}
           title={isWorker ? t('workerArea') : t('imWorker')}
           sub={isWorker ? t('workerAreaSub') : t('imWorkerSub')}
           onClick={onWorker}
-        />
+        />}
       </div>
     </div>
   )
