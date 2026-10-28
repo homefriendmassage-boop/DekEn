@@ -137,7 +137,7 @@ export default function PaymentModal({ kind, tier, onClose, onPaid, onOpenSuppor
     }
     if (data.code === 'REVIEW_SUBMITTED') {
       // Genuine slip to our account, wrong amount: a human decides. Pop up the chat with the admin.
-      setReview({ paid: money(data.paid), expected: (data.expected ?? []).map(money).join(' / ') })
+      setReview({ paid: money(data.paid), expected: (data.expected ?? []).map(money).join(' / '), expired: !(data.expected ?? []).length })
       return setStep('pay')
     }
     if (!data.ok) {
@@ -236,7 +236,7 @@ export default function PaymentModal({ kind, tier, onClose, onPaid, onOpenSuppor
           <div className="w-full max-w-sm space-y-4 rounded-3xl bg-neutral-900 p-5 text-center shadow-2xl ring-1 ring-white/10">
             <p className="text-4xl">📨</p>
             <h3 className="text-lg font-bold">{t('payReviewTitle')}</h3>
-            <p className="text-sm text-neutral-300">{t('payReviewBody', review)}</p>
+            <p className="text-sm text-neutral-300">{t(review.expired ? 'payReviewBodyExpired' : 'payReviewBody', review)}</p>
             <button onClick={() => { onOpenSupport?.(); onClose() }}
               className="w-full rounded-xl bg-line py-3 font-bold text-black active:scale-95">{t('chatAdmin')}</button>
             <button onClick={() => { setReview(null); onClose() }} className="w-full rounded-xl bg-white/10 py-2.5 text-sm font-semibold active:scale-95">{t('close')}</button>

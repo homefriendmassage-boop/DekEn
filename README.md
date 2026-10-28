@@ -16,6 +16,7 @@ supabase/migration_007.sql       Automatic payment: unique-amount requests, slip
 supabase/migration_008.sql       Idempotent admin payment entry: double tap can't apply twice (run after 007)
 supabase/migration_009.sql       Slip review (amount mismatch -> admin) + support chat with admin (run after 008)
 supabase/migration_010.sql       Per-role chat lists, self-chat error, renewal notice ledger (run after 009)
+supabase/migration_011.sql       Payment requests are reusable (same amount when you come back); late slips go to review (run after 010)
 supabase/functions/send-renewal/ Edge Function (admin only): LINE Flex renewal reminder with a button to the plan picker
 supabase/functions/verify-slip/  Edge Function: verifies the slip with Thunder, opens the plan / credits the wallet
 admin.html + src/admin/          Separate admin page (not linked from the customer app)
@@ -209,3 +210,10 @@ button opens `https://liff.line.me/<LIFF_ID>?open=plans` (the app opens the plan
 everyone ending within 7 days. This is a LINE **push** message: it uses the OA's monthly message quota, and only reaches
 users who added the OA as a friend and haven't blocked it. Duplicates are suppressed (24 h single, 3 days bulk).
 Secrets for the function: `LINE_CHANNEL_ACCESS_TOKEN` (Messaging API channel of the OA, same LINE provider as the LIFF app) and `LIFF_ID`.
+
+## Coming back after paying (migration_011)
+
+`create_payment_intent` returns the SAME open request (same amount, same expiry) when the customer asks again for the same plan
+or top-up amount, so leaving the app to transfer and returning never changes the amount to match. A different plan makes a
+different request (the earlier one stays valid; at most 2 older ones are kept). A genuine slip that arrives after the request
+expired is not rejected: it goes to Admin > Slip review, linked to the customer's latest request of the last 24 hours.

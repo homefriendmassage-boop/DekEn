@@ -129,11 +129,17 @@ Deno.serve(async (req) => {
     // 3) Only spend a Thunder call if the user actually has an open payment request
     const { data: pending } = await admin.from('payment_intents').select('amount')
       .eq('user_id', userId).eq('status', 'pending').gt('expires_at', new Date().toISOString())
+    const expected = (pending ?? []).map((p: any) => Number(p.amount))
     if (!pending?.length) {
-      await log('NO_PENDING_INTENT')
-      return json({ ok: false, code: 'NO_PENDING_INTENT' })
+      // No open request. Someone who paid and came back after it expired still gets a hearing (admin review),
+      // but only if they created a request in the last 24h, so strangers can't burn Thunder quota.
+      const { count: recent } = await admin.from('payment_intents').select('id', { count: 'exact', head: true })
+        .eq('user_id', userId).gte('created_at', new Date(Date.now() - 24 * 3600_000).toISOString())
+      if (!recent) {
+        await log('NO_PENDING_INTENT')
+        return json({ ok: false, code: 'NO_PENDING_INTENT' })
+      }
     }
-    const expected = pending.map((p: any) => Number(p.amount))
 
     // 4) Ask Thunder
     const apiKey = Deno.env.get('THUNDER_API_KEY')
