@@ -6,6 +6,7 @@ import PhotoUploader from './PhotoUploader'
 import ThreadList from './ThreadList'
 import ChatModal from './ChatModal'
 import { logoUrl } from '../lib/logo'
+import { clearAgencyCode, getAgencyCode } from '../lib/auth'
 
 // Provider home: online switch, profile edit, photo upload, live job inbox.
 export default function WorkerDashboard({ userId }) {
@@ -15,6 +16,8 @@ export default function WorkerDashboard({ userId }) {
   const [form, setForm] = useState({ display_name: '', price: '', province: '', district: '', nearby: '' })
   const [chat, setChat] = useState(null)
   const [note, setNote] = useState(null)
+  const [invite, setInvite] = useState(() => getAgencyCode())      // invitation link opened earlier
+  const [inviteAgency, setInviteAgency] = useState(null)
   const [aff, setAff] = useState(null)   // my_worker_agency(): { agency_name, logo_path, plan_expires_at, can_leave }
   const [error, setError] = useState(null)
 
@@ -32,6 +35,19 @@ export default function WorkerDashboard({ userId }) {
 
   const loadAff = useCallback(() => supabase.rpc('my_worker_agency').then(({ data }) => setAff(data?.[0] ?? null)), [])
   useEffect(() => { loadWorker(); loadJobs(); loadAff() }, [loadWorker, loadJobs, loadAff])
+
+  useEffect(() => {
+    if (!invite) return setInviteAgency(null)
+    supabase.rpc('agency_public', { p_code: invite }).then(({ data }) => setInviteAgency(data?.[0] ?? null))
+  }, [invite])
+
+  async function joinAgency() {
+    const { error } = await supabase.rpc('worker_join_agency', { p_code: invite })
+    if (error) return setError(t(error.message.includes('AGENCY_FULL') ? 'errAgencyFull' : error.message.includes('ALREADY_IN_AGENCY') ? 'errAlreadyInAgency' : 'errGeneric'))
+    clearAgencyCode(); setInvite(null)
+    setNote(t('joinedAgency'))
+    loadAff()
+  }
 
   async function leaveAgency() {
     if (!window.confirm(t('leaveAgencyConfirm'))) return
@@ -84,7 +100,21 @@ export default function WorkerDashboard({ userId }) {
 
       {error && <p className="rounded-lg bg-red-500/10 p-2 text-sm text-red-300">{error}</p>}
 
-      {/* Agency affiliation: leaving is possible only once the agency's period has ended */}
+      {/* Invitation from an agency (also how a girl who left comes back) */}
+      {invite && inviteAgency && !aff && (
+        <section className="space-y-2 rounded-2xl bg-amber-400/10 p-3 ring-1 ring-amber-400/30">
+          <div className="flex items-center gap-3">
+            {inviteAgency.logo_path && <img src={logoUrl(inviteAgency.logo_path)} alt="" className="h-10 w-10 rounded-full object-cover" />}
+            <p className="font-semibold">{t('invitedBy', { name: inviteAgency.name })}</p>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={joinAgency} className="rounded-xl bg-line py-2 text-sm font-bold text-black active:scale-95">{t('joinAgencyBtn')}</button>
+            <button onClick={() => { clearAgencyCode(); setInvite(null) }} className="rounded-xl bg-white/10 py-2 text-sm active:scale-95">{t('joinLater')}</button>
+          </div>
+        </section>
+      )}
+
+      {/* Agency affiliation: she can leave after the waiting period (or when the agency's plan is not active) */}
       {aff && (
         <section className="space-y-2 rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
           <div className="flex items-center gap-3">
@@ -96,8 +126,8 @@ export default function WorkerDashboard({ userId }) {
           </div>
           <button disabled={!aff.can_leave} onClick={leaveAgency}
             className="w-full rounded-xl bg-white/10 py-2 text-sm font-semibold active:scale-95 disabled:opacity-40">{t('leaveAgency')}</button>
-          {!aff.can_leave && aff.plan_expires_at && (
-            <p className="text-[11px] text-neutral-500">{t('leaveAgencyWait', { date: new Date(aff.plan_expires_at).toLocaleDateString() })}</p>
+          {!aff.can_leave && aff.can_leave_at && (
+            <p className="text-[11px] text-neutral-500">{t('leaveAgencyFrom', { date: new Date(aff.can_leave_at).toLocaleDateString() })}</p>
           )}
         </section>
       )}

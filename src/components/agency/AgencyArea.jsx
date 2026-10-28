@@ -7,7 +7,6 @@ import ShareModal from '../ShareModal'
 
 const ERRORS = {
   INSUFFICIENT_BALANCE: 'ยอด Wallet ไม่พอ กรุณาเติมเงินก่อน',
-  NO_SLOT: 'โควตาน้องเต็มแล้ว ซื้อที่เพิ่ม 200 บาท/คน (ต่อรอบ 30 วัน) แล้วกดรับอีกครั้ง',
   PLAN_INACTIVE: 'แพ็กเกจสังกัดหมดอายุ กรุณาชำระ/ต่ออายุก่อน',
   NOT_APPROVED: 'ยังไม่ได้รับอนุมัติจากแอดมิน',
   ALREADY_APPROVED: 'สังกัดนี้ได้รับอนุมัติแล้ว',
@@ -81,7 +80,7 @@ function Apply({ ag, me, onDone, flash }) {
   return (
     <form onSubmit={submit} className="space-y-4 p-4">
       {ag?.status === 'rejected' && <p className="rounded-xl bg-red-500/10 p-2 text-sm text-red-300">ไม่ผ่านการอนุมัติ{ag.reject_reason ? ` — ${ag.reject_reason}` : ''} แก้ไขแล้วส่งใหม่ได้</p>}
-      <p className="text-sm text-neutral-400">ค่าใช้แพลตฟอร์ม 1,000 บาท / 30 วัน (ชำระจาก Wallet หลังอนุมัติ) ขึ้นรูปน้องได้ 10 คน เกินคนละ 200 บาท / 30 วัน น้องทุกคนต้องลงทะเบียนด้วย LINE ของตัวเองผ่านลิงก์ที่คุณส่งให้</p>
+      <p className="text-sm text-neutral-400">ค่าใช้แพลตฟอร์ม 1,000 บาท / 30 วัน (ชำระจาก Wallet หลังอนุมัติ) ขึ้นรูปน้องได้ 10 คน เกินคนละ 200 บาท / 30 วัน น้องสมัครด้วย LINE ของตัวเองผ่านลิงก์ที่คุณส่งให้ ระบบรับเข้าสังกัดอัตโนมัติ</p>
       <label className="block text-sm">ชื่อสังกัด
         <input required minLength={2} maxLength={60} value={name} onChange={(e) => setName(e.target.value)} className={input} />
       </label>
@@ -99,7 +98,7 @@ function Apply({ ag, me, onDone, flash }) {
 
 function Dashboard({ ag, me, reload, flash, onTopUp, onWallet, onChanged }) {
   const [tab, setTab] = useState('girls')
-  const tabs = [['girls', '👯 น้อง'], ['reqs', '📨 คำขอ'], ['chat', '💬 แชต'], ['plan', '🧾 แพ็กเกจ']]
+  const tabs = [['girls', '👯 น้อง'], ['reqs', '⏳ รออนุมัติ'], ['chat', '💬 แชต'], ['plan', '🧾 แพ็กเกจ']]
   return (
     <div>
       <nav className="flex gap-2 overflow-x-auto px-4 py-3">
@@ -152,34 +151,28 @@ function Requests({ flash, reload }) {
   const [rows, setRows] = useState(null)
   const load = useCallback(() => supabase.rpc('agency_pending_girls').then(({ data }) => setRows(data ?? [])), [])
   useEffect(() => { load() }, [load])
-  async function review(r, accept) {
-    const { error } = await supabase.rpc('agency_review_girl', { p_app: r.app_id, p_accept: accept })
-    if (error) {
-      if (error.message.includes('NO_SLOT') && window.confirm('โควตาน้องเต็ม ซื้อที่เพิ่ม 1 คน 200 บาท (ต่อรอบ 30 วัน) จาก Wallet ตอนนี้เลยไหม?')) {
-        const buy = await supabase.rpc('agency_buy_slot')
-        if (buy.error) return flash(errText(buy.error.message))
-        return review(r, accept)
-      }
-      return flash(errText(error.message))
-    }
-    flash(accept ? 'รับเข้าสังกัดแล้ว รอแอดมินอนุมัติโปรไฟล์' : 'ปฏิเสธแล้ว'); load(); reload()
+  async function withdraw(r) {
+    if (!window.confirm(`ถอนชื่อ ${r.display_name} ออกจากสังกัด? แอดมินจะไม่อนุมัติเธอในสังกัดนี้`)) return
+    const { error } = await supabase.rpc('agency_review_girl', { p_app: r.app_id, p_accept: false })
+    if (error) return flash(errText(error.message))
+    flash('ถอนชื่อแล้ว'); load(); reload()
   }
   if (rows === null) return <p className="py-8 text-center text-neutral-500">กำลังโหลด…</p>
-  if (rows.length === 0) return <p className="rounded-2xl bg-white/5 p-6 text-center text-neutral-500">ไม่มีคำขอเข้าสังกัด</p>
   return (
-    <ul className="space-y-2">
-      {rows.map((r) => (
-        <li key={r.app_id} className="rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
-          <p className="font-semibold">{r.display_name}</p>
-          <p className="text-xs text-neutral-400">{r.province ?? ''} · สมัครเมื่อ {fmtDate(r.created_at)}</p>
-          {r.note && <p className="mt-1 text-xs text-neutral-300">{r.note}</p>}
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <button onClick={() => review(r, true)} className="rounded-xl bg-line py-2 text-sm font-bold text-black active:scale-95">รับเข้าสังกัด</button>
-            <button onClick={() => review(r, false)} className="rounded-xl bg-white/10 py-2 text-sm active:scale-95">ปฏิเสธ</button>
-          </div>
-        </li>
-      ))}
-    </ul>
+    <>
+      <p className="mb-2 text-xs text-neutral-400">น้องที่สมัครผ่านลิงก์ของคุณ เข้าสังกัดอัตโนมัติ รอแอดมินอนุมัติโปรไฟล์ ไม่ต้องกดยืนยัน (นับรวมในโควตาแล้ว)</p>
+      {rows.length === 0 ? <p className="rounded-2xl bg-white/5 p-6 text-center text-neutral-500">ไม่มีน้องที่รออนุมัติ</p> : (
+        <ul className="space-y-2">
+          {rows.map((r) => (
+            <li key={r.app_id} className="rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
+              <p className="font-semibold">{r.display_name}</p>
+              <p className="text-xs text-neutral-400">{r.province ?? ''} · สมัครเมื่อ {fmtDate(r.created_at)}</p>
+              <button onClick={() => withdraw(r)} className="mt-2 rounded-lg bg-white/10 px-3 py-1 text-xs active:scale-95">ถอนชื่อ</button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
   )
 }
 
@@ -256,7 +249,7 @@ function Plan({ ag, me, reload, flash, onTopUp, onWallet, onChanged }) {
 
       <section className="space-y-2 rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
         <p className="text-sm font-semibold">เชิญน้องเข้าสังกัด</p>
-        <p className="text-xs text-neutral-400">ส่งลิงก์/QR/Flex ให้น้อง น้องต้องลงทะเบียนสมัครงานด้วย LINE ของตัวเอง แล้วคุณกด "รับเข้าสังกัด" ในแท็บคำขอ</p>
+        <p className="text-xs text-neutral-400">ส่งลิงก์/QR/Flex ให้น้อง น้องกดสมัครด้วย LINE ของตัวเองแล้วเข้าสังกัดอัตโนมัติ (รอแอดมินอนุมัติโปรไฟล์) น้องที่เคยออกไปแล้วอยากกลับ ส่งลิงก์ให้อีกครั้งแล้วให้กด "ยอมรับเข้าสังกัด"</p>
         <button onClick={() => setShare(true)} className="w-full rounded-xl bg-line py-2 font-bold text-black active:scale-95">ส่งลิงก์เชิญน้อง</button>
       </section>
       {share && <ShareModal agencyCode={ag.code} onClose={() => setShare(false)} />}
