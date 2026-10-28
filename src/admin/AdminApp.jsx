@@ -1,0 +1,109 @@
+import { useCallback, useEffect, useState } from 'react'
+import { supabase } from '../supabaseClient'
+import { signIn } from '../lib/auth'
+import Applications from './Applications'
+import Payments from './Payments'
+import Members from './Members'
+import { baht } from './format'
+
+// Separate back office (admin.html). Access is decided by the DATABASE: every admin_* function
+// checks public.admins, so a non-admin who finds this URL can load the page but nothing else.
+export default function AdminApp() {
+  const [phase, setPhase] = useState('loading') // loading | denied | ready | error
+  const [error, setError] = useState(null)
+  const [adminName, setAdminName] = useState('')
+  const [tab, setTab] = useState('apps')
+  const [stats, setStats] = useState(null)
+  const [prefill, setPrefill] = useState(null)   // { user, tier } from "renew" on the Members tab
+  const [toast, setToast] = useState(null)
+
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3500) }
+
+  const loadStats = useCallback(async () => {
+    const { data } = await supabase.rpc('admin_stats')
+    setStats(data?.[0] ?? null)
+  }, [])
+
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const s = await signIn()
+        setAdminName(s.profile.displayName)
+        const { data } = await supabase.rpc('is_admin')
+        if (data !== true) return setPhase('denied')
+        await loadStats()
+        setPhase('ready')
+      } catch (e) {
+        console.error(e)
+        setError(e.message ?? String(e))
+        setPhase('error')
+      }
+    })()
+  }, [loadStats])
+
+  if (phase === 'loading') {
+    return <div className="flex min-h-screen items-center justify-center"><div className="h-10 w-10 animate-spin rounded-full border-4 border-neutral-700 border-t-line" /></div>
+  }
+  if (phase === 'denied' || phase === 'error') {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-2 p-6 text-center">
+        <p className="text-lg font-semibold">{phase === 'denied' ? 'ไม่มีสิทธิ์เข้าถึงหน้านี้' : 'เริ่มต้นไม่สำเร็จ'}</p>
+        {error && <p className="max-w-sm break-words text-sm text-neutral-400">{error}</p>}
+      </div>
+    )
+  }
+
+  const tabs = [
+    ['apps', `📝 ใบสมัคร${stats?.pending_apps ? ` (${stats.pending_apps})` : ''}`],
+    ['pay', '💳 รับชำระเงิน'],
+    ['members', '👑 สมาชิก'],
+  ]
+
+  return (
+    <div className="mx-auto min-h-screen w-full max-w-5xl pb-10">
+      <header className="sticky top-0 z-30 border-b border-white/10 bg-neutral-950/95 px-4 py-3 backdrop-blur">
+        <div className="flex items-center justify-between">
+          <h1 className="text-lg font-bold">🛠️ Admin</h1>
+          <span className="text-xs text-neutral-400">{adminName}</span>
+        </div>
+        <nav className="mt-2 flex gap-2 overflow-x-auto">
+          {tabs.map(([id, label]) => (
+            <button key={id} onClick={() => setTab(id)}
+              className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-semibold ${tab === id ? 'bg-line text-black' : 'bg-white/10 text-neutral-200'}`}>
+              {label}
+            </button>
+          ))}
+        </nav>
+      </header>
+
+      {stats && (
+        <section className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-4">
+          <Stat label="ใบสมัครรอตรวจ" value={stats.pending_apps} warn={stats.pending_apps > 0} />
+          <Stat label="สมาชิก Gold / Plat. / Diamond" value={`${stats.gold} / ${stats.platinum} / ${stats.diamond}`} />
+          <Stat label="ใกล้หมดอายุ (7 วัน)" value={stats.expiring_7d} warn={stats.expiring_7d > 0} />
+          <Stat label="รายรับสมาชิกเดือนนี้" value={baht(stats.membership_month)} sub={`เติม Wallet ${baht(stats.topup_month)}`} />
+        </section>
+      )}
+
+      <main className="px-4">
+        {tab === 'apps' && <Applications onChanged={loadStats} toast={showToast} />}
+        {tab === 'pay' && <Payments prefill={prefill} clearPrefill={() => setPrefill(null)} onChanged={loadStats} toast={showToast} />}
+        {tab === 'members' && <Members onRenew={(user) => { setPrefill({ user, tier: user.vip_tier }); setTab('pay') }} />}
+      </main>
+
+      {toast && (
+        <div className="fixed inset-x-4 bottom-6 z-[60] mx-auto max-w-sm rounded-xl bg-line px-4 py-3 text-center text-sm font-semibold text-black shadow-lg">{toast}</div>
+      )}
+    </div>
+  )
+}
+
+function Stat({ label, value, sub, warn }) {
+  return (
+    <div className={`rounded-2xl p-3 ring-1 ${warn ? 'bg-amber-400/10 ring-amber-400/40' : 'bg-white/5 ring-white/10'}`}>
+      <p className="text-[11px] text-neutral-400">{label}</p>
+      <p className="mt-1 text-lg font-bold">{value}</p>
+      {sub && <p className="text-[11px] text-neutral-500">{sub}</p>}
+    </div>
+  )
+}

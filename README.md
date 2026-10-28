@@ -10,6 +10,8 @@ supabase/migration_002.sql       Categories, membership tiers, photo storage, wo
 supabase/seed2.sql               Dev-only: 21 more demo workers (tests the top-10 free limit)
 supabase/migration_003.sql       Remove ENT Plus, rename Spa, service area, members-only chat (run after migration_002)
 supabase/migration_004.sql       Multi-category providers, phone + LINE ID, editable applications, promo photo (run after 003)
+supabase/migration_005.sql       Admin back office: admins, payment ledger, review/payment functions (run after 004)
+admin.html + src/admin/          Separate admin page (not linked from the customer app)
 supabase/functions/line-auth/    Edge Function: LIFF ID token -> Supabase session
 src/lib/auth.js                  LIFF init, ?ref capture, mock login    (Part 2)
 src/App.jsx                      App shell, data loading, realtime      (Part 2)
@@ -123,3 +125,23 @@ Run `migration_004.sql` after 003. Order for a fresh project: `schema` -> `migra
   never copied to the public provider profile.
 - While an application is `pending` the applicant can edit it and upload a promo photo (face mosaic, same as providers).
   Approval carries the photo over.
+
+## Admin page (migration_005)
+
+Separate page: `https://<user>.github.io/<repo>/admin.html` (also reachable as
+`https://liff.line.me/<LIFF_ID>/admin.html`; on a computer, open the first URL and log in with LINE).
+
+1. Run `migration_005.sql`.
+2. Open the customer app once with your LINE account so your `users` row exists, then make yourself admin:
+   ```sql
+   select id, display_name from public.users;                       -- find your id
+   insert into public.admins (user_id) values ('<your id>');
+   ```
+3. Open `admin.html`. Anyone not in `public.admins` sees "no access"; every `admin_*` function also
+   checks this server-side.
+
+What it does: review applications (see contact details and the un-mosaicked photo, approve or reject with a
+reason the applicant sees); record verified payments (membership or wallet top-up) in a ledger that also applies
+them in one step; duplicate transfer references are rejected; list active members with expiry and renew them.
+Payments are recorded by the admin after checking a slip/bank statement; there is no automatic payment
+gateway or customer slip upload yet.

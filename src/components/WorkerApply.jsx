@@ -80,7 +80,11 @@ export default function WorkerApply({ userId, defaultName }) {
       ) : (
         <>
           <p className="text-sm text-neutral-400">{t('applySub')}</p>
-          {app?.status === 'rejected' && <p className="rounded-xl bg-red-500/10 p-2 text-sm text-red-300">{t('appRejected')}</p>}
+          {app?.status === 'rejected' && (
+            <p className="rounded-xl bg-red-500/10 p-2 text-sm text-red-300">
+              {t('appRejected')}{app.reject_reason ? ` — ${app.reject_reason}` : ''}
+            </p>
+          )}
         </>
       )}
 
