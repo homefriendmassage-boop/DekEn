@@ -55,7 +55,7 @@ export default function Members({ onRenew, toast }) {
             {found.map((f) => (
               <li key={f.id}>
                 <button onClick={() => setManage(f.id)} className="flex w-full items-center justify-between rounded-xl bg-white/5 px-3 py-2 text-left text-sm active:scale-95">
-                  <span className="truncate">{f.display_name ?? '—'}</span>
+                  <span className="truncate">{f.role === 'worker' ? '💃 ' : ''}{f.display_name ?? '—'}</span>
                   <span className="text-xs text-neutral-400">{f.vip_tier > 0 && new Date(f.vip_expires_at) > new Date() ? PLAN_META[f.vip_tier].name : 'ไม่มีแพ็กเกจ'}</span>
                 </button>
               </li>

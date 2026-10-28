@@ -57,7 +57,7 @@ export default function ManageUser({ userId, onClose, onChanged, toast }) {
   }
   const suspend = () => {
     const until = susp === 'forever' ? '9999-12-31T00:00:00Z' : inDays(Number(susp))
-    if (!window.confirm(`ระงับบัญชี ${u.display_name ?? 'ผู้ใช้'} ${susp === 'forever' ? 'ถาวร' : `${susp} วัน`}?\nเข้าใช้งานไม่ได้ จองไม่ได้ แชตกับน้องไม่ได้ (ยังแชตกับแอดมินได้)`)) return
+    if (!window.confirm(`ระงับบัญชี ${u.display_name ?? 'ผู้ใช้'} ${susp === 'forever' ? 'ถาวร' : `${susp} วัน`}?\nเข้าใช้งานไม่ได้ จองไม่ได้ แชตกับน้องไม่ได้ (ยังแชตกับแอดมินได้)${u.role === 'worker' ? '\nและถูกซ่อนจากหน้าฟีด' : ''}`)) return
     run(() => supabase.rpc('admin_set_suspension', { p_user: u.id, p_until: until, p_reason: reason }), 'ระงับบัญชีแล้ว')
   }
   const unsuspend = () => run(() => supabase.rpc('admin_set_suspension', { p_user: u.id, p_until: null, p_reason: reason }), 'ปลดระงับแล้ว')
@@ -101,7 +101,8 @@ export default function ManageUser({ userId, onClose, onChanged, toast }) {
         </section>
 
         <section className="space-y-2 rounded-2xl bg-white/5 p-3">
-          <p className="text-sm font-semibold">ระงับบัญชี</p>
+          <p className="text-sm font-semibold">{u.role === 'worker' ? 'ระงับผู้ให้บริการ' : 'ระงับบัญชี'}</p>
+          {u.role === 'worker' && <p className="text-[11px] text-neutral-400">ซ่อนจากหน้าฟีด ลูกค้าจองและแชตด้วยไม่ได้ (คนอื่นขยับอันดับขึ้น) · ปลดระงับแล้วกลับมาแสดงเอง</p>}
           {suspended ? (
             <button disabled={busy} onClick={unsuspend} className="w-full rounded-xl bg-line py-2 text-sm font-bold text-black active:scale-95 disabled:opacity-50">ปลดระงับ</button>
           ) : (
