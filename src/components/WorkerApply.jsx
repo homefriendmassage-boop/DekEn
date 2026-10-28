@@ -88,7 +88,7 @@ export default function WorkerApply({ userId, defaultName }) {
       ? await supabase.from('worker_applications').update(payload).eq('id', app.id)
       : await supabase.from('worker_applications').insert({ user_id: userId, ...payload, accepted_terms: true, agency_code: joining ? invite : null })
     setBusy(false)
-    if (error) return setError(error.message.includes('app_contact_check') ? t('errPhone') : error.message.includes('AGENCY_NOT_FOUND') ? t('errAgencyNotFound') : error.message.includes('AGENCY_FULL') ? t('errAgencyFull') : t('errApply'))
+    if (error) return setError(error.message.includes('app_contact_check') ? t('errPhone') : error.message.includes('AGENCY_NOT_FOUND') ? t('errAgencyNotFound') : error.message.includes('AGENCY_FULL') ? t('errAgencyFull') : error.message.includes('CONTACT_IN_PROFILE') ? t('errContactProfile') : t('errApply'))
     if (joining) clearAgencyCode()
     if (!editing && local.length > 0) {            // the application exists now: send the pictures picked earlier
       try { for (const pic of local) await uploadPhoto(userId, pic, 'application') } catch (e) { console.error(e); setError(t('errUpload')) }

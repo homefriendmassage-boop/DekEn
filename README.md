@@ -306,3 +306,8 @@ Run `supabase/migration_027.sql` once, after migration_026.
   `select public.configure_chat_notify('https://<project>.supabase.co/functions/v1/notify-chat', '<the same CHAT_NOTIFY_SECRET>');`
 - **Provider money card:** the provider dashboard shows the Bonus wallet and the Wallet, a history button and a withdraw button (withdrawals themselves are step 6, still on hold).
 - **"The access token expired":** `signIn()` now logs out of LIFF and logs in again when LINE says the login ticket is expired.
+
+## migration_028 — no contact details in chat or profile text
+
+Run `supabase/migration_028.sql` once, after migration_027. `contact_problem(text)` returns `NUMBER`, `LINK`, `HANDLE`, `WORD` or null. It blocks 9+ digits in a row (Thai digits, full-width digits, number words in Thai/English, separators `space . - _ ( ) +`), every link except Google Maps (`maps.app.goo.gl`, `maps.google.com`, `google.com/maps`, `goo.gl/maps`; the host must end there), `@handles`, e-mail and words like line id / whatsapp / telegram / wechat / เบอร์โทร / เลขบัญชี / promptpay.
+`send_message` raises `CONTACT_BLOCKED` before any fee is held; `normalize_worker_profile` raises `CONTACT_IN_PROFILE` for the name / about / nearby / district when they are new or changed. Known limits: a number split over several messages or hidden between letters is not caught, and a list of several 4-digit prices separated only by spaces counts as a number.

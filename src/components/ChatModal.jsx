@@ -3,7 +3,7 @@ import { supabase } from '../supabaseClient'
 import { useI18n } from '../i18n'
 
 // Maps the exceptions raised by send_message() to translated text keys.
-const ERROR_KEYS = { MEMBERS_ONLY: 'errMembersOnly', RATE_LIMIT: 'errRate', BAD_MESSAGE: 'errBadMessage' }
+const ERROR_KEYS = { MEMBERS_ONLY: 'errMembersOnly', RATE_LIMIT: 'errRate', BAD_MESSAGE: 'errBadMessage', CONTACT_BLOCKED: 'errContact' }
 const errorKey = (msg = '') => Object.entries(ERROR_KEYS).find(([k]) => msg.includes(k))?.[1] ?? 'errGeneric'
 
 // In-app chat (no LINE push => no OA message cost). New messages arrive via Realtime.

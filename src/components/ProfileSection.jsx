@@ -69,7 +69,7 @@ export default function ProfileSection({ worker, userId, onChanged, onTopUp }) {
     const { error } = await supabase.rpc('submit_profile_edit', { p_changes: changes, p_remove: removeIds })
     setBusy(false)
     if (error) {
-      const code = ['NOTHING_TO_CHANGE', 'REQUEST_PENDING', 'INSUFFICIENT_BALANCE', 'TOO_MANY_PHOTOS', 'NO_PHOTO', 'BAD_AGE', 'SUSPENDED'].find((c) => error.message.includes(c))
+      const code = ['NOTHING_TO_CHANGE', 'REQUEST_PENDING', 'INSUFFICIENT_BALANCE', 'TOO_MANY_PHOTOS', 'NO_PHOTO', 'BAD_AGE', 'CONTACT_IN_PROFILE', 'SUSPENDED'].find((c) => error.message.includes(c))
       if (code === 'INSUFFICIENT_BALANCE' && onTopUp && window.confirm(t('editNeedTopup', { fee: money(fee) }))) return onTopUp()
       return setError(t(code ? `editErr_${code}` : 'errGeneric'))
     }
