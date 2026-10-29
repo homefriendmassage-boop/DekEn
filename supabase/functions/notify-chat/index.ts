@@ -2,6 +2,8 @@
 //   { thread_id, recipient_id, sender_id }          a new chat message is waiting -> the button opens that chat room
 //   { type: 'booking', event, job_id }              a booking event (new / accepted / declined / expired / arrived / completed / ...)
 //                                                    -> the button opens that booking (LIFF ?job=<id>)
+//   { type: 'support', event: 'incoming' | 'reply', thread_id }   a seller's customer wrote to the seller's staff / the staff answered
+//                                                    (sent through the SELLER's OA with his token; the button opens ?support=<thread>)
 //
 // Called by the database (trigger notify_chat_message on chat_messages, through pg_net), NOT by the browser:
 // it is protected by a shared secret header instead of a login. Deploy with "Verify JWT" OFF.
@@ -90,6 +92,28 @@ export function buildBookingFlex(o: { event: string; jobId: string; liffId: { wo
     default: return null
   }
 }
+
+export function buildSupportFlex(o: { event: 'incoming' | 'reply'; name: string; liffId: string; threadId: string; logo?: string }) {
+  const incoming = o.event === 'incoming'
+  const url = `https://liff.line.me/${o.liffId}?support=${incoming ? o.threadId : 'open'}`
+  return {
+    type: 'flex',
+    altText: incoming ? `💬 ${o.name} ส่งข้อความถึงแอดมิน` : '💬 แอดมินตอบข้อความของคุณแล้ว',
+    contents: {
+      type: 'bubble', size: 'kilo',
+      styles: { body: { backgroundColor: '#161616' }, footer: { backgroundColor: '#161616' } },
+      body: { type: 'box', layout: 'vertical', spacing: 'md', paddingAll: 'xl', contents: [
+        { type: 'box', layout: 'horizontal', spacing: 'md', alignItems: 'center', contents: [
+          ...(o.logo ? [{ type: 'image', url: o.logo, size: '40px', aspectMode: 'cover', aspectRatio: '1:1', flex: 0 }] : []),
+          { type: 'text', text: incoming ? '💬 ข้อความจากลูกค้า' : '💬 แอดมินตอบแล้ว', weight: 'bold', size: 'md', color: '#F472B6', gravity: 'center' },
+        ] },
+        { type: 'text', text: incoming ? `${o.name} ส่งข้อความหาแอดมิน` : 'แอดมินตอบข้อความของคุณแล้ว', weight: 'bold', size: 'lg', color: '#FFFFFF', wrap: true },
+        { type: 'text', text: incoming ? 'กดเพื่อเปิดกล่องข้อความและตอบกลับ' : 'กดเพื่อเปิดอ่านและตอบกลับ', size: 'sm', color: '#BBBBBB', wrap: true },
+      ] },
+      footer: { type: 'box', layout: 'vertical', paddingAll: 'lg', contents: [{ type: 'button', style: 'primary', color: '#EC4899', height: 'md', action: { type: 'uri', label: incoming ? 'เปิดกล่องข้อความ' : 'เปิดอ่าน', uri: url } }] },
+    },
+  }
+}
 // ---- END pure rules -----------------------------------------------------------------------------
 
 // Who gets the push and through which OA: a vendor's customer is reached by the vendor's OA (his token and LIFF), everybody else by ours.
@@ -113,12 +137,38 @@ Deno.serve(async (req) => {
   const input = await req.json().catch(() => ({}))
   const { thread_id, recipient_id, sender_id } = input
   const isBooking = input.type === 'booking'
-  if (!isBooking && (!thread_id || !recipient_id || !sender_id)) return json({ ok: false, code: 'BAD_INPUT' }, 400)
+  const isSupport = input.type === 'support'
+  if (!isBooking && !isSupport && (!thread_id || !recipient_id || !sender_id)) return json({ ok: false, code: 'BAD_INPUT' }, 400)
+  if (isSupport && !input.thread_id) return json({ ok: false, code: 'BAD_INPUT' }, 400)
   if (isBooking && (!input.job_id || !input.event)) return json({ ok: false, code: 'BAD_INPUT' }, 400)
 
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
   const central = { token, liffId }
+  if (isSupport) {
+    // only a seller's customers have a seller's staff; the push leaves through the seller's own OA
+    const { data: th } = await admin.from('support_threads').select('id, user_id, vendor_id').eq('id', input.thread_id).maybeSingle()
+    if (!th?.vendor_id) return json({ ok: true, status: 'NOT_A_VENDOR_THREAD' })
+    const { data: vtoken } = await admin.rpc('vendor_token', { p_vendor: th.vendor_id })
+    const { data: vv } = await admin.from('vendors').select('liff_id').eq('id', th.vendor_id).maybeSingle()
+    if (!vtoken || !vv) return json({ ok: true, status: 'NO_VENDOR_TOKEN' })
+    const { data: cust } = await admin.from('users').select('display_name, line_user_id').eq('id', th.user_id).maybeSingle()
+    const appUrl = Deno.env.get('APP_URL')?.replace(/\/$/, '')
+    const message = buildSupportFlex({ event: input.event === 'reply' ? 'reply' : 'incoming', name: String(cust?.display_name ?? 'ลูกค้า').slice(0, 40), liffId: vv.liff_id as string, threadId: th.id, logo: appUrl ? `${appUrl}/dekn-logo.jpg?v=2` : undefined })
+    let targets: string[] = []
+    if (input.event === 'reply') targets = [String(cust?.line_user_id ?? '').split(':').pop() ?? '']
+    else { const { data: ids } = await admin.rpc('vendor_staff_line_ids', { p_vendor: th.vendor_id }); targets = (ids ?? []) as string[] }
+    const results: unknown[] = []
+    for (const to of targets.filter((x) => /^U[0-9a-f]{32}$/.test(x))) {
+      const r = await fetch('https://api.line.me/v2/bot/message/push', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${vtoken}`, 'Content-Type': 'application/json', 'X-Line-Retry-Key': crypto.randomUUID() },
+        body: JSON.stringify({ to, messages: [message] }),
+      })
+      results.push({ status: r.ok ? 'SENT' : 'FAILED' })
+    }
+    return json({ ok: true, results })
+  }
   if (isBooking) {
     const { data: job } = await admin.from('jobs').select('id, customer_id, worker_id, rate_label, service_price, scheduled_at, place_note, source_label').eq('id', input.job_id).maybeSingle()
     if (!job) return json({ ok: false, code: 'NOT_FOUND' }, 404)

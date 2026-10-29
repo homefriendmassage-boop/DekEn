@@ -381,3 +381,12 @@ How a seller is connected (admin tab "🏪 เซลล์/OA"):
 5. `resolve_sales()` returns the vendor's owner for every vendor customer (no 24-hour takeover), so every booking / membership of his customers pays his share.
 6. `jobs.source_label` ("customer from <vendor name>", or the seller whose link a central customer used — `users.seller_label`, set in the admin user controls, else his LINE name) is shown in the booking Flex and the provider's inbox.
 - The forced "add our OA as a friend" gate for customers is gone; providers must follow our OA before switching Online.
+
+## migration_038 — seller customers: support chat, staff, referral split
+
+Run `supabase/migration_038.sql` once, after migration_037. **Redeploy** the Edge Function `notify-chat` (new `type:'support'` branch).
+
+- **Package referral (20%)** stays the platform's rule and the invite text is unchanged. For a seller's customer `resolve_package_referrer()` pays the inviting friend when the friend belongs to the same seller, otherwise the seller's owner account. `register_referral_click` only accepts a referrer from the same seller (or the seller owner). The booking-fee split (40/40/20) is unrelated and still goes to `resolve_sales()` (the seller owner for his customers).
+- **Support chat routing**: `support_threads.vendor_id` is copied from the customer. Seller customers talk to the seller's own admins (`vendor_staff`), not central admins. Central inbox, stats and member list exclude them; the admin tabs "💬 ซัพพอร์ต" and "สมาชิก" have a seller selector (`admin_support_threads`, `admin_list_vendor_members`) and the thread header shows "🏪 <seller>".
+- **Seller staff**: admin tab "🏪 เซลล์/OA" → "👥 แอดมินเซลล์" (`admin_vendor_staff_list/add/remove`, `admin_search_vendor_users`). The person must open the seller's LIFF once with their own LINE (creating the account) and be a friend of the seller's OA. In the seller's LIFF they get a "💬 กล่องข้อความลูกค้า" button.
+- **Push**: `support_notify_push` (vendor threads only) → `notify-chat` sends a Flex through the seller's OA: customer → each staff LINE id (`vendor_staff_line_ids`), staff → customer. At most one push per thread and kind per 10 minutes (`support_push_log`). Central customers get no support push.

@@ -23,6 +23,7 @@ export default function ManageUser({ userId, onClose, onChanged, toast }) {
   const [tier, setTier] = useState(1)
   const [expires, setExpires] = useState(toLocalDate(inDays(30)))
   const [reason, setReason] = useState('')
+  const [vendorName, setVendorName] = useState(null)
   const [susp, setSusp] = useState('7')            // '3' | '7' | '30' | 'forever'
 
   const load = () => supabase.rpc('admin_user_detail', { p_user: userId }).then(({ data }) => {
@@ -32,6 +33,7 @@ export default function ManageUser({ userId, onClose, onChanged, toast }) {
     if (row?.vip_expires_at && new Date(row.vip_expires_at) > new Date()) setExpires(toLocalDate(row.vip_expires_at))
   })
   useEffect(() => { load() }, [userId]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { supabase.rpc('admin_user_vendor', { p_user: userId }).then(({ data }) => setVendorName(data ?? null)) }, [userId])
 
   async function run(fn, okMsg) {
     if (busy) return
@@ -66,7 +68,7 @@ export default function ManageUser({ userId, onClose, onChanged, toast }) {
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center sm:p-4" onClick={onClose} role="dialog" aria-modal="true">
       <div onClick={(e) => e.stopPropagation()} className="max-h-[92vh] w-full max-w-md space-y-4 overflow-y-auto rounded-t-3xl bg-neutral-900 p-5 shadow-2xl sm:rounded-3xl">
         <div>
-          <h2 className="text-lg font-bold">{u.display_name ?? '—'}</h2>
+          <h2 className="text-lg font-bold">{u.display_name ?? '—'}{vendorName && <span className="ml-2 rounded-full bg-amber-400/20 px-2 py-0.5 text-xs font-semibold text-amber-300">🏪 {vendorName}</span>}</h2>
           <p className="text-sm text-neutral-400">
             {active ? <>{meta.icon} {meta.name} · หมด {fmtDate(u.vip_expires_at)}</> : 'ไม่มีแพ็กเกจที่ใช้งานอยู่'} · Wallet {baht(u.wallet_balance)}
           </p>

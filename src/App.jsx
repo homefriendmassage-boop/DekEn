@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from './supabaseClient'
-import { signIn, takeOpenIntent, takeWorkerIntent, takeChatIntent, takeDraftIntent, takeJobIntent, getAgencyCode } from './lib/auth'
+import { signIn, takeOpenIntent, takeWorkerIntent, takeChatIntent, takeDraftIntent, takeJobIntent, takeSupportIntent, getAgencyCode } from './lib/auth'
 import { getPosition } from './lib/geo'
 import { CATEGORIES, PLAN_META, canViewWorker, suspensionOf, tierOf } from './config'
 import { useI18n } from './i18n'
@@ -21,6 +21,7 @@ import ThreadList from './components/ThreadList'
 import WorkerDetail from './components/WorkerDetail'
 import ClaimDraft from './components/ClaimDraft'
 import MyBookings from './components/MyBookings'
+import VendorInbox from './components/VendorInbox'
 
 // Mock mode only, when the workers table is empty: lets you click through the UI
 // before running seed SQL. Rank within a category = order in this list.
@@ -79,6 +80,9 @@ export default function App() {
   const [invitedBy, setInvitedBy] = useState(null)       // agency name when the app was opened from an agency invitation
   const [walletPaying, setWalletPaying] = useState(false)
   const [termsBusy, setTermsBusy] = useState(false)
+  const [staffVendor, setStaffVendor] = useState(null)   // the seller whose customers' chats I answer (seller's staff only)
+  const [inbox, setInbox] = useState(null)                 // null | { thread }
+  const [inboxUnread, setInboxUnread] = useState(0)
   const [showBookings, setShowBookings] = useState(false)
   const [highlightJob, setHighlightJob] = useState(null)   // a booking opened from its push
   const [claim, setClaim] = useState(null)            // token of an application draft someone filled in for her
@@ -122,6 +126,18 @@ export default function App() {
           const th = (ths ?? []).find((x) => x.id === chatId)
           if (th && th.worker_id === meRow.id) { setView('worker'); setWorkerTab('self'); setOpenChat(th) }
           else if (th) { setView('categories'); setChat(th) }
+        }
+        let staffOf = null
+        if (s.vendor) {      // a seller's staff member opening his seller's app gets the customers' inbox
+          const { data: sv } = await supabase.rpc('my_vendor_staff')
+          staffOf = sv ?? null
+          setStaffVendor(staffOf)
+          if (staffOf) { const { data: ths } = await supabase.rpc('support_threads_for', { p_vendor: staffOf }); setInboxUnread((ths ?? []).reduce((n, x) => n + x.unread, 0)) }
+        }
+        const supportIntent = takeSupportIntent()
+        if (supportIntent) {
+          if (staffOf) setInbox({ thread: supportIntent === 'open' ? null : supportIntent })
+          else { const { data: th } = await supabase.rpc('support_open'); if (th) setSupport({ threadId: th }) }
         }
         const jobId = takeJobIntent()          // a booking push: provider -> her inbox, customer -> my bookings
         if (jobId && meRow) {
@@ -360,6 +376,8 @@ export default function App() {
           onWorker={() => setView('worker')}
           invitedBy={invitedBy}
           vendor={session.vendor}
+          onInbox={staffVendor ? () => setInbox({ thread: null }) : undefined}
+          inboxUnread={inboxUnread}
         />
       )}
 
@@ -451,6 +469,8 @@ export default function App() {
           }}
         />
       )}
+
+      {inbox && staffVendor && <VendorInbox vendor={staffVendor} openThread={inbox.thread} onChanged={(rows) => setInboxUnread((rows ?? []).reduce((n, x) => n + x.unread, 0))} onClose={() => setInbox(null)} />}
 
       {showBookings && <MyBookings highlightId={highlightJob} onClose={() => { setShowBookings(false); setHighlightJob(null); loadMe() }} />}
 

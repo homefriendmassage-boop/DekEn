@@ -15,6 +15,7 @@ const CODE = { NO_TOKEN: 'ยังไม่ได้ใส่ token', LINE_REJE
 export default function Vendors({ toast }) {
   const [rows, setRows] = useState(null)
   const [editing, setEditing] = useState(null)      // null | 'new' | vendor row
+  const [staffOf, setStaffOf] = useState(null)        // vendor row whose staff are being managed
   const load = useCallback(async () => { const { data } = await supabase.rpc('admin_vendor_list'); setRows(data ?? []) }, [])
   useEffect(() => { load() }, [load])
 
@@ -56,6 +57,7 @@ export default function Vendors({ toast }) {
                 <button onClick={() => copy(endpoint(v.id), 'คัดลอก Endpoint URL แล้ว (ไปใส่ใน LIFF ของเซลล์)')} className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold active:scale-95">📋 Endpoint URL</button>
                 <button onClick={() => copy(`https://liff.line.me/${v.liff_id}`, 'คัดลอกลิงก์ลูกค้าแล้ว')} className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold active:scale-95">🔗 ลิงก์ลูกค้า</button>
                 <button onClick={() => test(v)} className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold active:scale-95">🧪 ทดสอบ token</button>
+                <button onClick={() => setStaffOf(v)} className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold active:scale-95">👥 แอดมินเซลล์</button>
                 <button onClick={() => setEditing(v)} className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold active:scale-95">✏️ แก้ไข</button>
                 <button onClick={() => setStatus(v, v.status === 'active' ? 'disabled' : 'active')} className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold active:scale-95">{v.status === 'active' ? 'ปิด' : 'เปิด'}</button>
               </div>
@@ -64,6 +66,7 @@ export default function Vendors({ toast }) {
         </ul>
       )}
 
+      {staffOf && <StaffModal vendor={staffOf} toast={toast} onClose={() => setStaffOf(null)} />}
       {editing && <VendorForm vendor={editing === 'new' ? null : editing} endpoint={endpoint} onClose={() => setEditing(null)} onSaved={(msg) => { setEditing(null); toast(msg); load() }} />}
     </div>
   )
@@ -144,6 +147,63 @@ function VendorForm({ vendor, endpoint, onClose, onSaved }) {
 
         {error && <p className="rounded-lg bg-red-500/10 p-2 text-sm text-red-300">{error}</p>}
         <button disabled={busy} onClick={save} className="w-full rounded-xl bg-line py-3 font-bold text-black active:scale-95 disabled:opacity-50">{busy ? 'กำลังบันทึก…' : 'บันทึก'}</button>
+      </div>
+    </div>
+  )
+}
+
+// The seller's own admins: they answer his customers' chats (in his LIFF) and get the Flex pushes through his OA.
+function StaffModal({ vendor, toast, onClose }) {
+  const [staff, setStaff] = useState(null)
+  const [q, setQ] = useState('')
+  const [found, setFound] = useState([])
+  const load = useCallback(async () => { const { data } = await supabase.rpc('admin_vendor_staff_list', { p_vendor: vendor.id }); setStaff(data ?? []) }, [vendor.id])
+  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    const h = setTimeout(() => supabase.rpc('admin_search_vendor_users', { p_vendor: vendor.id, p_q: q }).then(({ data }) => setFound(data ?? [])), 250)
+    return () => clearTimeout(h)
+  }, [q, vendor.id])
+
+  async function add(u) {
+    const { error } = await supabase.rpc('admin_vendor_staff_add', { p_vendor: vendor.id, p_user: u.id })
+    if (error) return toast('เพิ่มไม่สำเร็จ')
+    toast(`เพิ่ม ${u.display_name ?? 'แอดมิน'} แล้ว`); setQ(''); load()
+  }
+  async function remove(u) {
+    if (!window.confirm(`เอา ${u.name ?? 'แอดมิน'} ออก? จะไม่ได้รับแจ้งเตือนและตอบแชตไม่ได้`)) return
+    await supabase.rpc('admin_vendor_staff_remove', { p_vendor: vendor.id, p_user: u.user_id })
+    load()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center sm:p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="max-h-[92vh] w-full max-w-md space-y-3 overflow-y-auto rounded-t-3xl bg-neutral-900 p-5 shadow-2xl sm:rounded-3xl">
+        <div className="flex items-center justify-between"><h2 className="text-lg font-bold">👥 แอดมินของ {vendor.name}</h2><button onClick={onClose} className="rounded-full bg-white/10 px-3 py-1 text-sm">✕</button></div>
+        <p className="text-xs text-neutral-400">ลูกค้าของเซลล์ที่กดแชตหาแอดมินจะคุยกับคนในรายการนี้ (ไม่ใช่แอดมินกลาง) เมื่อลูกค้าส่งข้อความ ระบบส่ง Flex ผ่าน OA ของเซลล์ถึง User ID LINE ของแต่ละคน (ไม่เกิน 1 ครั้งต่อห้องต่อ 10 นาที)</p>
+
+        {staff === null ? <p className="text-center text-sm text-neutral-500">กำลังโหลด…</p> : staff.length === 0 ? (
+          <p className="rounded-xl bg-white/5 p-3 text-center text-sm text-neutral-500">ยังไม่มีแอดมินของเซลล์นี้</p>
+        ) : (
+          <ul className="space-y-2">
+            {staff.map((u) => (
+              <li key={u.user_id} className="flex items-center justify-between gap-2 rounded-xl bg-white/5 p-3">
+                <span className="min-w-0 text-sm"><b className="block truncate">{u.name ?? '—'}</b>
+                  <span className="block truncate text-[11px] text-neutral-400">User ID: {u.line_id}</span>
+                  <span className={`text-[11px] ${u.push_ready ? 'text-green-300' : 'text-red-300'}`}>{u.push_ready ? '✓ พร้อมรับ push' : '✗ รหัส LINE ไม่ถูกต้อง'}</span></span>
+                <button onClick={() => remove(u)} className="shrink-0 rounded-lg bg-red-500/10 px-3 py-1 text-xs text-red-300 active:scale-95">ออก</button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <div className="space-y-2 rounded-2xl bg-white/5 p-3">
+          <p className="text-sm font-semibold">เพิ่มแอดมินเซลล์</p>
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 ค้นชื่อ LINE (บัญชีใน LIFF ของเซลล์นี้)" className="w-full rounded-xl bg-white/10 px-3 py-2 text-sm" />
+          <ul className="space-y-1">
+            {found.map((f) => <li key={f.id}><button onClick={() => add(f)} className="flex w-full items-center justify-between rounded-xl bg-white/5 px-3 py-2 text-left text-sm active:scale-95"><span>{f.display_name ?? '—'}</span><span className="text-[10px] text-neutral-500">{f.line_id.slice(0, 10)}…</span></button></li>)}
+          </ul>
+          <p className="text-[11px] text-neutral-500">คนที่จะเป็นแอดมินเซลล์ต้องเปิดลิงก์ LIFF ของเซลล์ด้วย LINE ของตัวเองหนึ่งครั้ง (จึงมีบัญชีให้ค้นเจอ) และเพิ่มเพื่อน LINE OA ของเซลล์ เพื่อรับ push</p>
+        </div>
       </div>
     </div>
   )

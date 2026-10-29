@@ -2,7 +2,7 @@ import { LangSwitcher, useI18n } from '../i18n'
 import logo from '../assets/dekn-logo.jpg'
 
 // First screen: customer or provider.
-export default function Landing({ displayName, role, onCustomer, onWorker, invitedBy, vendor }) {
+export default function Landing({ displayName, role, onCustomer, onWorker, invitedBy, vendor, onInbox, inboxUnread }) {
   const { t } = useI18n()
   const isWorker = role === 'worker'
 
@@ -23,6 +23,13 @@ export default function Landing({ displayName, role, onCustomer, onWorker, invit
           <button onClick={onWorker} className="flex w-full items-center gap-3 rounded-3xl bg-amber-400 p-4 text-left text-black active:scale-[0.98]">
             <span className="text-3xl">🏢</span>
             <span><span className="block font-bold">{t('invitedBy', { name: invitedBy })}</span><span className="block text-sm text-black/70">{t('invitedApply')}</span></span>
+          </button>
+        )}
+        {onInbox && (
+          <button onClick={onInbox} className="relative flex w-full items-center gap-4 rounded-3xl bg-pink-500 p-5 text-left active:scale-[0.98]">
+            <span className="text-4xl">💬</span>
+            <span><span className="block text-lg font-bold">{t('staffInbox')}</span><span className="block text-sm text-white/80">{t('staffInboxSub')}</span></span>
+            {inboxUnread > 0 && <span className="absolute right-4 top-4 rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold">{inboxUnread}</span>}
           </button>
         )}
         <Choice emoji="🛍️" title={t('imCustomer')} sub={t('imCustomerSub')} onClick={onCustomer} primary={!invitedBy} />

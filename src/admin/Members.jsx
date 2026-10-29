@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient'
 import { PLAN_META } from '../config'
 import { baht, fmtDate, ago } from './format'
 import ManageUser from './ManageUser'
+import VendorSelect from './VendorSelect'
 
 const ERRORS = {
   CONFIG_MISSING: 'ยังไม่ได้ตั้งค่า LINE_CHANNEL_ACCESS_TOKEN / LIFF_ID ใน Supabase Secrets ของฟังก์ชัน send-renewal',
@@ -18,8 +19,9 @@ export default function Members({ onRenew, toast }) {
   const [q, setQ] = useState('')
   const [found, setFound] = useState([])
 
-  const load = () => supabase.rpc('admin_list_members').then(({ data }) => setRows(data ?? []))
-  useEffect(() => { load() }, [])
+  const [vendor, setVendor] = useState(null)        // null = central members, else one seller's customers
+  const load = () => (vendor ? supabase.rpc('admin_list_vendor_members', { p_vendor: vendor }) : supabase.rpc('admin_list_members')).then(({ data }) => setRows(data ?? []))
+  useEffect(() => { setRows(null); load() }, [vendor]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function notify(body, label) {
     if (busy) return
@@ -47,6 +49,7 @@ export default function Members({ onRenew, toast }) {
 
   return (
     <div className="space-y-3">
+      <VendorSelect value={vendor} onChange={setVendor} />
       <div>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 ค้นหาผู้ใช้ (ชื่อ / LINE ID) เพื่อยกเลิก แก้แพ็กเกจ หรือระงับบัญชี"
           className="w-full rounded-xl bg-white/10 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-line" />

@@ -4,15 +4,15 @@ import SupportChat from '../components/SupportChat'
 import { ago } from './format'
 
 // Inbox of customer chats. New messages refresh the list live (admins can read every support message via RLS).
-export default function Support({ onChanged }) {
+export default function Support({ onChanged, vendor = null, vendorLabel = null, openThread = null }) {
   const [rows, setRows] = useState(null)
   const [open, setOpen] = useState(null)
 
   const load = useCallback(async () => {
-    const { data } = await supabase.rpc('admin_support_threads')
+    const { data } = await supabase.rpc('support_threads_for', { p_vendor: vendor })
     setRows(data ?? [])
-    onChanged?.()
-  }, [onChanged])
+    onChanged?.(data ?? [])
+  }, [onChanged, vendor])
 
   useEffect(() => {
     load()
@@ -21,6 +21,8 @@ export default function Support({ onChanged }) {
       .subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [load])
+
+  useEffect(() => { if (openThread && rows) { const t = rows.find((r) => r.thread_id === openThread); if (t) setOpen(t) } }, [openThread, rows === null]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (rows === null) return <p className="py-10 text-center text-neutral-500">กำลังโหลด…</p>
   return (
@@ -44,7 +46,7 @@ export default function Support({ onChanged }) {
           ))}
         </ul>
       )}
-      {open && <SupportChat threadId={open.thread_id} title={open.user_name ?? 'ลูกค้า'} isAdmin onClose={() => { setOpen(null); load() }} />}
+      {open && <SupportChat threadId={open.thread_id} title={`${open.user_name ?? 'ลูกค้า'}${vendorLabel ? ` · 🏪 ${vendorLabel}` : ''}`} isAdmin onClose={() => { setOpen(null); load() }} />}
     </>
   )
 }

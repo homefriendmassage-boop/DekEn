@@ -10,6 +10,7 @@ import Agencies from './Agencies'
 import ProfileEdits from './ProfileEdits'
 import Chats from './Chats'
 import Vendors from './Vendors'
+import VendorSelect from './VendorSelect'
 import DraftsPanel from '../components/DraftsPanel'
 import { baht } from './format'
 
@@ -23,6 +24,8 @@ export default function AdminApp() {
   const [stats, setStats] = useState(null)
   const [editCount, setEditCount] = useState(0)   // pending profile changes + removal requests
   const [draftCount, setDraftCount] = useState(0)    // agency drafts waiting for review
+  const [supportVendor, setSupportVendor] = useState(null)   // null = central customers
+  const [supportVendorName, setSupportVendorName] = useState(null)
   const [chatCount, setChatCount] = useState(0)    // flagged / reported / suspended chats waiting for a decision
   const [prefill, setPrefill] = useState(null)   // { user, tier } from "renew" on the Members tab
   const [toast, setToast] = useState(null)
@@ -127,7 +130,12 @@ export default function AdminApp() {
       <main className="px-4">
         {tab === 'apps' && <Applications onChanged={loadStats} toast={showToast} />}
         {tab === 'reviews' && <Reviews onChanged={loadStats} toast={showToast} />}
-        {tab === 'support' && <Support onChanged={loadStats} />}
+        {tab === 'support' && (
+          <div className="space-y-3">
+            <VendorSelect value={supportVendor} onChange={(id, name) => { setSupportVendor(id); setSupportVendorName(name) }} />
+            <Support key={supportVendor ?? 'central'} vendor={supportVendor} vendorLabel={supportVendorName} onChanged={loadStats} />
+          </div>
+        )}
         {tab === 'pay' && <Payments prefill={prefill} clearPrefill={() => setPrefill(null)} onChanged={loadStats} toast={showToast} />}
         {tab === 'drafts' && <DraftsPanel mode="admin" toast={showToast} />}
         {tab === 'chats' && <Chats onChanged={loadStats} toast={showToast} />}

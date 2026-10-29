@@ -72,6 +72,20 @@ export function takeDraftIntent() {
   } catch { return null }
 }
 
+// Opened from a support push: https://liff.line.me/<id>?support=<thread uuid | open>
+export function captureSupportParam() {
+  const params = new URLSearchParams(window.location.search)
+  let v = params.get('support')
+  if (!v) {
+    const state = params.get('liff.state')
+    if (state) { const q = state.indexOf('?'); v = new URLSearchParams(q >= 0 ? state.slice(q) : state).get('support') }
+  }
+  try { if (v && (v === 'open' || UUID.test(v))) sessionStorage.setItem('open_support', v) } catch { /* storage blocked */ }
+}
+export function takeSupportIntent() {
+  try { const v = sessionStorage.getItem('open_support'); sessionStorage.removeItem('open_support'); return v } catch { return null }
+}
+
 // Opened from a booking push: https://liff.line.me/<id>?job=<job uuid>
 export function captureJobParam() {
   const params = new URLSearchParams(window.location.search)
@@ -192,6 +206,7 @@ export async function signIn() {
   captureChatParam()
   captureDraftParam()
   captureJobParam()
+  captureSupportParam()
   captureAgencyCode()
 
   let profile
@@ -242,6 +257,7 @@ export async function signIn() {
   captureChatParam()
   captureDraftParam()
   captureJobParam()
+  captureSupportParam()
   captureAgencyCode()
   const refCode = captureRefCode() // URL is clean again after init(); re-check
   if (refCode) {
