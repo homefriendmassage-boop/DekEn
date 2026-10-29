@@ -43,9 +43,11 @@ function mosaicCircle(src, cx, cy, r) {
 export default function PhotoUploader({ userId, previousOriginal, onUploaded, target = 'worker', onPicked }) {
   const { t } = useI18n()
   const boxRef = useRef(null)
-  const dragging = useRef(false)
+  const dragging = useRef(-1)                    // index of the circle being dragged, -1 = none
   const [src, setSrc] = useState(null)               // object URL of the chosen file
-  const [circle, setCircle] = useState({ x: 0.5, y: 0.3, r: 0.18 }) // fractions of image width
+  // mosaic spots, fractions of the image width: the first one covers the face, more can be added (tattoo, name tag, background ...)
+  const [circles, setCircles] = useState([{ x: 0.5, y: 0.3, r: 0.18 }])
+  const [sel, setSel] = useState(0)
   const [preview, setPreview] = useState(null)       // { orig: Blob, pub: Blob, url }
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState(null)
@@ -57,19 +59,23 @@ export default function PhotoUploader({ userId, previousOriginal, onUploaded, ta
     if (!f) return
     setPreview(null)
     setMsg(null)
+    setCircles([{ x: 0.5, y: 0.3, r: 0.18 }])
+    setSel(0)
     setSrc(URL.createObjectURL(f))
   }
 
   // Only the yellow circle is draggable (touch-action:none on the circle alone), so swiping anywhere else on the
   // page still scrolls normally. The photo is capped to ~55% of the screen height so there is always room to scroll.
-  function place(e) {
+  function place(e, i) {
     const rect = boxRef.current.getBoundingClientRect()
-    setCircle((c) => ({
+    setCircles((cs) => cs.map((c, k) => (k !== i ? c : {
       ...c,
       x: Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)),
       y: Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height)),
-    }))
+    })))
   }
+  const addSpot = () => { setCircles((cs) => [...cs, { x: 0.5, y: 0.6, r: 0.08 }].slice(0, 8)); setSel(circles.length) }
+  const removeSpot = () => { if (sel === 0) return; setCircles((cs) => cs.filter((_, k) => k !== sel)); setSel(0) }
 
   async function makePreview() {
     setBusy(true)
@@ -89,7 +95,7 @@ export default function PhotoUploader({ userId, previousOriginal, onUploaded, ta
       base.height = h
       base.getContext('2d').drawImage(img, 0, 0, w, h)
 
-      const pubCanvas = mosaicCircle(base, circle.x * w, circle.y * h, circle.r * w)
+      const pubCanvas = circles.reduce((cv, c) => mosaicCircle(cv, c.x * w, c.y * h, c.r * w), base)   // the original stays untouched
       const [orig, pub] = await Promise.all([toBlob(base), toBlob(pubCanvas)])
       if (preview) URL.revokeObjectURL(preview.url)
       setPreview({ orig, pub, url: URL.createObjectURL(pub) })
@@ -153,33 +159,35 @@ export default function PhotoUploader({ userId, previousOriginal, onUploaded, ta
         <>
           <div ref={boxRef} className="relative mx-auto w-fit max-w-full select-none overflow-hidden rounded-xl bg-black">
             <img src={src} alt="" className="block max-h-[52vh] w-auto max-w-full" draggable={false} />
-            <div
-              role="slider"
-              aria-label={t('faceSize')}
-              className="absolute cursor-grab touch-none rounded-full border-2 border-amber-400 bg-amber-400/25 shadow-[0_0_0_2px_rgba(0,0,0,0.35)]"
-              style={{
-                left: `${circle.x * 100}%`,
-                top: `${circle.y * 100}%`,
-                width: `${circle.r * 200}%`,
-                aspectRatio: '1',
-                transform: 'translate(-50%, -50%)',
-              }}
-              onPointerDown={(e) => { dragging.current = true; e.currentTarget.setPointerCapture(e.pointerId); e.preventDefault() }}
-              onPointerMove={(e) => { if (dragging.current) place(e) }}
-              onPointerUp={() => { dragging.current = false }}
-              onPointerCancel={() => { dragging.current = false }}
-            >
-              <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-lg opacity-80">✥</span>
-            </div>
+            {circles.map((c, i) => (
+              <div
+                key={i}
+                role="slider"
+                aria-label={t('faceSize')}
+                className={`absolute cursor-grab touch-none rounded-full border-2 shadow-[0_0_0_2px_rgba(0,0,0,0.35)] ${i === sel ? 'border-amber-400 bg-amber-400/25' : 'border-dashed border-white/80 bg-white/10'}`}
+                style={{ left: `${c.x * 100}%`, top: `${c.y * 100}%`, width: `${c.r * 200}%`, aspectRatio: '1', transform: 'translate(-50%, -50%)', zIndex: i === sel ? 2 : 1 }}
+                onPointerDown={(e) => { dragging.current = i; setSel(i); e.currentTarget.setPointerCapture(e.pointerId); e.preventDefault() }}
+                onPointerMove={(e) => { if (dragging.current === i) place(e, i) }}
+                onPointerUp={() => { dragging.current = -1 }}
+                onPointerCancel={() => { dragging.current = -1 }}
+              >
+                <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-lg opacity-80">{i === 0 ? '✥' : i + 1}</span>
+              </div>
+            ))}
           </div>
           <label className="block text-xs text-neutral-400">
             {t('faceSize')}
             <input
-              type="range" min="0.05" max="0.45" step="0.01" value={circle.r}
-              onChange={(e) => setCircle((c) => ({ ...c, r: Number(e.target.value) }))}
+              type="range" min="0.03" max="0.45" step="0.01" value={circles[sel]?.r ?? 0.18}
+              onChange={(e) => setCircles((cs) => cs.map((c, k) => (k === sel ? { ...c, r: Number(e.target.value) } : c)))}
               className="mt-1 w-full"
             />
           </label>
+          <p className="text-[11px] text-neutral-500">{t('mosaicHint')}</p>
+          <div className="grid grid-cols-2 gap-2">
+            <button type="button" onClick={addSpot} disabled={circles.length >= 8} className="rounded-xl bg-white/10 py-2 text-sm font-semibold active:scale-95 disabled:opacity-40">{t('addMosaic')}</button>
+            <button type="button" onClick={removeSpot} disabled={sel === 0} className="rounded-xl bg-white/10 py-2 text-sm font-semibold active:scale-95 disabled:opacity-40">{t('delMosaic')}</button>
+          </div>
           <button onClick={makePreview} disabled={busy} className="w-full rounded-xl bg-amber-400 py-2.5 text-sm font-bold text-black active:scale-95 disabled:opacity-50">
             {t('previewPhoto')}
           </button>

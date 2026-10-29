@@ -468,3 +468,9 @@ Run `supabase/migration_046.sql` once, after migration_045. No Edge Function cha
 ## migration_047 — any admin can edit an admin draft
 
 Run `supabase/migration_047.sql` once, after migration_046. `draft_save`, `draft_attach_photo`, `draft_remove_photo` and the draft storage policies accept any admin for drafts with `source = 'admin'` (before: only the admin who created the draft, so drafts made by `bulk_create_drafts()` under another admin id could be listed but not saved).
+
+## migration_048 — draft photo upload permission; extra mosaic spots
+
+Run `supabase/migration_048.sql` once, after migration_047. The storage policies for `<draft id>/` folders read `application_drafts` directly, which is closed to the app's users ("permission denied for table application_drafts"); they now call the SECURITY DEFINER helper `draft_folder_writable()` (creator, or any admin for an admin draft).
+
+`PhotoUploader`: the first circle covers the face; up to 8 more mosaic spots can be added (tattoo, name tag, background), each draggable and resizable. Only the public copy is pixelated; the private original stays clear.
