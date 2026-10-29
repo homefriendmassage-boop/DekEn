@@ -30,6 +30,8 @@ export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlo
   const { t, money, catName } = useI18n()
   const [imgs, setImgs] = useState([])      // gallery: the clear picture where the viewer may see it, else the mosaic
   const [idx, setIdx] = useState(0)
+  const [viewer, setViewer] = useState(false)   // full-screen viewer of the picture
+  const [zoom, setZoom] = useState(false)
   useEffect(() => {
     let alive = true
     ;(async () => {
@@ -93,8 +95,13 @@ export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlo
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center sm:p-4" onClick={onClose} role="dialog" aria-modal="true">
       <div onClick={(e) => e.stopPropagation()}
         className="max-h-[94vh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-neutral-900 shadow-2xl sm:rounded-3xl">
-        <div className="relative aspect-[3/4] max-h-[52vh] w-full overflow-hidden bg-neutral-800">
-          {(imgs[idx]?.url ?? w.image) && <img src={imgs[idx]?.url ?? w.image} alt={w.display_name} draggable={false} className="h-full w-full select-none object-cover" />}
+        <div className="relative h-[52vh] w-full overflow-hidden bg-neutral-950">
+          {(imgs[idx]?.url ?? w.image) && (
+            <button type="button" onClick={() => { setZoom(false); setViewer(true) }} aria-label={t('viewFull')} className="block h-full w-full">
+              <img src={imgs[idx]?.url ?? w.image} alt={w.display_name} draggable={false} className="h-full w-full select-none object-contain" />
+            </button>
+          )}
+          {(imgs[idx]?.url ?? w.image) && <span className="pointer-events-none absolute bottom-3 right-3 rounded-full bg-black/60 px-2 py-0.5 text-[10px] text-neutral-200">🔍 {t('viewFull')}</span>}
           <button onClick={onClose} aria-label={t('close')} className="absolute right-3 top-3 rounded-full bg-black/60 px-3 py-1 text-sm active:scale-95">✕</button>
           {w.agency_logo && (
             <span className="absolute bottom-3 left-3 flex items-center gap-1 rounded-full bg-black/60 py-0.5 pl-0.5 pr-2 text-xs">
@@ -187,6 +194,27 @@ export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlo
           )}
         </div>
       </div>
+
+      {viewer && (imgs[idx]?.url ?? w.image) && (
+        <div onClick={(e) => { e.stopPropagation(); setViewer(false) }} className="fixed inset-0 z-[80] flex flex-col bg-black">
+          <div className="flex items-center justify-between px-4 py-3 text-sm" onClick={(e) => e.stopPropagation()}>
+            <span className="text-neutral-300">{imgs.length > 1 ? `${idx + 1} / ${imgs.length}` : ''}</span>
+            <button onClick={() => setViewer(false)} aria-label={t('close')} className="rounded-full bg-white/15 px-3 py-1 active:scale-95">✕</button>
+          </div>
+          <div className="flex-1 overflow-auto" onClick={(e) => e.stopPropagation()}>
+            <img src={imgs[idx]?.url ?? w.image} alt={w.display_name} draggable={false} onClick={() => setZoom((z) => !z)}
+              className="mx-auto block select-none" style={zoom ? { width: '250%', maxWidth: 'none' } : { maxWidth: '100%', maxHeight: 'calc(100vh - 110px)', objectFit: 'contain', margin: '0 auto' }} />
+          </div>
+          {imgs.length > 1 && (
+            <div className="flex items-center justify-center gap-4 px-4 pb-5 pt-2" onClick={(e) => e.stopPropagation()}>
+              <button onClick={() => { setZoom(false); setIdx((i) => (i - 1 + imgs.length) % imgs.length) }} className="rounded-full bg-white/15 px-5 py-2 text-lg active:scale-95">‹</button>
+              <span className="text-xs text-neutral-400">{zoom ? t('tapToShrink') : t('tapToZoom')}</span>
+              <button onClick={() => { setZoom(false); setIdx((i) => (i + 1) % imgs.length) }} className="rounded-full bg-white/15 px-5 py-2 text-lg active:scale-95">›</button>
+            </div>
+          )}
+          {imgs.length <= 1 && <p className="pb-5 pt-2 text-center text-xs text-neutral-400">{zoom ? t('tapToShrink') : t('tapToZoom')}</p>}
+        </div>
+      )}
 
       {reporting && (
         <div onClick={(e) => { e.stopPropagation(); setReporting(false) }} className="absolute inset-0 z-10 flex items-center justify-center bg-black/60 p-6">

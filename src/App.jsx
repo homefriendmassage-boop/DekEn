@@ -242,6 +242,7 @@ export default function App() {
     const { data, error } = await supabase.rpc('support_open')
     if (error || !data) return showToast(t('errGeneric'))
     setSupport({ threadId: data })
+    setSupportUnread(0)            // the chat marks everything read as it opens; clear the red number at once
   }
 
   const tier = session?.isMock && previewTier !== null ? previewTier : tierOf(me)
@@ -347,7 +348,7 @@ export default function App() {
         </p>
         <p className="max-w-sm text-sm text-neutral-400">{t('suspendedBody')}</p>
         <button onClick={openSupport} className="rounded-full bg-line px-5 py-2 font-semibold text-black">{t('chatAdmin')}</button>
-        {support && <SupportChat threadId={support.threadId} onClose={() => { setSupport(null); loadSupportUnread() }} />}
+        {support && <SupportChat threadId={support.threadId} onClose={async () => { const id = support?.threadId; setSupport(null); if (id) await supabase.rpc('support_mark_read', { p_thread: id }); loadSupportUnread() }} />}
       </div>
     )
   }
@@ -531,7 +532,7 @@ export default function App() {
       )}
 
       {support && (
-        <SupportChat threadId={support.threadId} onClose={() => { setSupport(null); loadSupportUnread() }} />
+        <SupportChat threadId={support.threadId} onClose={async () => { const id = support?.threadId; setSupport(null); if (id) await supabase.rpc('support_mark_read', { p_thread: id }); loadSupportUnread() }} />
       )}
 
       {toast && (

@@ -33,6 +33,14 @@ export default function SupportChat({ threadId, title, isAdmin = false, onClose 
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }) }, [msgs])
 
+  // admin / seller staff: wipe the room (the customer's messages and the replies); it leaves the inbox until he writes again
+  async function clearRoom() {
+    if (!window.confirm('ล้างข้อความทั้งหมดในห้องนี้? ลบแล้วกู้คืนไม่ได้')) return
+    const { error } = await supabase.rpc('support_clear', { p_thread: threadId })
+    if (error) return setError('ล้างแชตไม่สำเร็จ')
+    setMsgs([])
+  }
+
   async function send(e) {
     e.preventDefault()
     const body = text.trim()
@@ -51,7 +59,10 @@ export default function SupportChat({ threadId, title, isAdmin = false, onClose 
       <div onClick={(e) => e.stopPropagation()} className="flex h-[85vh] w-full max-w-md flex-col rounded-t-3xl bg-neutral-900 shadow-2xl sm:rounded-3xl">
         <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
           <h2 className="truncate text-base font-bold">🛟 {title ?? t('supportTitle')}</h2>
-          <button onClick={onClose} aria-label={t('close')} className="rounded-full bg-white/10 px-3 py-1 text-sm active:scale-95">✕</button>
+          <div className="flex shrink-0 items-center gap-2">
+            {isAdmin && <button onClick={clearRoom} className="rounded-full bg-red-500/20 px-3 py-1 text-xs font-semibold text-red-300 active:scale-95">🧹 ล้างแชต</button>}
+            <button onClick={onClose} aria-label={t('close')} className="rounded-full bg-white/10 px-3 py-1 text-sm active:scale-95">✕</button>
+          </div>
         </div>
         {!isAdmin && <p className="px-4 pt-2 text-[11px] text-neutral-500">{t('supportNote')}</p>}
 

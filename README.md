@@ -485,3 +485,12 @@ Run `supabase/migration_050.sql` once, after migration_049. No Edge Function cha
 
 - Category page: every tile opens its list. In the paid groups (massage / spa) a visitor without the package sees the girls with the face covered; the card has "สมัครแพ็กเกจเพื่อดูรายละเอียด" (opens the package sheet) instead of the details.
 - An active seller (paid plan, or owner of a seller OA) sees the faces and the details of ALL groups so he can share: `seller_can_view()` / `view_tier()` feed `list_workers` and `can_view_worker` (photos, bookings). Chat and the package tiers still follow the membership; providers who are sellers for free get nothing extra.
+
+## migration_051 — 10 clear faces, support "clear chat", full-size photo viewer
+
+Run `supabase/migration_051.sql` once, after migration_050. No Edge Function change.
+
+- `ranked_workers`: free viewers get 10 clear faces per free group (was 6), reshuffled every midnight (Thailand); bought places still come first.
+- `support_clear(thread)` + the red "🧹 ล้างแชต" button in the admin / staff chat room (deletes the room's messages; the room leaves the inbox until the customer writes again).
+- The red number on "แชทกับแอดมิน" is cleared as soon as the chat is opened and re-checked (after `support_mark_read`) when it is closed.
+- Provider detail: the picture is shown whole (`object-contain`, no cropping) and tapping it opens a full-screen viewer (tap to zoom, ‹ › between pictures).
