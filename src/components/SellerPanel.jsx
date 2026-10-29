@@ -52,6 +52,9 @@ export default function SellerPanel({ onClose, walletBalance = 0, onTopUp, onCha
           <p className="rounded-xl bg-green-500/10 p-3 text-sm text-green-200">✓ คุณเป็นเซลล์อยู่แล้ว ({VIA[st.via] ?? '—'}) ไม่ต้องชำระค่าบริการ</p>
         ) : (
           <div className="space-y-2 rounded-2xl bg-white/5 p-3">
+            {st.expired && (
+              <p className="rounded-xl bg-red-500/15 p-3 text-xs font-semibold text-red-200">⚠️ แพ็กเกจเซลล์หมดอายุแล้ว ลูกค้าที่จองผ่านลิงก์ของคุณยังจองได้ตามปกติ แต่ช่วงที่ขาดอายุคุณไม่ได้ส่วนแบ่ง 40% (ตกเป็นของแพลตฟอร์มทันที) ต่ออายุเพื่อรับต่อ</p>
+            )}
             {st.is_seller
               ? <p className="text-sm text-green-200">✓ คุณเป็นเซลล์ ใช้งานได้ถึง <b>{fmtDate(st.until)}</b></p>
               : <p className="text-sm font-semibold">{st.expired ? 'แพ็กเกจเซลล์หมดอายุแล้ว' : 'อยากรับ 40% ของค่าจอง? สมัครเป็นเซลล์'}</p>}
@@ -74,6 +77,9 @@ export default function SellerPanel({ onClose, walletBalance = 0, onTopUp, onCha
               <div className="rounded-xl bg-white/5 p-3"><p className="text-[11px] text-neutral-400">ค่าจอง (40%)</p><p className="text-lg font-bold">{money(rep.booking_total)}</p></div>
               <div className="rounded-xl bg-white/5 p-3"><p className="text-[11px] text-neutral-400">ค่าแพ็กเกจ (20%)</p><p className="text-lg font-bold">{money(rep.package_total)}</p></div>
             </div>
+            {rep.missed_count > 0 && (
+              <p className="rounded-xl bg-amber-400/10 p-3 text-xs text-amber-200">ที่ผ่านมามี {rep.missed_count} การจองจากลูกค้าที่คุณชวนที่คุณไม่ได้ส่วนแบ่ง (ประมาณ {money(rep.missed_amount)}) เพราะยังไม่ได้เป็นเซลล์หรือแพ็กเกจหมดอายุในขณะนั้น</p>
+            )}
             <List title="รายการค่าจองล่าสุด" rows={rep.bookings} fmtDate={fmtDate} money={money} sub={(r) => (r.via === 'link' ? 'จองผ่านลิงก์ของคุณ' : 'ลูกค้าที่คุณชวน')} />
             <List title="รายการค่าแพ็กเกจล่าสุด" rows={rep.packages} fmtDate={fmtDate} money={money} />
           </>

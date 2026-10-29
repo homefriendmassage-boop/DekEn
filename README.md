@@ -456,3 +456,11 @@ Run `supabase/migration_045.sql` once, after migration_044. **Redeploy** the Edg
 - Agency: `can_view_worker` / `list_workers` / `agency_girls` show its own girls in full (photos + details via "ดูรูปและรายละเอียด"). Providers and other agencies see the others like any customer (package tiers, free groups bartender / ENT clear faces for free viewers, the rest covered). Chat between accounts is paid from the Wallet as before.
 - `ranked_workers`: the order of the girls nobody bought a place for is a daily shuffle (online first), instead of oldest-first.
 - App start: providers open on the provider side again.
+
+## migration_046 — bulk girls, seller "missed" report
+
+Run `supabase/migration_046.sql` once, after migration_045. No Edge Function change.
+
+- Bulk entry of many girls: `supabase/bulk_girls_template.sql` (step 1: paste rows → `bulk_create_drafts()` makes admin drafts with prices / tags / province; step 2: add the photos in the admin tab "➕ แบบร่างให้น้อง", the face-cover circle stays manual; step 3: `bulk_publish_drafts()` publishes every draft that has photos with one age-check / consent attestation). Profiles are live but unclaimed (same as the single publish).
+- `supabase/remove_demo.sql`: hide (or delete) the demo girls of seed.sql / seed2.sql.
+- A lapsed seller sees a red notice on the categories page and in "🤝 ส่วนแบ่งของฉัน"; the report also shows how many invited customers' bookings paid nothing (`missed_count`, `missed_amount`). Behaviour unchanged: bookings work normally and the 40 % goes to the platform while the plan is lapsed.

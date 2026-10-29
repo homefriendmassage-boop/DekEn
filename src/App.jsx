@@ -88,6 +88,8 @@ export default function App() {
   const [showBookings, setShowBookings] = useState(false)
   const [showSeller, setShowSeller] = useState(false)
   const [showShare, setShowShare] = useState(false)
+  const [sellerSt, setSellerSt] = useState(null)       // my_seller_status: used for the "plan lapsed" notice
+  const loadSellerSt = useCallback(() => supabase.rpc('my_seller_status').then(({ data }) => setSellerSt(data ?? null), () => {}), [])
   const [highlightJob, setHighlightJob] = useState(null)   // a booking opened from its push
   const [claim, setClaim] = useState(null)            // token of an application draft someone filled in for her
   const [openChat, setOpenChat] = useState(null)      // chat to open inside the provider side
@@ -118,6 +120,7 @@ export default function App() {
         setSession(s)
         try { await supabase.rpc('release_my_expired_holds') } catch { /* optional */ }   // chat holds that ran out go back to the Wallet
         const meRow = await loadMe()
+        loadSellerSt()
         if (meRow?.role === 'worker') setView('worker')   // providers mostly open the app to take jobs: straight to their own side
         const inv = getAgencyCode()
         if (inv) {
@@ -388,6 +391,11 @@ export default function App() {
                 {inboxUnread > 0 && <span className="rounded-full bg-red-500 px-2 text-xs">{inboxUnread}</span>}
               </button>
             )}
+            {sellerSt?.expired && (
+              <button onClick={() => setShowSeller(true)} className="w-full rounded-xl bg-red-500/15 px-3 py-2.5 text-left text-xs font-semibold text-red-200 ring-1 ring-red-400/40 active:scale-95">
+                ⚠️ แพ็กเกจเซลล์หมดอายุ: ตอนนี้ลูกค้าที่จองผ่านลิงก์ของคุณยังจองได้ปกติ แต่คุณไม่ได้ส่วนแบ่ง (ตกเป็นของแพลตฟอร์ม) กดเพื่อต่ออายุ
+              </button>
+            )}
             <button onClick={() => setShowSeller(true)} className="w-full rounded-xl bg-white/10 py-2.5 text-sm font-semibold text-neutral-100 ring-1 ring-white/15 active:scale-95">🤝 ส่วนแบ่งของฉัน</button>
             {!session.vendor && (
               <button onClick={() => setView('worker')} className="w-full rounded-xl bg-white/10 py-2.5 text-sm font-semibold text-neutral-100 ring-1 ring-white/15 active:scale-95">
@@ -453,7 +461,7 @@ export default function App() {
         </div>
       )}
 
-      {showSeller && <SellerPanel walletBalance={me?.wallet_balance ?? 0} onTopUp={() => { setShowSeller(false); setPay({ kind: 'wallet_topup' }) }} onChanged={loadMe} onClose={() => setShowSeller(false)} />}
+      {showSeller && <SellerPanel walletBalance={me?.wallet_balance ?? 0} onTopUp={() => { setShowSeller(false); setPay({ kind: 'wallet_topup' }) }} onChanged={() => { loadMe(); loadSellerSt() }} onClose={() => setShowSeller(false)} />}
       {showShare && <ShareModal onClose={() => setShowShare(false)} />}
 
       {claim && <ClaimDraft token={claim} onClose={() => setClaim(null)} onDone={async () => { setClaim(null); setView('worker'); setWorkerTab('self'); await loadMe() }} />}
