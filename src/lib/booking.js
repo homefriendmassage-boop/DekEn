@@ -1,7 +1,12 @@
 import { BOOKING_FEE } from '../config'
 
+// Massage and spa carry a higher platform fee (the database charges the same: booking_fee_for()).
+export const PREMIUM_FEE = 700
+export const isPremium = (categories) => (categories ?? []).some((c) => c === 'masseuse' || c === 'spa')
+export const feeFor = (categories) => (isPremium(categories) ? PREMIUM_FEE : BOOKING_FEE)
+
 // What the customer sees = what the provider receives in cash + the platform fee (paid from the Wallet when booking).
-export const withFee = (cash) => Number(cash) + BOOKING_FEE
+export const withFee = (cash, categories) => Number(cash) + feeFor(categories)
 
 export const fmtWhen = (v, lang = 'th') => new Date(v).toLocaleString(lang === 'th' ? 'th-TH' : undefined, { dateStyle: 'medium', timeStyle: 'short' })
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useI18n } from '../i18n'
-import { fmtWhen, minutesLeft, withFee } from '../lib/booking'
+import { fmtWhen, mapsLink, minutesLeft } from '../lib/booking'
 
 const BADGE = { pending: 'bg-amber-400/20 text-amber-200', matched: 'bg-green-500/20 text-green-300', completed: 'bg-sky-500/20 text-sky-200', cancelled: 'bg-neutral-600/40 text-neutral-300' }
 
@@ -47,8 +47,9 @@ export default function MyBookings({ onClose, highlightId }) {
                   </div>
                   <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${BADGE[j.status]}`}>{t(`bkStatus_${j.status}`)}</span>
                 </div>
-                <p className="text-xs text-neutral-300">{t('bkRateLine', { rate: j.rate_label ? t(`rate_${j.rate_label}`) === `rate_${j.rate_label}` ? j.rate_label : t(`rate_${j.rate_label}`) : '', price: money(withFee(j.service_price)), cash: money(j.service_price) })}</p>
+                <p className="text-xs text-neutral-300">{t('bkRateLine', { rate: j.rate_label ? t(`rate_${j.rate_label}`) === `rate_${j.rate_label}` ? j.rate_label : t(`rate_${j.rate_label}`) : '', price: money(Number(j.service_price) + Number(j.fee ?? 500)), cash: money(j.service_price) })}</p>
                 {j.place_note && <p className="text-xs text-neutral-400">📍 {j.place_note}</p>}
+                {j.travel_mode === 'customer_goes' && j.status === 'pending' && <p className="text-xs text-sky-300">{t('travelCustPending')}</p>}
 
                 {j.status === 'pending' && (
                   <>
@@ -62,6 +63,9 @@ export default function MyBookings({ onClose, highlightId }) {
                     {j.worker_phone && <a href={`tel:${j.worker_phone}`} className="block font-bold text-green-200 underline">📞 {j.worker_phone}</a>}
                     {j.worker_line_id && <p>LINE: <b>{j.worker_line_id}</b></p>}
                     {!j.worker_phone && !j.worker_line_id && <p className="text-xs text-neutral-400">{t('bkNoContact')}</p>}
+                    {j.worker_place && (
+                      <p className="text-sm">🚶 {t('workerPlaceLabel')}: <b>{j.worker_place}</b>{j.worker_place_url && <> · <a href={j.worker_place_url} target="_blank" rel="noreferrer" className="font-semibold text-green-200 underline">🗺️ {t('jobOpenMap')}</a></>}</p>
+                    )}
                     {j.arrived_at && <p className="text-xs font-semibold text-green-300">📍 {t('bkArrived')}</p>}
                     <p className="text-[11px] text-neutral-400">{t('bkPayCash', { cash: money(j.service_price) })}</p>
                   </div>

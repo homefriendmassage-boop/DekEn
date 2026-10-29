@@ -114,11 +114,11 @@ function WorkerCard({ worker: w, onUnlock, onDetail, isMe }) {
 
         <span
           className={`absolute right-2 top-2 flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] sm:text-xs ${
-            w.is_online ? 'text-green-400' : 'text-neutral-400'
+            w.is_online && w.is_busy ? 'text-amber-300' : w.is_online ? 'text-green-400' : 'text-neutral-400'
           }`}
         >
-          <span className={`h-1.5 w-1.5 rounded-full ${w.is_online ? 'bg-green-400' : 'bg-neutral-500'}`} />
-          {w.is_online ? t('online') : t('offline')}
+          <span className={`h-1.5 w-1.5 rounded-full ${w.is_online && w.is_busy ? 'bg-amber-400' : w.is_online ? 'bg-green-400' : 'bg-neutral-500'}`} />
+          {w.is_online && w.is_busy ? t('busyNow') : w.is_online ? t('online') : t('offline')}
         </span>
       </div>
 
@@ -141,7 +141,7 @@ function WorkerCard({ worker: w, onUnlock, onDetail, isMe }) {
           </p>
         )}
         <p className="text-xs text-neutral-400 sm:text-sm">
-          {t('from')} <span className="font-semibold text-white">{money(withFee(w.start_price ?? w.price))}</span>
+          {t('from')} <span className="font-semibold text-white">{money(withFee(w.start_price ?? w.price, w.categories))}</span>
           {w.start_rate && <span className="text-[10px] text-neutral-500"> / {priceLabel(w.start_rate, t)}</span>}
         </p>
         {isMe ? (

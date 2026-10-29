@@ -1,10 +1,9 @@
 import { getVendor } from '../lib/vendor'
 import { useMemo, useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { BOOKING_FEE } from '../config'
 import { useI18n } from '../i18n'
 import { getPosition } from '../lib/geo'
-import { bookingErrorKey, withFee } from '../lib/booking'
+import { bookingErrorKey, feeFor, isPremium, withFee } from '../lib/booking'
 import { ratesOf } from './WorkerDetail'
 
 const input = 'mt-1 w-full rounded-xl bg-white/10 px-3 py-2.5 text-base outline-none ring-1 ring-white/10 focus:ring-line'
@@ -27,6 +26,9 @@ export default function BookingModal({ worker, walletBalance, onClose, onBooked,
   const [url, setUrl] = useState('')
   const [pin, setPin] = useState(null)
   const [pinBusy, setPinBusy] = useState(false)
+  const canChooseTravel = isPremium(worker.categories)                     // massage / spa: who goes to whom
+  const [travel, setTravel] = useState('worker_goes')
+  const custGoes = canChooseTravel && travel === 'customer_goes'
   const [phone, setPhone] = useState('')
   const [note, setNote] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -34,7 +36,8 @@ export default function BookingModal({ worker, walletBalance, onClose, onBooked,
 
   const picked = rates.find((r) => r[0] === rate) ?? rates[0]
   const cash = Number(picked?.[2] ?? 0)
-  const insufficient = walletBalance < BOOKING_FEE
+  const fee = feeFor(worker.categories)                                   // 500, or 700 for massage / spa
+  const insufficient = walletBalance < fee
 
   async function pinHere() {
     setPinBusy(true); setError(null)
@@ -45,13 +48,13 @@ export default function BookingModal({ worker, walletBalance, onClose, onBooked,
     if (submitting || insufficient) return
     setError(null)
     if (!when) return setError(t('errBadTime'))
-    if (!pin && !url.trim() && !placeNote.trim()) return setError(t('errPlaceRequired'))
+    if (!custGoes && !pin && !url.trim() && !placeNote.trim()) return setError(t('errPlaceRequired'))
     if (phone.replace(/\D/g, '').length < 9) return setError(t('errBadPhone'))
     setSubmitting(true)
     const { error } = await supabase.rpc('create_booking', {
-      p_worker: worker.user_id, p_rate: rate, p_scheduled: new Date(when).toISOString(), p_place_note: placeNote, p_note: note,
-      p_phone: phone, p_lat: pin?.lat ?? null, p_lng: pin?.lng ?? null, p_url: url.trim() || null,
-      p_vendor: getVendor()?.id ?? null,      // the seller whose link he is booking through (gets the sales share)
+      p_worker: worker.user_id, p_rate: rate, p_scheduled: new Date(when).toISOString(), p_place_note: custGoes ? '' : placeNote, p_note: note,
+      p_phone: phone, p_lat: custGoes ? null : pin?.lat ?? null, p_lng: custGoes ? null : pin?.lng ?? null, p_url: custGoes ? null : url.trim() || null,
+      p_vendor: getVendor()?.id ?? null, p_travel: custGoes ? 'customer_goes' : 'worker_goes',      // the seller whose link he is booking through (gets the sales share)
     })
     setSubmitting(false)
     if (error) return setError(t(bookingErrorKey(error.message)))
@@ -81,7 +84,7 @@ export default function BookingModal({ worker, walletBalance, onClose, onBooked,
             {rates.map(([k, label, price]) => (
               <button type="button" key={k} aria-pressed={rate === k} onClick={() => setRate(k)}
                 className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left ring-1 active:scale-[0.99] ${rate === k ? 'bg-line text-black ring-line' : 'bg-white/10 ring-white/15'}`}>
-                <span className="font-semibold">{rate === k ? '✓ ' : ''}{label}</span><b>{money(withFee(price))}</b>
+                <span className="font-semibold">{rate === k ? '✓ ' : ''}{label}</span><b>{money(withFee(price, worker.categories))}</b>
               </button>
             ))}
           </div>
@@ -91,6 +94,20 @@ export default function BookingModal({ worker, walletBalance, onClose, onBooked,
           <input type="datetime-local" value={when} min={localInput(new Date(Date.now() + 15 * 60000))} onChange={(e) => setWhen(e.target.value)} className={input} />
         </label>
 
+        {canChooseTravel && (
+          <fieldset className="space-y-2 rounded-2xl bg-white/5 p-3">
+            <legend className="px-1 text-sm font-semibold">{t('travelTitle')}</legend>
+            <div className="grid grid-cols-2 gap-2">
+              {[['worker_goes', t('travelWorkerGoes')], ['customer_goes', t('travelCustGoes')]].map(([k, label]) => (
+                <button key={k} type="button" onClick={() => setTravel(k)} aria-pressed={travel === k}
+                  className={`rounded-xl py-2.5 text-sm font-semibold active:scale-95 ${travel === k ? 'bg-line text-black' : 'bg-white/10'}`}>{label}</button>
+              ))}
+            </div>
+            {custGoes && <p className="text-[11px] text-neutral-400">{t('travelCustNote')}</p>}
+          </fieldset>
+        )}
+
+        {!custGoes && (
         <fieldset className="space-y-2 rounded-2xl bg-white/5 p-3">
           <legend className="px-1 text-sm font-semibold">{t('bookWhere')}</legend>
           <button type="button" onClick={pinHere} disabled={pinBusy} className="w-full rounded-xl bg-white/10 py-2.5 text-sm font-semibold active:scale-95 disabled:opacity-50">
@@ -104,6 +121,7 @@ export default function BookingModal({ worker, walletBalance, onClose, onBooked,
           </label>
           <p className="text-[11px] text-neutral-500">{t('bookPrivacy')}</p>
         </fieldset>
+        )}
 
         <label className="block text-sm font-semibold">{t('bookPhone')}
           <input type="tel" inputMode="tel" maxLength={20} value={phone} onChange={(e) => setPhone(e.target.value)} className={input} />
@@ -114,15 +132,15 @@ export default function BookingModal({ worker, walletBalance, onClose, onBooked,
         </label>
 
         <div className="overflow-hidden rounded-2xl bg-white/5 text-sm ring-1 ring-white/10">
-          <div className="flex items-center justify-between px-4 py-3"><span>{t('bookWage', { rate: picked?.[1] ?? '' })}</span><b>{money(withFee(cash))}</b></div>
-          <div className="flex items-center justify-between border-t border-white/5 px-4 py-3"><span>{t('bookFeeRow')}</span><b>{money(BOOKING_FEE)}</b></div>
+          <div className="flex items-center justify-between px-4 py-3"><span>{t('bookWage', { rate: picked?.[1] ?? '' })}</span><b>{money(withFee(cash, worker.categories))}</b></div>
+          <div className="flex items-center justify-between border-t border-white/5 px-4 py-3"><span>{t('bookFeeRow')}</span><b>{money(fee)}</b></div>
           <div className="flex items-center justify-between border-t border-white/5 bg-white/5 px-4 py-3"><span>{t('bookDirectRow')}</span><b className="text-green-300">{money(cash)}</b></div>
         </div>
         <p className="text-[11px] text-neutral-500">{t('bookAnswerNote')}</p>
 
         {insufficient && (
           <div className="space-y-2 rounded-xl bg-red-500/10 p-3 text-sm text-red-300">
-            <p>{t('lowBalance', { fee: money(BOOKING_FEE) })}</p>
+            <p>{t('lowBalance', { fee: money(fee) })}</p>
             {onTopUp && <button onClick={onTopUp} className="w-full rounded-xl bg-line py-2 font-bold text-black active:scale-95">{t('topUp')}</button>}
           </div>
         )}

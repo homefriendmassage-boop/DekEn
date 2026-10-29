@@ -414,3 +414,12 @@ Run `supabase/migration_040.sql` once, after migration_039. No Edge Function cha
 - Customer app: "🤝 ส่วนแบ่งของฉัน" (`my_seller_status`, `my_commission_report`, share link).
 - First screen: the "who are you?" page is gone. A new customer sees the terms (full page) and then the categories; providers open on the provider side. The strip under the header has "📝 สมัครงานเป็นพาทเนอร์ ที่นี่" (providers: "💼 ฝั่งผู้ให้บริการ").
 - Draft applications have a temporary province (`draft_save`, synced to the managed profile until the girl confirms by GPS).
+
+## migration_041 — chat rules, 700 THB for massage / spa, who travels, busy status
+
+Run `supabase/migration_041.sql` once, after migration_040. **Redeploy** the Edge Function `notify-chat` (fee in the refund text, travel / place lines).
+
+- Chat (`chat_problem`, used by `send_message`): no links of any kind (Google Maps included) and no message with 2 or more digits (Thai / Arabic / full-width / spelled-out). Booking notes still allow room numbers and map links; profile text rules are unchanged.
+- Fee: `booking_fee_for(worker)` = 700 for `masseuse` / `spa`, else 500. The Wallet charge, refunds and the 40 / 40 / 20 split use the fee stored in the booking. The app shows prices + the right fee (`feeFor`).
+- Massage / spa bookings: the customer chooses `worker_goes` or `customer_goes` (`jobs.travel_mode`, `create_booking(..., p_travel)`). When the customer goes he gives no place; she gives name / room (+ optional map link) when she accepts (`job_accept`), shown to him in "My bookings" and in the accepted push.
+- Busy (`worker_busy`): shown on the card and the detail ("ไม่ว่าง", `is_busy` of `list_workers` / `get_worker`) while she has an ACCEPTED booking within 3 hours before to 12 hours after the appointment; pressing "finish" (or a cancel) frees her at once. Her own online switch is not touched.

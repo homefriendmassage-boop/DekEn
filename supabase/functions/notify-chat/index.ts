@@ -56,7 +56,8 @@ const baht = (n: number) => `${Number(n).toLocaleString('en-US')} บาท`
 const when = (v: string) => new Date(v).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', dateStyle: 'medium', timeStyle: 'short' })
 
 // One booking event -> { to: 'worker' | 'customer', flex } (null when nobody needs to hear about it)
-export function buildBookingFlex(o: { event: string; jobId: string; liffId: { worker: string; customer: string }; customer: string; worker: string; rate: string; price: number; at: string; place?: string; source?: string; logo?: string }) {
+export function buildBookingFlex(o: { event: string; jobId: string; liffId: { worker: string; customer: string }; customer: string; worker: string; rate: string; price: number; at: string; place?: string; source?: string; logo?: string; fee?: number; travel?: string; workerPlace?: string }) {
+  const fee = o.fee ?? 500
   const rate = RATE[o.rate] ?? o.rate
   const line = (text: string, extra: Record<string, unknown> = {}) => ({ type: 'text', text, wrap: true, size: 'sm', color: '#DDDDDD', ...extra })
   const card = (to: 'worker' | 'customer', head: string, title: string, lines: string[], button: string, color = '#EC4899') => ({
@@ -80,10 +81,10 @@ export function buildBookingFlex(o: { event: string; jobId: string; liffId: { wo
   })
   const when1 = `นัด: ${when(o.at)}`
   switch (o.event) {
-    case 'new': return card('worker', '🔔 มีการจองใหม่', `${o.customer} จอง ${rate}`, [...(o.source ? [`ลูกค้าจาก: ${o.source}`] : []), when1, `ค่าบริการที่คุณได้รับ (เงินสด): ${baht(o.price)}`, ...(o.place ? [`สถานที่: ${o.place}`] : []), 'ตอบรับภายใน 30 นาที ไม่เช่นนั้นงานจะถูกยกเลิก', 'เบอร์และตำแหน่งลูกค้าจะแสดงหลังคุณกดรับงาน'], 'เปิดดูและตอบรับ')
-    case 'accepted': return card('customer', '✅ น้องรับงานแล้ว', `${o.worker} รับงานของคุณแล้ว`, [when1, `เรท: ${rate}`, `จ่ายตรงให้น้องเมื่อพบกัน: ${baht(o.price)}`, 'ดูเบอร์ติดต่อและสถานะได้ที่หน้าการจอง'], 'ดูรายละเอียดการจอง', '#06C755')
-    case 'declined': return card('customer', '❌ น้องปฏิเสธงาน', `${o.worker} ไม่สะดวกรับงานนี้`, ['ค่าธรรมเนียมแพลตฟอร์ม 500 บาท คืนเข้า Wallet ของคุณแล้ว'], 'ดูการจอง', '#F59E0B')
-    case 'expired': return card('customer', '⏰ งานถูกยกเลิก', `${o.worker} ไม่ได้ตอบภายใน 30 นาที`, ['ค่าธรรมเนียมแพลตฟอร์ม 500 บาท คืนเข้า Wallet ของคุณแล้ว', 'เลือกคนใหม่ได้เลย'], 'ดูการจอง', '#F59E0B')
+    case 'new': return card('worker', '🔔 มีการจองใหม่', `${o.customer} จอง ${rate}`, [...(o.source ? [`ลูกค้าจาก: ${o.source}`] : []), when1, `ค่าบริการที่คุณได้รับ (เงินสด): ${baht(o.price)}`, ...(o.travel === 'customer_goes' ? ['ลูกค้าจะเดินทางไปหาคุณ: กรุณากรอกชื่อสถานที่/เลขห้องตอนกดรับงาน'] : o.place ? [`สถานที่: ${o.place}`] : []), 'ตอบรับภายใน 30 นาที ไม่เช่นนั้นงานจะถูกยกเลิก', 'เบอร์และตำแหน่งลูกค้าจะแสดงหลังคุณกดรับงาน'], 'เปิดดูและตอบรับ')
+    case 'accepted': return card('customer', '✅ น้องรับงานแล้ว', `${o.worker} รับงานของคุณแล้ว`, [when1, `เรท: ${rate}`, `จ่ายตรงให้น้องเมื่อพบกัน: ${baht(o.price)}`, ...(o.workerPlace ? [`สถานที่ที่น้องแจ้ง: ${o.workerPlace}`] : []), 'ดูเบอร์ติดต่อและสถานะได้ที่หน้าการจอง'], 'ดูรายละเอียดการจอง', '#06C755')
+    case 'declined': return card('customer', '❌ น้องปฏิเสธงาน', `${o.worker} ไม่สะดวกรับงานนี้`, [`ค่าธรรมเนียมแพลตฟอร์ม ${fee} บาท คืนเข้า Wallet ของคุณแล้ว`], 'ดูการจอง', '#F59E0B')
+    case 'expired': return card('customer', '⏰ งานถูกยกเลิก', `${o.worker} ไม่ได้ตอบภายใน 30 นาที`, [`ค่าธรรมเนียมแพลตฟอร์ม ${fee} บาท คืนเข้า Wallet ของคุณแล้ว`, 'เลือกคนใหม่ได้เลย'], 'ดูการจอง', '#F59E0B')
     case 'missed': return card('worker', '⏰ งานถูกยกเลิก', `คุณไม่ได้ตอบรับงานของ ${o.customer} ภายใน 30 นาที`, ['ครั้งต่อไปกรุณาตอบรับหรือปฏิเสธให้เร็วขึ้น'], 'เปิดแอป', '#F59E0B')
     case 'customer': return card('worker', '↩️ ลูกค้ายกเลิกคำขอ', `${o.customer} ยกเลิกการจอง`, [when1], 'เปิดแอป', '#F59E0B')
     case 'arrived': return card('customer', '📍 น้องถึงแล้ว', `${o.worker} ถึงจุดนัดหมายแล้ว`, [when1], 'ดูรายละเอียดการจอง', '#06C755')
@@ -170,10 +171,11 @@ Deno.serve(async (req) => {
     return json({ ok: true, results })
   }
   if (isBooking) {
-    const { data: job } = await admin.from('jobs').select('id, customer_id, worker_id, rate_label, service_price, scheduled_at, place_note, source_label').eq('id', input.job_id).maybeSingle()
+    const { data: job } = await admin.from('jobs').select('id, customer_id, worker_id, rate_label, service_price, scheduled_at, place_note, source_label, booking_fee, travel_mode').eq('id', input.job_id).maybeSingle()
     if (!job) return json({ ok: false, code: 'NOT_FOUND' }, 404)
     const { data: cu } = await admin.from('users').select('display_name').eq('id', job.customer_id).maybeSingle()
     const { data: ww } = await admin.from('workers').select('display_name').eq('user_id', job.worker_id).maybeSingle()
+    const { data: jp } = await admin.from('job_private').select('worker_place').eq('job_id', job.id).maybeSingle()
     const rw = await recipient(admin, job.worker_id, central)
     const rc = await recipient(admin, job.customer_id, central)
     const appUrl = Deno.env.get('APP_URL')?.replace(/\/$/, '')
@@ -181,7 +183,7 @@ Deno.serve(async (req) => {
     // a missed / expired booking tells both sides
     const events = input.event === 'expired' ? ['expired', 'missed'] : [input.event]
     for (const ev of events) {
-      const card = buildBookingFlex({ event: ev, jobId: job.id, liffId: { worker: rw?.liffId ?? liffId, customer: rc?.liffId ?? liffId }, customer: cu?.display_name ?? 'ลูกค้า', worker: ww?.display_name ?? 'น้อง', rate: job.rate_label ?? '', price: Number(job.service_price), at: job.scheduled_at, place: job.place_note ?? undefined, source: job.source_label ?? undefined, logo: appUrl ? `${appUrl}/dekn-logo.jpg?v=2` : undefined })
+      const card = buildBookingFlex({ event: ev, jobId: job.id, liffId: { worker: rw?.liffId ?? liffId, customer: rc?.liffId ?? liffId }, customer: cu?.display_name ?? 'ลูกค้า', worker: ww?.display_name ?? 'น้อง', rate: job.rate_label ?? '', price: Number(job.service_price), at: job.scheduled_at, place: job.place_note ?? undefined, source: job.source_label ?? undefined, fee: Number(job.booking_fee), travel: job.travel_mode, workerPlace: jp?.worker_place ?? undefined, logo: appUrl ? `${appUrl}/dekn-logo.jpg?v=2` : undefined })
       if (!card) { results.push({ event: ev, status: 'SKIPPED' }); continue }
       const rcp = card.to === 'worker' ? rw : rc
       if (!rcp || !/^U[0-9a-f]{32}$/.test(rcp.lineId)) { results.push({ event: ev, status: 'NO_LINE_ID' }); continue }

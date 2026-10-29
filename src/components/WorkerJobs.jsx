@@ -17,6 +17,14 @@ export default function WorkerJobs({ jobs, reload, highlightId, onError }) {
     if (error) onError?.(t('errGeneric'))
     reload()
   }
+  // Accept: a booking where the customer travels to her needs the place (name + room, optional map link)
+  const [acc, setAcc] = useState(null)      // { id, place, url } while the place form is open
+  async function accept(j, place = null, url = null) {
+    const { error } = await supabase.rpc('job_accept', { p_job: j.id, p_place: place, p_url: url })
+    if (error) { onError?.(/PLACE_REQUIRED/.test(error.message) ? t('errPlaceName') : /BAD_MAP_LINK/.test(error.message) ? t('errBadMapLink') : /CONTACT_IN_BOOKING/.test(error.message) ? t('errBookingContact') : t('errGeneric')); return }
+    setAcc(null)
+    reload()
+  }
   async function arrived(id) {
     const { error } = await supabase.rpc('job_arrived', { p_job: id })
     if (error) onError?.(t('errGeneric'))
@@ -38,6 +46,7 @@ export default function WorkerJobs({ jobs, reload, highlightId, onError }) {
             <p className="mt-1 text-xs text-neutral-300">
               {j.rate_label ? `${t(`rate_${j.rate_label}`) === `rate_${j.rate_label}` ? j.rate_label : t(`rate_${j.rate_label}`)} · ` : ''}{t('cashLabel')}: <b className="text-white">{money(j.service_price)}</b>
             </p>
+            {j.travel_mode === 'customer_goes' && j.status === 'pending' && <p className="text-xs font-semibold text-sky-300">{t('travelCustJob')}</p>}
             {j.scheduled_at && <p className="text-xs text-neutral-300">🕒 {fmtWhen(j.scheduled_at, lang)}</p>}
             {j.place_note && <p className="text-xs text-neutral-400">📍 {j.place_note}</p>}
             {j.customer_note && <p className="text-xs text-neutral-400">📝 {j.customer_note}</p>}
@@ -46,9 +55,17 @@ export default function WorkerJobs({ jobs, reload, highlightId, onError }) {
               <>
                 <p className="mt-2 rounded-lg bg-amber-400/10 p-2 text-xs text-amber-200">⏳ {t('jobAnswerIn', { min: minutesLeft(j.expires_at) })} · {t('jobHidden')}</p>
                 <div className="mt-2 grid grid-cols-2 gap-2">
-                  <button onClick={() => setStatus(j.id, 'matched')} className="rounded-lg bg-line py-2 font-bold text-black active:scale-95">{t('accept')}</button>
+                  <button onClick={() => (j.travel_mode === 'customer_goes' ? setAcc({ id: j.id, place: '', url: '' }) : accept(j))} className="rounded-lg bg-line py-2 font-bold text-black active:scale-95">{t('accept')}</button>
                   <button onClick={() => setStatus(j.id, 'cancelled')} className="rounded-lg bg-white/10 py-2 font-semibold active:scale-95">{t('decline')}</button>
                 </div>
+                {acc?.id === j.id && (
+                  <div className="mt-2 space-y-2 rounded-xl bg-white/5 p-3">
+                    <p className="text-sm font-semibold">{t('acceptPlaceTitle')}</p>
+                    <input maxLength={200} value={acc.place} onChange={(e) => setAcc({ ...acc, place: e.target.value })} placeholder={t('acceptPlaceName')} className="w-full rounded-xl bg-white/10 px-3 py-2 text-base outline-none ring-1 ring-white/10 focus:ring-line" />
+                    <input value={acc.url} onChange={(e) => setAcc({ ...acc, url: e.target.value })} placeholder={t('acceptPlaceUrl')} className="w-full rounded-xl bg-white/10 px-3 py-2 text-base outline-none ring-1 ring-white/10 focus:ring-line" />
+                    <button onClick={() => accept(j, acc.place, acc.url.trim() || null)} className="w-full rounded-xl bg-line py-2.5 font-bold text-black active:scale-95">{t('acceptPlaceOk')}</button>
+                  </div>
+                )}
               </>
             )}
             {(j.status === 'matched' || j.status === 'completed') && (

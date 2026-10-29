@@ -3,8 +3,7 @@ import { supabase } from '../supabaseClient'
 import { useI18n } from '../i18n'
 import liff from '@line/liff'
 import { logoUrl } from '../lib/logo'
-import { BOOKING_FEE } from '../config'
-import { withFee } from '../lib/booking'
+import { feeFor, withFee } from '../lib/booking'
 import { appLink, canShareFlex, workerBubble } from '../lib/flex'
 
 export function LocBadge({ verified }) {
@@ -120,7 +119,7 @@ export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlo
             <h2 className="text-xl font-bold">{w.display_name}</h2>
             <div className="mt-1 flex flex-wrap items-center gap-1">
               {(w.categories ?? [w.category]).map((c) => <span key={c} className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-neutral-300">{catName(c)}</span>)}
-              <span className={`text-xs ${w.is_online ? 'text-green-400' : 'text-neutral-400'}`}>● {w.is_online ? t('online') : t('offline')}</span>
+              <span className={`text-xs ${w.is_online && w.is_busy ? 'text-amber-300' : w.is_online ? 'text-green-400' : 'text-neutral-400'}`}>● {w.is_online && w.is_busy ? t('busyNow') : w.is_online ? t('online') : t('offline')}</span>
               {w.distance_km != null && <span className="text-xs text-amber-300">📍 {t('kmAway', { n: w.distance_km })}</span>}
               {w.province && <LocBadge verified={!!w.loc_verified} />}
             </div>
@@ -156,10 +155,10 @@ export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlo
             <ul className="divide-y divide-white/5 rounded-xl bg-white/5 text-sm">
               {prices.map(([key, label, price]) => (
                 <li key={key} className="flex items-center justify-between px-3 py-2">
-                  <span>{label}{(w.start_rate || prices[0]?.[0]) === key && <span className="ml-2 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-bold text-black">{t('startHere')}</span>}</span><b>{money(withFee(price))}</b></li>
+                  <span>{label}{(w.start_rate || prices[0]?.[0]) === key && <span className="ml-2 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-bold text-black">{t('startHere')}</span>}</span><b>{money(withFee(price, w.categories))}</b></li>
               ))}
             </ul>
-            <p className="mt-1 text-[11px] text-neutral-500">{t('priceNote', { fee: money(BOOKING_FEE) })}</p>
+            <p className="mt-1 text-[11px] text-neutral-500">{t('priceNote', { fee: money(feeFor(w.categories)) })}</p>
           </div>
 
           {canShareFlex() && (

@@ -107,6 +107,10 @@ export default function WorkerDashboard({ userId, onTopUp, me, onWallet, openCha
         </span>
       </button>
 
+      {worker.is_online && jobs.some((j) => j.status === 'matched' && j.scheduled_at && Date.now() >= new Date(j.scheduled_at) - 3 * 3600e3 && Date.now() <= +new Date(j.scheduled_at) + 12 * 3600e3) && (
+        <p className="rounded-xl bg-amber-400/15 p-3 text-sm font-semibold text-amber-200">🟠 {t('busyNow')} · {t('busyNote')}</p>
+      )}
+
       {worker.admin_hidden && <p className="rounded-xl bg-red-500/15 p-3 text-sm font-semibold text-red-200">🛡️ {t('profileHiddenByAdmin')}</p>}
       {friendGate && (
         <div className="space-y-2 rounded-2xl bg-amber-400/10 p-3 ring-1 ring-amber-400/30">
