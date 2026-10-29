@@ -3,9 +3,10 @@ import { supabase } from './supabaseClient'
 import { signIn, takeOpenIntent, takeWorkerIntent, takeChatIntent, takeDraftIntent, takeJobIntent, takeSupportIntent, getAgencyCode } from './lib/auth'
 import { getPosition } from './lib/geo'
 import { CATEGORIES, PLAN_META, canViewWorker, suspensionOf, tierOf } from './config'
-import { useI18n } from './i18n'
+import { LangSwitcher, useI18n } from './i18n'
+import SellerPanel from './components/SellerPanel'
 import Header from './components/Header'
-import Landing from './components/Landing'
+import logo from './assets/dekn-logo.jpg'
 import CategoryPicker from './components/CategoryPicker'
 import HomeFeed from './components/HomeFeed'
 import BookingModal from './components/BookingModal'
@@ -59,7 +60,7 @@ export default function App() {
   const [me, setMe] = useState(null)            // row from public.users
 
   const [workerTab, setWorkerTab] = useState('self')   // inside the provider side: self | agency
-  const [view, setView] = useState('landing')   // landing | categories | feed | worker | agency
+  const [view, setView] = useState('categories')   // categories | feed | worker | agency
   const [category, setCategory] = useState(null)
   const [workers, setWorkers] = useState([])
   const [signedUrls, setSignedUrls] = useState({})     // original_path -> signed URL
@@ -84,6 +85,7 @@ export default function App() {
   const [inbox, setInbox] = useState(null)                 // null | { thread }
   const [inboxUnread, setInboxUnread] = useState(0)
   const [showBookings, setShowBookings] = useState(false)
+  const [showSeller, setShowSeller] = useState(false)
   const [highlightJob, setHighlightJob] = useState(null)   // a booking opened from its push
   const [claim, setClaim] = useState(null)            // token of an application draft someone filled in for her
   const [openChat, setOpenChat] = useState(null)      // chat to open inside the provider side
@@ -114,6 +116,7 @@ export default function App() {
         setSession(s)
         try { await supabase.rpc('release_my_expired_holds') } catch { /* optional */ }   // chat holds that ran out go back to the Wallet
         const meRow = await loadMe()
+        if (meRow?.role === 'worker') setView('worker')   // providers open straight on their own side; customers on the categories
         const inv = getAgencyCode()
         if (inv) {
           const { data } = await supabase.rpc('agency_public', { p_code: inv })
@@ -368,22 +371,24 @@ export default function App() {
         </div>
       )}
 
-      {view === 'landing' && (
-        <Landing
-          displayName={session.profile.displayName}
-          role={me?.role}
-          onCustomer={() => setView('categories')}
-          onWorker={() => setView('worker')}
-          invitedBy={invitedBy}
-          vendor={session.vendor}
-          onInbox={staffVendor ? () => setInbox({ thread: null }) : undefined}
-          inboxUnread={inboxUnread}
-        />
-      )}
-
       {view === 'categories' && (
         <>
-          <Header {...headerProps} title={t('categories')} onBack={() => setView('landing')} />
+          <Header {...headerProps} title={t('categories')} />
+          <div className="space-y-2 px-4 pt-3">
+            {session.vendor && <p className="text-center text-xs font-semibold text-amber-300">🏪 {t('viaVendor', { name: session.vendor.name })}</p>}
+            {staffVendor && (
+              <button onClick={() => setInbox({ thread: null })} className="relative flex w-full items-center justify-center gap-2 rounded-xl bg-pink-500 py-2.5 text-sm font-bold active:scale-95">
+                💬 {t('staffInbox')}
+                {inboxUnread > 0 && <span className="rounded-full bg-red-500 px-2 text-xs">{inboxUnread}</span>}
+              </button>
+            )}
+            <button onClick={() => setShowSeller(true)} className="w-full rounded-xl bg-white/10 py-2.5 text-sm font-semibold text-neutral-100 ring-1 ring-white/15 active:scale-95">🤝 ส่วนแบ่งของฉัน</button>
+            {!session.vendor && (
+              <button onClick={() => setView('worker')} className="w-full rounded-xl bg-white/10 py-2.5 text-sm font-semibold text-neutral-100 ring-1 ring-white/15 active:scale-95">
+                {me?.role === 'worker' ? `💼 ${t('workerArea')}` : `📝 ${t('applyPartnerHere')}`}
+              </button>
+            )}
+          </div>
           <CategoryPicker tier={tier} onPick={openCategory} onLocked={() => setShowMembership(true)} />
         </>
       )}
@@ -410,7 +415,7 @@ export default function App() {
           <Header
             displayName={session.profile.displayName}
             title={t('providerSide')}
-            onBack={() => setView('landing')}
+            onBack={() => setView('categories')}
           />
           {/* One place for everything on the provider side: on my own, or through a modelling agency */}
           <nav className="grid grid-cols-2 gap-2 px-4 pt-3">
@@ -428,17 +433,21 @@ export default function App() {
       )}
 
       {me && !me.customer_terms_at && (view === 'categories' || view === 'feed') && (
-        <div className="fixed inset-0 z-[58] flex items-end justify-center bg-black/85 sm:items-center sm:p-4">
-          <div className="max-h-[92vh] w-full max-w-md space-y-3 overflow-y-auto rounded-t-3xl bg-neutral-900 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl sm:rounded-3xl">
-            <h2 className="text-xl font-bold">📜 {t('custTermsTitle')}</h2>
+        <div className="fixed inset-0 z-[58] overflow-y-auto bg-neutral-950">
+          <div className="mx-auto flex min-h-full max-w-md flex-col justify-center gap-4 px-5 py-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+            <div className="flex justify-end"><LangSwitcher /></div>
+            <img src={logo} alt="DekEn" className="mx-auto h-32 w-32 rounded-[2rem] object-cover shadow-lg ring-1 ring-white/10" />
+            <h1 className="text-center text-2xl font-extrabold">DekEn</h1>
+            <h2 className="text-center text-lg font-bold">📜 {t('custTermsTitle')}</h2>
             <ul className="space-y-2 text-sm text-neutral-200">
               {[1, 2, 3, 4].map((n) => <li key={n} className="flex gap-2 rounded-xl bg-white/5 p-3"><span>✓</span><span>{t(`custTerms${n}`)}</span></li>)}
             </ul>
-            <button onClick={acceptTerms} disabled={termsBusy} className="w-full rounded-xl bg-line py-3 font-bold text-black active:scale-95 disabled:opacity-50">{t('custTermsOk')}</button>
-            <button onClick={() => setView('landing')} className="w-full text-center text-xs text-neutral-500 underline">{t('back')}</button>
+            <button onClick={acceptTerms} disabled={termsBusy} className="w-full rounded-2xl bg-line py-4 text-lg font-bold text-black active:scale-95 disabled:opacity-50">{t('custTermsOk')}</button>
           </div>
         </div>
       )}
+
+      {showSeller && <SellerPanel onClose={() => setShowSeller(false)} />}
 
       {claim && <ClaimDraft token={claim} onClose={() => setClaim(null)} onDone={async () => { setClaim(null); setView('worker'); setWorkerTab('self'); await loadMe() }} />}
 

@@ -80,6 +80,7 @@ export default function ManageUser({ userId, onClose, onChanged, toast }) {
         </div>
 
         <SellerLabel userId={u.id} toast={toast} />
+        <ReferrerSection userId={u.id} toast={toast} />
 
         <label className="block text-sm">
           <span className="text-neutral-300">เหตุผล (จำเป็น · เก็บเป็นประวัติ)</span>
@@ -155,6 +156,54 @@ function SellerLabel({ userId, toast }) {
         <input value={label} onChange={(e) => setLabel(e.target.value)} maxLength={40} placeholder="เช่น เซลล์เอ / ทีมโอ๋" className="min-w-0 flex-1 rounded-xl bg-white/10 px-3 py-2 text-sm" />
         <button onClick={save} className="rounded-xl bg-white/10 px-4 text-sm font-semibold active:scale-95">บันทึก</button>
       </div>
+    </section>
+  )
+}
+
+// Who invited this customer (first link wins). Admin can correct it, always with a reason that is kept as history.
+function ReferrerSection({ userId, toast }) {
+  const [info, setInfo] = useState(null)
+  const [q, setQ] = useState('')
+  const [found, setFound] = useState([])
+  const [pick, setPick] = useState(null)      // { id, name } | 'none'
+  const [reason, setReason] = useState('')
+  const load = () => supabase.rpc('admin_get_referrer', { p_user: userId }).then(({ data }) => setInfo(data ?? null))
+  useEffect(() => { load() }, [userId])
+  useEffect(() => {
+    const h = setTimeout(() => supabase.rpc('admin_find_users', { p_q: q }).then(({ data }) => setFound(data ?? [])), 250)
+    return () => clearTimeout(h)
+  }, [q])
+
+  async function save() {
+    if (reason.trim().length < 3) return toast('ใส่เหตุผลก่อน')
+    const { error } = await supabase.rpc('admin_set_referrer', { p_user: userId, p_referrer: pick === 'none' ? null : pick.id, p_reason: reason })
+    if (error) return toast('บันทึกไม่สำเร็จ')
+    toast('แก้ผู้แนะนำแล้ว'); setPick(null); setReason(''); setQ(''); load()
+  }
+
+  return (
+    <section className="space-y-2 rounded-2xl bg-white/5 p-3">
+      <p className="text-sm font-semibold">🤝 ผู้แนะนำ</p>
+      <p className="text-sm">{info?.referrer_id ? <>{info.referrer_name ?? '—'} <span className={`text-xs ${info.referrer_is_seller ? 'text-green-300' : 'text-neutral-400'}`}>{info.referrer_is_seller ? '(เป็นเซลล์ — ได้ 40% ค่าจอง)' : '(ไม่ใช่เซลล์ — ได้แค่ค่าแพ็กเกจ 20%)'}</span></> : <span className="text-neutral-400">ไม่มีผู้แนะนำ</span>}</p>
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 ค้นชื่อคนที่จะเป็นผู้แนะนำใหม่" className="w-full rounded-xl bg-white/10 px-3 py-2 text-sm" />
+      <ul className="space-y-1">
+        {found.filter((f) => f.id !== userId).map((f) => (
+          <li key={f.id}><button onClick={() => setPick({ id: f.id, name: f.display_name })} className="w-full rounded-xl bg-white/5 px-3 py-1.5 text-left text-sm active:scale-95">{f.display_name ?? '—'}{f.is_seller ? ' · เซลล์' : ''}</button></li>
+        ))}
+      </ul>
+      {info?.referrer_id && <button onClick={() => setPick('none')} className="text-xs text-red-300 underline">เอาผู้แนะนำออก</button>}
+      {pick && (
+        <div className="space-y-2 rounded-xl bg-amber-400/10 p-2">
+          <p className="text-xs text-amber-200">เปลี่ยนผู้แนะนำเป็น: <b>{pick === 'none' ? 'ไม่มี' : pick.name}</b></p>
+          <input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={300} placeholder="เหตุผล (จำเป็น เก็บเป็นประวัติ)" className="w-full rounded-xl bg-white/10 px-3 py-2 text-sm" />
+          <button onClick={save} className="w-full rounded-xl bg-line py-2 text-sm font-bold text-black active:scale-95">ยืนยันการแก้</button>
+        </div>
+      )}
+      {info?.history?.length > 0 && (
+        <ul className="space-y-1 text-[11px] text-neutral-400">
+          {info.history.map((h, i) => <li key={i}>{new Date(h.at).toLocaleString('th-TH')} · {h.old ?? 'ไม่มี'} → {h.new ?? 'ไม่มี'} · {h.reason} ({h.by ?? '—'})</li>)}
+        </ul>
+      )}
     </section>
   )
 }

@@ -20,7 +20,7 @@ export default function DraftEditor({ draft, mode, onClose, onSaved }) {
   const { catName } = useI18n()
   const [grp, setGrp] = useState(draft ? groupOf(draft.categories) : null)
   const [form, setForm] = useState({
-    display_name: draft?.display_name ?? '', categories: draft?.categories ?? [], district: draft?.district ?? '', nearby: draft?.nearby ?? '',
+    display_name: draft?.display_name ?? '', categories: draft?.categories ?? [], province: draft?.province ?? '', district: draft?.district ?? '', nearby: draft?.nearby ?? '',
     phone: draft?.phone ?? '', line_id: draft?.line_id ?? '', note: draft?.note ?? '',
   })
   const [prof, setProf] = useState(() => (draft ? profileFromRow(draft) : emptyProfile()))
@@ -30,7 +30,7 @@ export default function DraftEditor({ draft, mode, onClose, onSaved }) {
   const [adding, setAdding] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
-  const [pub, setPub] = useState({ province: draft?.province ?? '', method: '', consent: '', ok: false })   // admin: publish now
+  const [pub, setPub] = useState({ method: '', consent: '', ok: false })   // admin: publish now
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
   const total = photos.length - removed.length + local.length
 
@@ -42,7 +42,7 @@ export default function DraftEditor({ draft, mode, onClose, onSaved }) {
     if (bad) return setError({ errGender: 'กรุณาเลือกเพศ', errAge: 'อายุต้อง 20 ปีขึ้นไป', errPrice: 'กรอกราคาอย่างน้อย 1 ช่อง', errServiceMode: 'เลือกรูปแบบการให้บริการ' }[bad] ?? 'ข้อมูลไม่ครบ')
     if (total < 1) return setError('ต้องมีรูปอย่างน้อย 1 ภาพ')
     if (andThen === 'publish') {
-      if (!pub.province) return setError('กรุณาเลือกจังหวัดของน้อง')
+      if (!form.province) return setError('กรุณาเลือกจังหวัดของน้อง')
       if (!pub.method) return setError('กรุณาเลือกวิธีที่ตรวจอายุแล้ว')
       if (!pub.ok || pub.consent.trim().length < 3) return setError('ต้องยืนยันว่าได้รับความยินยอมจากน้องแล้ว และระบุช่องทางที่ได้รับ')
     }
@@ -50,15 +50,14 @@ export default function DraftEditor({ draft, mode, onClose, onSaved }) {
     try {
       const payload = {
         display_name: form.display_name.trim(), categories: form.categories, ...profileToPayload(prof, grp),
-        district: form.district.trim() || null, nearby: form.nearby.trim() || null,
+        province: form.province || null, district: form.district.trim() || null, nearby: form.nearby.trim() || null,
         phone: form.phone.trim() || null, line_id: form.line_id.trim() || null, note: form.note.trim() || null,
       }
-      delete payload.province
       const { data: id, error: e1 } = await supabase.rpc('draft_save', { p_id: draft?.id ?? null, p_data: payload })
       if (e1) throw e1
       for (const pid of removed) await removeDraftPhoto(pid)
       for (const pic of local) await uploadDraftPhoto(id, pic)
-      await onSaved(id, andThen, pub)
+      await onSaved(id, andThen, { ...pub, province: form.province })
     } catch (e) {
       console.error(e)
       setError(errText(e.message ?? String(e)))
@@ -124,7 +123,13 @@ export default function DraftEditor({ draft, mode, onClose, onSaved }) {
       </fieldset>
 
       <WorkerFields v={prof} set={(p) => setProf((x) => ({ ...x, ...p }))} grp={grp} hideLocation />
-      <p className="text-[11px] text-neutral-500">พิกัดน้องเป็นคนยืนยันเอง (GPS) ตอนกดรับลิงก์ จังหวัดจึงไม่ต้องกรอก</p>
+      <label className="block text-sm">จังหวัดที่น้องรับงาน (ชั่วคราว)
+        <select value={form.province} onChange={set('province')} className={input}>
+          <option value="" className="text-black">เลือกจังหวัด</option>
+          {PROVINCES.map((p) => <option key={p} value={p} className="text-black">{p}</option>)}
+        </select>
+        <span className="text-[11px] text-neutral-400">ใส่ไว้ก่อน น้องจะยืนยันตำแหน่งจริงด้วย GPS ตอนกดรับลิงก์</span>
+      </label>
       <label className="block text-sm">อำเภอ / เขต (ไม่บังคับ)<input maxLength={60} value={form.district} onChange={set('district')} className={input} /></label>
       <label className="block text-sm">พื้นที่ใกล้เคียง (ไม่บังคับ)<input maxLength={120} value={form.nearby} onChange={set('nearby')} className={input} /></label>
       <div className="space-y-2 rounded-2xl bg-white/5 p-3">
@@ -137,13 +142,6 @@ export default function DraftEditor({ draft, mode, onClose, onSaved }) {
       {mode === 'admin' && !draft?.managed && (
         <section className="space-y-2 rounded-2xl bg-green-500/10 p-3 ring-1 ring-green-400/30">
           <h3 className="text-sm font-bold text-green-200">เปิดโปรไฟล์ทันที (ลูกค้าเห็นได้ แต่จอง/แชตไม่ได้จนกว่าน้องกดยืนยัน)</h3>
-          <label className="block text-sm">จังหวัดที่น้องรับงาน
-            <select value={pub.province} onChange={(e) => setPub((x) => ({ ...x, province: e.target.value }))} className={input}>
-              <option value="" className="text-black">เลือกจังหวัด</option>
-              {PROVINCES.map((p) => <option key={p} value={p} className="text-black">{p}</option>)}
-            </select>
-            <span className="text-[11px] text-neutral-400">แสดงเป็น "จังหวัดที่ตั้งเอง" จนกว่าน้องจะยืนยันพิกัดด้วย GPS</span>
-          </label>
           <label className="block text-sm">ตรวจอายุแล้วด้วยวิธี
             <select value={pub.method} onChange={(e) => setPub((x) => ({ ...x, method: e.target.value }))} className={input}>
               <option value="" className="text-black">เลือกวิธี</option>

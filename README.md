@@ -402,3 +402,15 @@ Run `supabase/migration_039.sql` once, after migration_038. **Redeploy** the Edg
 - Booking fee split: `create_booking(..., p_vendor)` stores `jobs.sales_vendor` (the seller link in use; only an active seller counts). `resolve_sales(customer, vendor)` = that seller's owner, else the 24 h referrer, else the home seller's owner. Recruiter (agency) and platform parts are unchanged. `jobs.source_label` shows the seller of the booking.
 - Customer pushes still go through the home seller's OA (the customer is a friend of it); support chats belong to the home seller's staff.
 - Seller staff can be any account that opened the app once (`admin_search_vendor_users` searches all accounts by name).
+
+## migration_040 — seller rules, first screen, draft province
+
+Run `supabase/migration_040.sql` once, after migration_039. No Edge Function change.
+
+- **Package payments (20 %)**: the first inviter for ever (`resolve_package_referrer`); a link clicked later never takes over (an inviter-less customer can still adopt a link clicked in the last 24 h). The existing "bonus -> Wallet after `bonus_sweep_days` without renewing" rule (migration_017) is unchanged.
+- **Booking sales share (40 %)** (`resolve_sales(customer, vendor)`): the seller whose link the booking was made through, else the customer's first inviter if he is a seller on the booking date, else the platform. Seller = approved seller (`users.seller_since`), a seller with his own OA, or any provider (`workers.created_at`).
+- Seller applications: `seller_apply`, admin tab "🏪 เซลล์/OA" shows "🤝 ขอเป็นเซลล์" (`admin_seller_requests`, `admin_seller_decide`, `admin_seller_revoke`).
+- Admin member page: "🤝 ผู้แนะนำ" shows the inviter and lets an admin change it with a mandatory reason (`admin_set_referrer`, history in `referrer_changes`).
+- Customer app: "🤝 ส่วนแบ่งของฉัน" (`my_seller_status`, `my_commission_report`, share link).
+- First screen: the "who are you?" page is gone. A new customer sees the terms (full page) and then the categories; providers open on the provider side. The strip under the header has "📝 สมัครงานเป็นพาทเนอร์ ที่นี่" (providers: "💼 ฝั่งผู้ให้บริการ").
+- Draft applications have a temporary province (`draft_save`, synced to the managed profile until the girl confirms by GPS).
