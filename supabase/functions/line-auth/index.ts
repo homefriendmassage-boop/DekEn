@@ -5,8 +5,9 @@
 // user whose password is an HMAC only this function can compute.
 //
 // Vendors (sellers with their own LINE OA): the browser also sends { vendor: '<vendor id>' }; the token is then verified
-// against THAT vendor's LINE Login channel (the first part of its LIFF ID) and the account is scoped to the vendor:
-// users.line_user_id = '<vendor>:<LINE id>', users.vendor_id = '<vendor>'.
+// against THAT vendor's LINE Login channel (the first part of its LIFF ID). All seller OAs live in ONE LINE Provider, so the
+// LINE id is the same everywhere: one account (and one Wallet) per person. users.vendor_id records the seller the customer
+// FIRST came through and is never changed afterwards.
 //
 // Deploy:
 //   supabase functions deploy line-auth --no-verify-jwt
@@ -57,9 +58,9 @@ Deno.serve(async (req) => {
     if (!verify.ok) throw new Error('Invalid LINE token')
     const { sub, name } = await verify.json()
 
-    // 2) Deterministic credentials per LINE user (a vendor's users are separate accounts: LINE ids differ per Provider).
-    const lineUserId = vendorId ? `${vendorId}:${sub}` : sub
-    const email = vendorId ? `v-${vendorId}-${sub}@line.invalid` : `${sub}@line.invalid`
+    // 2) Deterministic credentials per LINE user (the same account through every seller's LIFF).
+    const lineUserId = sub
+    const email = `${sub}@line.invalid`
     const password = await hmacHex(Deno.env.get('PASSWORD_PEPPER')!, lineUserId)
 
     // 3) Sign in; on first visit create the user then sign in.
@@ -72,7 +73,7 @@ Deno.serve(async (req) => {
       if (created.error) throw created.error
       ;({ data, error } = await anon.auth.signInWithPassword({ email, password }))
       if (error) throw error
-      if (vendorId) await admin.from('users').update({ vendor_id: vendorId }).eq('line_user_id', lineUserId)
+      if (vendorId) await admin.from('users').update({ vendor_id: vendorId }).eq('line_user_id', lineUserId).is('vendor_id', null)
     }
 
     return new Response(JSON.stringify({ session: data.session }), {

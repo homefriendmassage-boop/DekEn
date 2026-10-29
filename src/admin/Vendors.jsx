@@ -198,11 +198,11 @@ function StaffModal({ vendor, toast, onClose }) {
 
         <div className="space-y-2 rounded-2xl bg-white/5 p-3">
           <p className="text-sm font-semibold">เพิ่มแอดมินเซลล์</p>
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 ค้นชื่อ LINE (บัญชีใน LIFF ของเซลล์นี้)" className="w-full rounded-xl bg-white/10 px-3 py-2 text-sm" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 ค้นชื่อ LINE ของคนที่เคยเปิดแอป" className="w-full rounded-xl bg-white/10 px-3 py-2 text-sm" />
           <ul className="space-y-1">
             {found.map((f) => <li key={f.id}><button onClick={() => add(f)} className="flex w-full items-center justify-between rounded-xl bg-white/5 px-3 py-2 text-left text-sm active:scale-95"><span>{f.display_name ?? '—'}</span><span className="text-[10px] text-neutral-500">{f.line_id.slice(0, 10)}…</span></button></li>)}
           </ul>
-          <p className="text-[11px] text-neutral-500">คนที่จะเป็นแอดมินเซลล์ต้องเปิดลิงก์ LIFF ของเซลล์ด้วย LINE ของตัวเองหนึ่งครั้ง (จึงมีบัญชีให้ค้นเจอ) และเพิ่มเพื่อน LINE OA ของเซลล์ เพื่อรับ push</p>
+          <p className="text-[11px] text-neutral-500">คนที่จะเป็นแอดมินเซลล์ต้องเคยเปิดแอป (ลิงก์ของเซลล์หรือของ DekEn) ด้วย LINE ของตัวเองหนึ่งครั้ง จึงจะค้นเจอ และต้องเพิ่มเพื่อน LINE OA ของเซลล์ เพื่อรับ push</p>
         </div>
       </div>
     </div>

@@ -42,8 +42,8 @@ export async function resolveVendor() {
 
 export const getVendor = () => current
 export const getActiveLiffId = () => current?.liff_id ?? LIFF_ID
-// Does the stored Supabase session belong to this context (this vendor, or the central app)?
+// One LINE Provider for every seller: the same account works in every seller's LIFF. Only sessions made by the old per-seller
+// accounts ('<seller>:<LINE id>') have to be replaced.
 export function sessionMatches(session) {
-  const lu = String(session?.user?.user_metadata?.line_user_id ?? '')
-  return current ? lu.startsWith(`${current.id}:`) : !lu.includes(':')
+  return !String(session?.user?.user_metadata?.line_user_id ?? '').includes(':')
 }

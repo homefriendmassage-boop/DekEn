@@ -390,3 +390,15 @@ Run `supabase/migration_038.sql` once, after migration_037. **Redeploy** the Edg
 - **Support chat routing**: `support_threads.vendor_id` is copied from the customer. Seller customers talk to the seller's own admins (`vendor_staff`), not central admins. Central inbox, stats and member list exclude them; the admin tabs "💬 ซัพพอร์ต" and "สมาชิก" have a seller selector (`admin_support_threads`, `admin_list_vendor_members`) and the thread header shows "🏪 <seller>".
 - **Seller staff**: admin tab "🏪 เซลล์/OA" → "👥 แอดมินเซลล์" (`admin_vendor_staff_list/add/remove`, `admin_search_vendor_users`). The person must open the seller's LIFF once with their own LINE (creating the account) and be a friend of the seller's OA. In the seller's LIFF they get a "💬 กล่องข้อความลูกค้า" button.
 - **Push**: `support_notify_push` (vendor threads only) → `notify-chat` sends a Flex through the seller's OA: customer → each staff LINE id (`vendor_staff_line_ids`), staff → customer. At most one push per thread and kind per 10 minutes (`support_push_log`). Central customers get no support push.
+
+## migration_039 — one account / Wallet per customer across every seller
+
+Run `supabase/migration_039.sql` once, after migration_038. **Redeploy** the Edge Function `line-auth`. Prerequisite: every seller's LINE Login channel and OA live in the SAME LINE Provider as ours (the LINE id is then identical everywhere; checked on production: the id behind a seller LIFF equals the id in the central app).
+
+- `line-auth`: account key = the plain LINE id (no `<seller>:` prefix). `users.vendor_id` = the seller the customer FIRST came through ("home seller"), set once.
+- The migration strips the prefix from existing seller accounts; if the same person already has a central account, the empty duplicate is merged away (seller-staff rows move to the central account; an account holding data is skipped with a NOTICE).
+- Top-ups: always the platform's single bank / PromptPay account (no per-seller accounts).
+- Package payments (20 %): `resolve_package_referrer` = who invited him the first time (`referred_by`), else the home seller's owner. Later links never take over.
+- Booking fee split: `create_booking(..., p_vendor)` stores `jobs.sales_vendor` (the seller link in use; only an active seller counts). `resolve_sales(customer, vendor)` = that seller's owner, else the 24 h referrer, else the home seller's owner. Recruiter (agency) and platform parts are unchanged. `jobs.source_label` shows the seller of the booking.
+- Customer pushes still go through the home seller's OA (the customer is a friend of it); support chats belong to the home seller's staff.
+- Seller staff can be any account that opened the app once (`admin_search_vendor_users` searches all accounts by name).

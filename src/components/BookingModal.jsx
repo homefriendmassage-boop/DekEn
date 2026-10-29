@@ -1,3 +1,4 @@
+import { getVendor } from '../lib/vendor'
 import { useMemo, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { BOOKING_FEE } from '../config'
@@ -50,6 +51,7 @@ export default function BookingModal({ worker, walletBalance, onClose, onBooked,
     const { error } = await supabase.rpc('create_booking', {
       p_worker: worker.user_id, p_rate: rate, p_scheduled: new Date(when).toISOString(), p_place_note: placeNote, p_note: note,
       p_phone: phone, p_lat: pin?.lat ?? null, p_lng: pin?.lng ?? null, p_url: url.trim() || null,
+      p_vendor: getVendor()?.id ?? null,      // the seller whose link he is booking through (gets the sales share)
     })
     setSubmitting(false)
     if (error) return setError(t(bookingErrorKey(error.message)))
