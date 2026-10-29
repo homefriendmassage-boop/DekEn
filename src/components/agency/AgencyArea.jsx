@@ -5,6 +5,7 @@ import { logoBlob, logoUrl } from '../../lib/logo'
 import { useI18n } from '../../i18n'
 import ChatModal from '../ChatModal'
 import ShareModal from '../ShareModal'
+import WorkerDetail from '../WorkerDetail'
 
 const ERRORS = {
   INSUFFICIENT_BALANCE: 'ยอด Wallet ไม่พอ กรุณาเติมเงินก่อน',
@@ -135,6 +136,13 @@ function Dashboard({ ag, me, reload, flash, onTopUp, onWallet, onChanged }) {
 
 function Girls({ flash, reload }) {
   const [rows, setRows] = useState(null)
+  const [detail, setDetail] = useState(null)       // her full profile (photos + details): an agency sees its own girls only
+  async function openDetail(g) {
+    const { data } = await supabase.rpc('get_worker', { p_worker: g.user_id })
+    const r = data?.[0]
+    if (!r) return flash('เปิดโปรไฟล์ไม่ได้ (น้องอาจยังไม่แสดงในระบบ)')
+    setDetail({ ...r, canView: true, image: r.profile_image })
+  }
   const load = useCallback(() => supabase.rpc('agency_girls').then(({ data }) => setRows(data ?? [])), [])
   useEffect(() => { load() }, [load])
   async function remove(g) {
@@ -146,18 +154,27 @@ function Girls({ flash, reload }) {
   if (rows === null) return <p className="py-8 text-center text-neutral-500">กำลังโหลด…</p>
   if (rows.length === 0) return <p className="rounded-2xl bg-white/5 p-6 text-center text-neutral-500">ยังไม่มีน้องในสังกัด ส่งลิงก์ให้น้องที่แท็บ "แพ็กเกจ"</p>
   return (
+    <>
+    {detail && <WorkerDetail worker={detail} agencyView onClose={() => setDetail(null)} />}
     <ul className="space-y-2">
       {rows.map((g) => (
         <li key={g.user_id} className="rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
           <div className="flex items-center justify-between gap-2">
-            <p className="truncate font-semibold">{g.display_name}</p>
+            <div className="flex min-w-0 items-center gap-2">
+              <div className="h-12 w-10 shrink-0 overflow-hidden rounded-lg bg-neutral-800">{g.profile_image && <img src={g.profile_image} alt="" className="h-full w-full object-cover" />}</div>
+              <p className="truncate font-semibold">{g.display_name}</p>
+            </div>
             <span className={`rounded-full px-2 py-0.5 text-[11px] ${g.listed ? 'bg-green-500/20 text-green-300' : 'bg-neutral-600/40 text-neutral-300'}`}>{g.listed ? 'แสดงอยู่' : 'ไม่แสดง'}</span>
           </div>
           <p className="mt-1 text-xs text-neutral-400">จองเดือนนี้ {g.jobs_month} ครั้ง · ส่วนแบ่งสะสม {baht(g.earned)}</p>
-          <button onClick={() => remove(g)} className="mt-2 rounded-lg bg-white/10 px-3 py-1 text-xs active:scale-95">นำออกจากสังกัด</button>
+          <div className="mt-2 flex gap-2">
+            <button onClick={() => openDetail(g)} className="rounded-lg bg-pink-500 px-3 py-1 text-xs font-semibold active:scale-95">ดูรูปและรายละเอียด</button>
+            <button onClick={() => remove(g)} className="rounded-lg bg-white/10 px-3 py-1 text-xs active:scale-95">นำออกจากสังกัด</button>
+          </div>
         </li>
       ))}
     </ul>
+    </>
   )
 }
 

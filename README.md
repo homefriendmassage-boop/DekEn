@@ -447,3 +447,12 @@ Run `supabase/migration_044.sql` once, after migration_043. **Redeploy** the Edg
 - `is_seller_at` = free seller, or `seller_since <= at <= seller_until`. When the plan expires the 40 % booking share goes to the platform again (the 20 % package share never needed a plan). The approval flow of migration_040 (`seller_apply`, requests tab) is removed; anybody who was approved there must pay or be granted days.
 - After payment `seller_notify` → notify-chat sends the Flex "🎉 คุณเป็นเซลล์แล้ว": CTA 1 opens the app (pick a girl, view photos, share), CTA 2 opens the invite share sheet (`?open=share`).
 - Admin member page: "🤝 สถานะเซลล์" (grant free days / cancel). Customer app: "🤝 ส่วนแบ่งของฉัน" (plan, earnings, share link).
+
+## migration_045 — plan reminders, agency Flex, agency sees its own girls, daily rotation
+
+Run `supabase/migration_045.sql` once, after migration_044. **Redeploy** the Edge Function `notify-chat` (`type: 'seller' | 'agency'`, events activated / renewed / expiring).
+
+- Agency plan payment (`agency_pay_plan`) now sends the same kind of Flex as the seller plan (activated / renewed). `remind_plan_expiry()` (pg_cron `remind-plan-expiry`, 09:00 Thailand) sends the "3 days left" Flex once per period to sellers (`users.seller_reminded_until`) and agencies (`agencies.reminded_until`); CTAs open `?open=seller` / `?open=agency`.
+- Agency: `can_view_worker` / `list_workers` / `agency_girls` show its own girls in full (photos + details via "ดูรูปและรายละเอียด"). Providers and other agencies see the others like any customer (package tiers, free groups bartender / ENT clear faces for free viewers, the rest covered). Chat between accounts is paid from the Wallet as before.
+- `ranked_workers`: the order of the girls nobody bought a place for is a daily shuffle (online first), instead of oldest-first.
+- App start: providers open on the provider side again.

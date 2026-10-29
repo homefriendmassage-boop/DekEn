@@ -26,7 +26,7 @@ export function ratesOf(w, t) {
 }
 
 // Full profile of one provider (only reached for providers the viewer may open). Chat and booking start from here.
-export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlock, isMe }) {
+export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlock, isMe, agencyView }) {
   const { t, money, catName } = useI18n()
   const [imgs, setImgs] = useState([])      // gallery: the clear picture where the viewer may see it, else the mosaic
   const [idx, setIdx] = useState(0)
@@ -166,9 +166,11 @@ export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlo
           )}
           {shareNote && <p className="text-xs text-amber-200">{shareNote}</p>}
 
-          {!isMe && <button onClick={() => { setReporting(true); setRepMsg(null) }} className="text-[11px] text-neutral-500 underline">🚩 {t('reportProfile')}</button>}
+          {!isMe && !agencyView && <button onClick={() => { setReporting(true); setRepMsg(null) }} className="text-[11px] text-neutral-500 underline">🚩 {t('reportProfile')}</button>}
 
-          {isMe ? (
+          {agencyView ? (
+            <p className="rounded-xl bg-white/10 py-2.5 text-center text-sm font-semibold text-neutral-300">🏢 น้องในสังกัดของคุณ</p>
+          ) : isMe ? (
             <p className="rounded-xl bg-white/10 py-2.5 text-center text-sm font-semibold text-neutral-300">{t('ownProfile')}</p>
           ) : (
             w.claimed === false ? null : <div className="grid gap-2">

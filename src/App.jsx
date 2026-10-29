@@ -118,6 +118,7 @@ export default function App() {
         setSession(s)
         try { await supabase.rpc('release_my_expired_holds') } catch { /* optional */ }   // chat holds that ran out go back to the Wallet
         const meRow = await loadMe()
+        if (meRow?.role === 'worker') setView('worker')   // providers mostly open the app to take jobs: straight to their own side
         const inv = getAgencyCode()
         if (inv) {
           const { data } = await supabase.rpc('agency_public', { p_code: inv })
@@ -126,6 +127,8 @@ export default function App() {
         const openIntent = takeOpenIntent()
         if (openIntent === 'plans') { setView('categories'); setShowMembership(true) } // opened from a renewal reminder
         if (openIntent === 'share') { setView('categories'); setShowShare(true) }       // opened from the new seller's Flex
+        if (openIntent === 'seller') { setView('categories'); setShowSeller(true) }     // seller plan reminder
+        if (openIntent === 'agency') { setView('worker'); setWorkerTab('agency') }       // agency plan Flex / reminder
         const chatId = takeChatIntent()        // opened from the "new message" push: go straight to that chat room
         if (chatId && meRow) {
           const { data: ths } = await supabase.rpc('my_threads', { p_role: null })

@@ -115,30 +115,43 @@ export function buildSupportFlex(o: { event: 'incoming' | 'reply'; name: string;
     },
   }
 }
-export function buildSellerFlex(o: { event: string; until: string; liffId: string; logo?: string }) {
+// Plan Flex for a seller (500 THB / 30 days) or an agency: activated | renewed | expiring (3 days before the end)
+export function buildPlanFlex(o: { kind: 'seller' | 'agency'; event: string; until: string; liffId: string; logo?: string; now?: number }) {
   const base = `https://liff.line.me/${o.liffId}`
-  const day = new Date(o.until).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok', dateStyle: 'medium' })
+  const exp = new Date(o.until)
+  const day = exp.toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok', dateStyle: 'medium' })
+  const left = Math.max(0, Math.ceil((exp.getTime() - (o.now ?? Date.now())) / 86400000))
   const text = (t: string, extra: Record<string, unknown> = {}) => ({ type: 'text', text: t, wrap: true, size: 'sm', color: '#DDDDDD', ...extra })
-  const renewed = o.event === 'renewed'
+  const seller = o.kind === 'seller'
+  const name = seller ? 'เซลล์' : 'สังกัด'
+  const head = o.event === 'expiring' ? `⏰ แพ็กเกจ${name}ใกล้หมดอายุ` : o.event === 'renewed' ? `✅ ต่ออายุ${name}แล้ว` : seller ? '🎉 คุณเป็นเซลล์แล้ว' : '🎉 เปิดใช้งานสังกัดแล้ว'
+  const title = o.event === 'expiring' ? `หมดอายุ ${day} (เหลือ ${left} วัน)` : `ใช้งานได้ถึง ${day}`
+  const lines = o.event === 'expiring'
+    ? [seller ? 'ต่ออายุก่อนหมด เพื่อรับส่วนแบ่ง 40% ของค่าจองจากลูกค้าที่คุณชวนต่อเนื่อง (วันที่เหลือบวกต่อให้)' : 'ต่ออายุก่อนหมด เพื่อให้น้องในสังกัดยังแสดงในหน้าลูกค้า (วันที่เหลือบวกต่อให้)']
+    : seller
+      ? ['ลูกค้าที่คุณชวนจองน้อง คุณได้ส่วนแบ่ง 40% ของค่าธรรมเนียม และ 20% ของค่าแพ็กเกจที่เขาซื้อ', 'วิธีหาลูกค้า: เลือกน้อง กดดูรูป แล้วกดปุ่มแชร์ ส่งให้ลูกค้าได้เลย หรือส่งข้อความชวนเพื่อนๆ']
+      : ['ส่งลิงก์ชวนน้องเข้าสังกัด และดูรูปกับรายละเอียดของน้องในสังกัดได้ที่หลังบ้านสังกัด', 'น้องในสังกัดได้รับการแสดงในหน้าลูกค้าตามปกติ']
+  const buttons = o.event === 'expiring'
+    ? [{ type: 'button', style: 'primary', color: '#EC4899', height: 'md', action: { type: 'uri', label: `ต่ออายุ${name}`, uri: `${base}?open=${o.kind}` } }]
+    : seller
+      ? [{ type: 'button', style: 'primary', color: '#EC4899', height: 'md', action: { type: 'uri', label: 'ดูรูปน้องแล้วแชร์', uri: base } },
+         { type: 'button', style: 'secondary', height: 'md', action: { type: 'uri', label: 'ส่งข้อความชวนเพื่อน/ลูกค้า', uri: `${base}?open=share` } }]
+      : [{ type: 'button', style: 'primary', color: '#EC4899', height: 'md', action: { type: 'uri', label: 'เปิดหลังบ้านสังกัด', uri: `${base}?open=agency` } }]
   return {
     type: 'flex',
-    altText: renewed ? '✅ ต่ออายุเซลล์เรียบร้อยแล้ว' : '🎉 คุณเป็นเซลล์แล้ว',
+    altText: `${head} ${title}`,
     contents: {
       type: 'bubble', size: 'kilo',
       styles: { body: { backgroundColor: '#161616' }, footer: { backgroundColor: '#161616' } },
       body: { type: 'box', layout: 'vertical', spacing: 'md', paddingAll: 'xl', contents: [
         { type: 'box', layout: 'horizontal', spacing: 'md', alignItems: 'center', contents: [
           ...(o.logo ? [{ type: 'image', url: o.logo, size: '40px', aspectMode: 'cover', aspectRatio: '1:1', flex: 0 }] : []),
-          { type: 'text', text: renewed ? '✅ ต่ออายุเซลล์แล้ว' : '🎉 คุณเป็นเซลล์แล้ว', weight: 'bold', size: 'md', color: '#06C755', gravity: 'center' },
+          { type: 'text', text: head, weight: 'bold', size: 'md', color: o.event === 'expiring' ? '#F59E0B' : '#06C755', gravity: 'center', wrap: true },
         ] },
-        { type: 'text', text: `ใช้งานได้ถึง ${day}`, weight: 'bold', size: 'lg', color: '#FFFFFF', wrap: true },
-        text('ลูกค้าที่คุณชวนจองน้อง คุณได้ส่วนแบ่ง 40% ของค่าธรรมเนียม และ 20% ของค่าแพ็กเกจที่เขาซื้อ'),
-        text('วิธีหาลูกค้า: เลือกน้อง กดดูรูป แล้วกดปุ่มแชร์ ส่งให้ลูกค้าได้เลย หรือส่งข้อความชวนเพื่อนๆ'),
+        { type: 'text', text: title, weight: 'bold', size: 'lg', color: '#FFFFFF', wrap: true },
+        ...lines.map((l) => text(l)),
       ] },
-      footer: { type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: 'lg', contents: [
-        { type: 'button', style: 'primary', color: '#EC4899', height: 'md', action: { type: 'uri', label: 'ดูรูปน้องแล้วแชร์', uri: base } },
-        { type: 'button', style: 'secondary', height: 'md', action: { type: 'uri', label: 'ส่งข้อความชวนเพื่อน/ลูกค้า', uri: `${base}?open=share` } },
-      ] },
+      footer: { type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: 'lg', contents: buttons },
     },
   }
 }
@@ -166,7 +179,7 @@ Deno.serve(async (req) => {
   const { thread_id, recipient_id, sender_id } = input
   const isBooking = input.type === 'booking'
   const isSupport = input.type === 'support'
-  const isSeller = input.type === 'seller'
+  const isSeller = input.type === 'seller' || input.type === 'agency'     // plan Flex (seller / agency): input.type tells which
   if (!isBooking && !isSupport && !isSeller && (!thread_id || !recipient_id || !sender_id)) return json({ ok: false, code: 'BAD_INPUT' }, 400)
   if (isSupport && !input.thread_id) return json({ ok: false, code: 'BAD_INPUT' }, 400)
   if (isSeller && !input.user_id) return json({ ok: false, code: 'BAD_INPUT' }, 400)
@@ -176,12 +189,17 @@ Deno.serve(async (req) => {
 
   const central = { token, liffId }
   if (isSeller) {
-    // "you are a seller now": through the OA the member is a friend of (his seller's OA, else ours)
-    const { data: su } = await admin.from('users').select('seller_until').eq('id', input.user_id).maybeSingle()
+    // plan Flex: the member is reached through the OA he is a friend of (his seller's OA, else ours)
+    const agency = input.type === 'agency'
+    const { data: until } = agency
+      ? await admin.from('agencies').select('plan_expires_at').eq('user_id', input.user_id).maybeSingle()
+      : await admin.from('users').select('seller_until').eq('id', input.user_id).maybeSingle()
+    const exp = (agency ? (until as { plan_expires_at?: string } | null)?.plan_expires_at : (until as { seller_until?: string } | null)?.seller_until) ?? null
     const rs = await recipient(admin, input.user_id, central)
-    if (!su?.seller_until || !rs || !/^U[0-9a-f]{32}$/.test(rs.lineId)) return json({ ok: true, status: 'NO_LINE_ID' })
+    if (!exp || !rs || !/^U[0-9a-f]{32}$/.test(rs.lineId)) return json({ ok: true, status: 'NO_LINE_ID' })
     const appUrl = Deno.env.get('APP_URL')?.replace(/\/$/, '')
-    const message = buildSellerFlex({ event: input.event === 'renewed' ? 'renewed' : 'activated', until: su.seller_until as string, liffId: rs.liffId, logo: appUrl ? `${appUrl}/dekn-logo.jpg?v=2` : undefined })
+    const ev = input.event === 'renewed' ? 'renewed' : input.event === 'expiring' ? 'expiring' : 'activated'
+    const message = buildPlanFlex({ kind: agency ? 'agency' : 'seller', event: ev, until: exp, liffId: rs.liffId, logo: appUrl ? `${appUrl}/dekn-logo.jpg?v=2` : undefined })
     const r = await fetch('https://api.line.me/v2/bot/message/push', {
       method: 'POST',
       headers: { Authorization: `Bearer ${rs.token}`, 'Content-Type': 'application/json', 'X-Line-Retry-Key': crypto.randomUUID() },
