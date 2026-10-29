@@ -21,7 +21,7 @@ export default function WorkerJobs({ jobs, reload, highlightId, onError }) {
   const [acc, setAcc] = useState(null)      // { id, place, url } while the place form is open
   async function accept(j, place = null, url = null) {
     const { error } = await supabase.rpc('job_accept', { p_job: j.id, p_place: place, p_url: url })
-    if (error) { onError?.(/PLACE_REQUIRED/.test(error.message) ? t('errPlaceName') : /BAD_MAP_LINK/.test(error.message) ? t('errBadMapLink') : /CONTACT_IN_BOOKING/.test(error.message) ? t('errBookingContact') : t('errGeneric')); return }
+    if (error) { onError?.(/TIME_CONFLICT/.test(error.message) ? t('errTimeConflict') : /PLACE_REQUIRED/.test(error.message) ? t('errPlaceName') : /BAD_MAP_LINK/.test(error.message) ? t('errBadMapLink') : /CONTACT_IN_BOOKING/.test(error.message) ? t('errBookingContact') : t('errGeneric')); return }
     setAcc(null)
     reload()
   }

@@ -19,7 +19,7 @@ export const minutesLeft = (expiresAt) => Math.max(0, Math.ceil((new Date(expire
 export const BOOKING_ERRORS = {
   INSUFFICIENT_BALANCE: 'errInsufficient', WORKER_UNAVAILABLE: 'errUnavailable', LOCKED: 'errLocked', UNCLAIMED: 'errUnclaimed',
   BAD_RATE: 'errBadRate', BAD_TIME: 'errBadTime', CONTACT_IN_BOOKING: 'errBookingContact', PLACE_REQUIRED: 'errPlaceRequired',
-  BAD_MAP_LINK: 'errBadMapLink', BAD_PHONE: 'errBadPhone', BAD_PLACE: 'errBadPlace', SUSPENDED: 'errSuspendedBooking',
+  BAD_MAP_LINK: 'errBadMapLink', BAD_PHONE: 'errBadPhone', WORKER_BOOKED: 'errWorkerBooked', BAD_PLACE: 'errBadPlace', SUSPENDED: 'errSuspendedBooking',
 }
 export const bookingErrorKey = (msg = '') => BOOKING_ERRORS[Object.keys(BOOKING_ERRORS).find((k) => msg.includes(k))] ?? 'errGeneric'
 

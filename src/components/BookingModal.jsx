@@ -53,6 +53,7 @@ export default function BookingModal({ worker, walletBalance, onClose, onBooked,
 
   async function confirm() {
     if (submitting || insufficient) return
+    if (overlaps) return setError(t('errWorkerBooked'))
     setError(null)
     if (!when) return setError(t('errBadTime'))
     if (!custGoes && !pin && !url.trim() && !placeNote.trim()) return setError(t('errPlaceRequired'))
@@ -165,7 +166,7 @@ export default function BookingModal({ worker, walletBalance, onClose, onBooked,
 
         <div className="grid grid-cols-2 gap-2">
           <button onClick={onClose} className="rounded-xl bg-white/10 py-3 font-semibold active:scale-95">{t('cancel')}</button>
-          <button onClick={confirm} disabled={submitting || insufficient} className="rounded-xl bg-line py-3 font-bold text-black active:scale-95 disabled:opacity-50">{submitting ? t('booking') : t('confirm')}</button>
+          <button onClick={confirm} disabled={submitting || insufficient || overlaps} className="rounded-xl bg-line py-3 font-bold text-black active:scale-95 disabled:opacity-50">{submitting ? t('booking') : t('confirm')}</button>
         </div>
       </div>
     </div>

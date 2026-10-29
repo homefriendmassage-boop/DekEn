@@ -430,3 +430,11 @@ Run `supabase/migration_042.sql` once, after migration_041. No Edge Function cha
 
 - `worker_busy`: busy from 1 hour before an accepted appointment until she presses "finish" / cancels, or (if she forgets) 2 hours after the booked length. `rate_minutes()`: @60/@90/@120 = minutes, @4h/@6h/1h = hours, else 4 h.
 - `worker_booked_slots(worker)`: accepted booking ranges (no customer data). The booking form lists them ("ช่วงเวลาที่น้องมีงานแล้ว") and warns when the picked time overlaps; the customer can still send the request. Unchanged rule: she accepts or declines; no answer in 30 minutes = cancelled, fee refunded, customer told by Flex.
+
+## migration_043 — accepted times cannot be double-booked
+
+Run `supabase/migration_043.sql` once, after migration_042. No Edge Function change.
+
+- `create_booking` refuses a time that overlaps an ACCEPTED booking of that provider (`WORKER_BOOKED`) until she presses "finish" or the booking is cancelled; the booking form disables the button and says so. Pending bookings do not block.
+- `job_accept` refuses to accept a booking that overlaps one she already accepted (`TIME_CONFLICT`): finish the earlier one or decline.
+- App start: everybody opens on the categories page (providers use the "💼 ฝั่งผู้ให้บริการ" button; push links to a job / chat still open the provider side).

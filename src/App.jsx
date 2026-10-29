@@ -116,7 +116,6 @@ export default function App() {
         setSession(s)
         try { await supabase.rpc('release_my_expired_holds') } catch { /* optional */ }   // chat holds that ran out go back to the Wallet
         const meRow = await loadMe()
-        if (meRow?.role === 'worker') setView('worker')   // providers open straight on their own side; customers on the categories
         const inv = getAgencyCode()
         if (inv) {
           const { data } = await supabase.rpc('agency_public', { p_code: inv })
