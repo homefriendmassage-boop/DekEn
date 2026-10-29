@@ -6,11 +6,10 @@ import ShareModal from './ShareModal'
 const VIA = { vendor: 'เซลล์ที่มี OA', provider: 'ผู้ให้บริการ', approved: 'เซลล์ที่อนุมัติแล้ว' }
 
 // "My commission": am I a seller, what did the people I invited earn me (bookings 40 %, packages 20 %), and how to share my link.
-export default function SellerPanel({ onClose }) {
+export default function SellerPanel({ onClose, walletBalance = 0, onTopUp, onChanged }) {
   const { money, fmtDate } = useI18n()
   const [st, setSt] = useState(null)
   const [rep, setRep] = useState(null)
-  const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [share, setShare] = useState(false)
   const [msg, setMsg] = useState(null)
@@ -21,15 +20,18 @@ export default function SellerPanel({ onClose }) {
   }
   useEffect(() => { load() }, [])
 
-  async function apply() {
-    setBusy(true)
-    const { error } = await supabase.rpc('seller_apply', { p_note: note })
+  async function buy() {
+    setBusy(true); setMsg(null)
+    const { error } = await supabase.rpc('buy_seller_plan')
     setBusy(false)
-    setMsg(error ? 'ส่งคำขอไม่สำเร็จ' : 'ส่งคำขอแล้ว รอแอดมินอนุมัติ')
+    if (error) return setMsg(/INSUFFICIENT/.test(error.message) ? 'ยอด Wallet ไม่พอ กรุณาเติมเงินก่อน' : /ALREADY_SELLER/.test(error.message) ? 'คุณเป็นเซลล์อยู่แล้ว ไม่ต้องชำระ' : 'ทำรายการไม่สำเร็จ')
+    setMsg('✓ เป็นเซลล์เรียบร้อย ระบบส่ง Flex แนะนำการใช้งานไปที่ LINE ของคุณแล้ว')
+    onChanged?.()
     load()
   }
 
-  const req = st?.request
+  const price = st?.price ?? 500
+  const short = walletBalance < price
   return (
     <div className="fixed inset-0 z-[55] flex items-end justify-center bg-black/70 sm:items-center sm:p-4" onClick={onClose} role="dialog" aria-modal="true">
       <div onClick={(e) => e.stopPropagation()}
@@ -46,16 +48,22 @@ export default function SellerPanel({ onClose }) {
           <li>• <b>ค่าจอง 40%</b> เฉพาะ "เซลล์" ได้ เมื่อลูกค้าที่คุณชวนจองในแอปกลาง หรือจองผ่านลิงก์ของคุณ</li>
         </ul>
 
-        {!st ? <p className="text-center text-sm text-neutral-500">กำลังโหลด…</p> : st.is_seller ? (
-          <p className="rounded-xl bg-green-500/10 p-3 text-sm text-green-200">✓ คุณเป็นเซลล์ ({VIA[st.via] ?? '—'}) ตั้งแต่ {fmtDate(st.since)}</p>
-        ) : req?.status === 'pending' ? (
-          <p className="rounded-xl bg-amber-400/10 p-3 text-sm text-amber-200">⏳ ส่งคำขอเป็นเซลล์แล้ว รอแอดมินอนุมัติ</p>
+        {!st ? <p className="text-center text-sm text-neutral-500">กำลังโหลด…</p> : st.is_seller && st.via !== 'paid' ? (
+          <p className="rounded-xl bg-green-500/10 p-3 text-sm text-green-200">✓ คุณเป็นเซลล์อยู่แล้ว ({VIA[st.via] ?? '—'}) ไม่ต้องชำระค่าบริการ</p>
         ) : (
           <div className="space-y-2 rounded-2xl bg-white/5 p-3">
-            {req?.status === 'rejected' && <p className="text-xs text-red-300">คำขอก่อนหน้าไม่ได้รับการอนุมัติ{req.admin_note ? `: ${req.admin_note}` : ''}</p>}
-            <p className="text-sm font-semibold">อยากรับ 40% ของค่าจอง? ขอเป็นเซลล์</p>
-            <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} placeholder="บอกแอดมินสั้นๆ ว่าคุณหาลูกค้าอย่างไร" className="w-full rounded-xl bg-white/10 px-3 py-2 text-sm" />
-            <button disabled={busy} onClick={apply} className="w-full rounded-xl bg-white/10 py-2 text-sm font-bold active:scale-95 disabled:opacity-50">ส่งคำขอเป็นเซลล์</button>
+            {st.is_seller
+              ? <p className="text-sm text-green-200">✓ คุณเป็นเซลล์ ใช้งานได้ถึง <b>{fmtDate(st.until)}</b></p>
+              : <p className="text-sm font-semibold">{st.expired ? 'แพ็กเกจเซลล์หมดอายุแล้ว' : 'อยากรับ 40% ของค่าจอง? สมัครเป็นเซลล์'}</p>}
+            <p className="text-[11px] text-neutral-400">ค่าบริการ {money(price)} ต่อ {st.days} วัน หักจาก Wallet แล้วเป็นเซลล์ได้ทันที ไม่ต้องรออนุมัติ · เซลล์แชร์ลิงก์หาลูกค้าได้อย่างเดียว ไม่สามารถเพิ่มน้องเข้าสังกัดได้ · ต่ออายุก่อนหมดได้ วันจะบวกต่อให้</p>
+            <p className="text-xs text-neutral-300">Wallet ของคุณ: <b>{money(walletBalance)}</b></p>
+            {short ? (
+              <button onClick={onTopUp} className="w-full rounded-xl bg-amber-400 py-2.5 text-sm font-bold text-black active:scale-95">เติม Wallet ก่อน</button>
+            ) : (
+              <button disabled={busy} onClick={buy} className="w-full rounded-xl bg-line py-2.5 text-sm font-bold text-black active:scale-95 disabled:opacity-50">
+                {busy ? '…' : st.is_seller ? `ต่ออายุ +${st.days} วัน (${money(price)})` : `สมัครเป็นเซลล์ ${money(price)} / ${st.days} วัน`}
+              </button>
+            )}
           </div>
         )}
         {msg && <p className="text-center text-xs text-amber-200">{msg}</p>}

@@ -10,7 +10,6 @@ import Agencies from './Agencies'
 import ProfileEdits from './ProfileEdits'
 import Chats from './Chats'
 import Vendors from './Vendors'
-import SellerRequests from './SellerRequests'
 import VendorSelect from './VendorSelect'
 import DraftsPanel from '../components/DraftsPanel'
 import { baht } from './format'
@@ -141,7 +140,7 @@ export default function AdminApp() {
         {tab === 'drafts' && <DraftsPanel mode="admin" toast={showToast} />}
         {tab === 'chats' && <Chats onChanged={loadStats} toast={showToast} />}
         {tab === 'edits' && <ProfileEdits onChanged={loadStats} toast={showToast} />}
-        {tab === 'vendors' && <><SellerRequests toast={showToast} /><Vendors toast={showToast} /></>}
+        {tab === 'vendors' && <Vendors toast={showToast} />}
         {tab === 'agencies' && <Agencies onChanged={loadStats} toast={showToast} />}
         {tab === 'members' && <Members toast={showToast} onRenew={(user) => { setPrefill({ user, tier: user.vip_tier }); setTab('pay') }} />}
       </main>

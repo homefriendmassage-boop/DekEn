@@ -438,3 +438,12 @@ Run `supabase/migration_043.sql` once, after migration_042. No Edge Function cha
 - `create_booking` refuses a time that overlaps an ACCEPTED booking of that provider (`WORKER_BOOKED`) until she presses "finish" or the booking is cancelled; the booking form disables the button and says so. Pending bookings do not block.
 - `job_accept` refuses to accept a booking that overlaps one she already accepted (`TIME_CONFLICT`): finish the earlier one or decline.
 - App start: everybody opens on the categories page (providers use the "💼 ฝั่งผู้ให้บริการ" button; push links to a job / chat still open the provider side).
+
+## migration_044 — seller plan (500 THB / 30 days), seller Flex
+
+Run `supabase/migration_044.sql` once, after migration_043. **Redeploy** the Edge Function `notify-chat` (new `type: 'seller'` Flex).
+
+- A plain seller pays 500 THB per 30 days from the Wallet (`buy_seller_plan`, ledger kind `seller_plan`); active at once, no approval; renewing adds 30 days. He can only share links (no agency / no girls). Providers and sellers with their own OA stay sellers without paying (`seller_free_via`).
+- `is_seller_at` = free seller, or `seller_since <= at <= seller_until`. When the plan expires the 40 % booking share goes to the platform again (the 20 % package share never needed a plan). The approval flow of migration_040 (`seller_apply`, requests tab) is removed; anybody who was approved there must pay or be granted days.
+- After payment `seller_notify` → notify-chat sends the Flex "🎉 คุณเป็นเซลล์แล้ว": CTA 1 opens the app (pick a girl, view photos, share), CTA 2 opens the invite share sheet (`?open=share`).
+- Admin member page: "🤝 สถานะเซลล์" (grant free days / cancel). Customer app: "🤝 ส่วนแบ่งของฉัน" (plan, earnings, share link).

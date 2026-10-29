@@ -5,6 +5,7 @@ import { getPosition } from './lib/geo'
 import { CATEGORIES, PLAN_META, canViewWorker, suspensionOf, tierOf } from './config'
 import { LangSwitcher, useI18n } from './i18n'
 import SellerPanel from './components/SellerPanel'
+import ShareModal from './components/ShareModal'
 import Header from './components/Header'
 import logo from './assets/dekn-logo.jpg'
 import CategoryPicker from './components/CategoryPicker'
@@ -86,6 +87,7 @@ export default function App() {
   const [inboxUnread, setInboxUnread] = useState(0)
   const [showBookings, setShowBookings] = useState(false)
   const [showSeller, setShowSeller] = useState(false)
+  const [showShare, setShowShare] = useState(false)
   const [highlightJob, setHighlightJob] = useState(null)   // a booking opened from its push
   const [claim, setClaim] = useState(null)            // token of an application draft someone filled in for her
   const [openChat, setOpenChat] = useState(null)      // chat to open inside the provider side
@@ -121,7 +123,9 @@ export default function App() {
           const { data } = await supabase.rpc('agency_public', { p_code: inv })
           if (data?.[0]) { setInvitedBy(data[0].name); setView('worker') }   // straight to the application form
         }
-        if (takeOpenIntent() === 'plans') { setView('categories'); setShowMembership(true) } // opened from a renewal reminder
+        const openIntent = takeOpenIntent()
+        if (openIntent === 'plans') { setView('categories'); setShowMembership(true) } // opened from a renewal reminder
+        if (openIntent === 'share') { setView('categories'); setShowShare(true) }       // opened from the new seller's Flex
         const chatId = takeChatIntent()        // opened from the "new message" push: go straight to that chat room
         if (chatId && meRow) {
           const { data: ths } = await supabase.rpc('my_threads', { p_role: null })
@@ -446,7 +450,8 @@ export default function App() {
         </div>
       )}
 
-      {showSeller && <SellerPanel onClose={() => setShowSeller(false)} />}
+      {showSeller && <SellerPanel walletBalance={me?.wallet_balance ?? 0} onTopUp={() => { setShowSeller(false); setPay({ kind: 'wallet_topup' }) }} onChanged={loadMe} onClose={() => setShowSeller(false)} />}
+      {showShare && <ShareModal onClose={() => setShowShare(false)} />}
 
       {claim && <ClaimDraft token={claim} onClose={() => setClaim(null)} onDone={async () => { setClaim(null); setView('worker'); setWorkerTab('self'); await loadMe() }} />}
 

@@ -115,6 +115,33 @@ export function buildSupportFlex(o: { event: 'incoming' | 'reply'; name: string;
     },
   }
 }
+export function buildSellerFlex(o: { event: string; until: string; liffId: string; logo?: string }) {
+  const base = `https://liff.line.me/${o.liffId}`
+  const day = new Date(o.until).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok', dateStyle: 'medium' })
+  const text = (t: string, extra: Record<string, unknown> = {}) => ({ type: 'text', text: t, wrap: true, size: 'sm', color: '#DDDDDD', ...extra })
+  const renewed = o.event === 'renewed'
+  return {
+    type: 'flex',
+    altText: renewed ? '✅ ต่ออายุเซลล์เรียบร้อยแล้ว' : '🎉 คุณเป็นเซลล์แล้ว',
+    contents: {
+      type: 'bubble', size: 'kilo',
+      styles: { body: { backgroundColor: '#161616' }, footer: { backgroundColor: '#161616' } },
+      body: { type: 'box', layout: 'vertical', spacing: 'md', paddingAll: 'xl', contents: [
+        { type: 'box', layout: 'horizontal', spacing: 'md', alignItems: 'center', contents: [
+          ...(o.logo ? [{ type: 'image', url: o.logo, size: '40px', aspectMode: 'cover', aspectRatio: '1:1', flex: 0 }] : []),
+          { type: 'text', text: renewed ? '✅ ต่ออายุเซลล์แล้ว' : '🎉 คุณเป็นเซลล์แล้ว', weight: 'bold', size: 'md', color: '#06C755', gravity: 'center' },
+        ] },
+        { type: 'text', text: `ใช้งานได้ถึง ${day}`, weight: 'bold', size: 'lg', color: '#FFFFFF', wrap: true },
+        text('ลูกค้าที่คุณชวนจองน้อง คุณได้ส่วนแบ่ง 40% ของค่าธรรมเนียม และ 20% ของค่าแพ็กเกจที่เขาซื้อ'),
+        text('วิธีหาลูกค้า: เลือกน้อง กดดูรูป แล้วกดปุ่มแชร์ ส่งให้ลูกค้าได้เลย หรือส่งข้อความชวนเพื่อนๆ'),
+      ] },
+      footer: { type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: 'lg', contents: [
+        { type: 'button', style: 'primary', color: '#EC4899', height: 'md', action: { type: 'uri', label: 'ดูรูปน้องแล้วแชร์', uri: base } },
+        { type: 'button', style: 'secondary', height: 'md', action: { type: 'uri', label: 'ส่งข้อความชวนเพื่อน/ลูกค้า', uri: `${base}?open=share` } },
+      ] },
+    },
+  }
+}
 // ---- END pure rules -----------------------------------------------------------------------------
 
 // Who gets the push and through which OA: a vendor's customer is reached by the vendor's OA (his token and LIFF), everybody else by ours.
@@ -139,13 +166,29 @@ Deno.serve(async (req) => {
   const { thread_id, recipient_id, sender_id } = input
   const isBooking = input.type === 'booking'
   const isSupport = input.type === 'support'
-  if (!isBooking && !isSupport && (!thread_id || !recipient_id || !sender_id)) return json({ ok: false, code: 'BAD_INPUT' }, 400)
+  const isSeller = input.type === 'seller'
+  if (!isBooking && !isSupport && !isSeller && (!thread_id || !recipient_id || !sender_id)) return json({ ok: false, code: 'BAD_INPUT' }, 400)
   if (isSupport && !input.thread_id) return json({ ok: false, code: 'BAD_INPUT' }, 400)
+  if (isSeller && !input.user_id) return json({ ok: false, code: 'BAD_INPUT' }, 400)
   if (isBooking && (!input.job_id || !input.event)) return json({ ok: false, code: 'BAD_INPUT' }, 400)
 
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
   const central = { token, liffId }
+  if (isSeller) {
+    // "you are a seller now": through the OA the member is a friend of (his seller's OA, else ours)
+    const { data: su } = await admin.from('users').select('seller_until').eq('id', input.user_id).maybeSingle()
+    const rs = await recipient(admin, input.user_id, central)
+    if (!su?.seller_until || !rs || !/^U[0-9a-f]{32}$/.test(rs.lineId)) return json({ ok: true, status: 'NO_LINE_ID' })
+    const appUrl = Deno.env.get('APP_URL')?.replace(/\/$/, '')
+    const message = buildSellerFlex({ event: input.event === 'renewed' ? 'renewed' : 'activated', until: su.seller_until as string, liffId: rs.liffId, logo: appUrl ? `${appUrl}/dekn-logo.jpg?v=2` : undefined })
+    const r = await fetch('https://api.line.me/v2/bot/message/push', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${rs.token}`, 'Content-Type': 'application/json', 'X-Line-Retry-Key': crypto.randomUUID() },
+      body: JSON.stringify({ to: rs.lineId, messages: [message] }),
+    })
+    return json({ ok: r.ok, status: r.ok ? 'SENT' : 'FAILED' })
+  }
   if (isSupport) {
     // only a seller's customers have a seller's staff; the push leaves through the seller's own OA
     const { data: th } = await admin.from('support_threads').select('id, user_id, vendor_id').eq('id', input.thread_id).maybeSingle()

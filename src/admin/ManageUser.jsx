@@ -81,6 +81,7 @@ export default function ManageUser({ userId, onClose, onChanged, toast }) {
 
         <SellerLabel userId={u.id} toast={toast} />
         <ReferrerSection userId={u.id} toast={toast} />
+        <SellerSection userId={u.id} toast={toast} />
 
         <label className="block text-sm">
           <span className="text-neutral-300">เหตุผล (จำเป็น · เก็บเป็นประวัติ)</span>
@@ -203,6 +204,38 @@ function ReferrerSection({ userId, toast }) {
         <ul className="space-y-1 text-[11px] text-neutral-400">
           {info.history.map((h, i) => <li key={i}>{new Date(h.at).toLocaleString('th-TH')} · {h.old ?? 'ไม่มี'} → {h.new ?? 'ไม่มี'} · {h.reason} ({h.by ?? '—'})</li>)}
         </ul>
+      )}
+    </section>
+  )
+}
+
+// Seller plan (500 THB / 30 days from the Wallet). The admin can give free days or cancel it.
+function SellerSection({ userId, toast }) {
+  const [info, setInfo] = useState(null)
+  const load = () => supabase.rpc('admin_get_seller', { p_user: userId }).then(({ data }) => setInfo(data ?? null))
+  useEffect(() => { load() }, [userId])
+  async function grant() {
+    const days = Number(window.prompt('ให้เป็นเซลล์ฟรีกี่วัน (1-365)', '30'))
+    if (!days) return
+    const { error } = await supabase.rpc('admin_seller_grant', { p_user: userId, p_days: days })
+    toast(error ? 'ไม่สำเร็จ' : `ให้เป็นเซลล์ ${days} วันแล้ว`); load()
+  }
+  async function revoke() {
+    if (!window.confirm('ยกเลิกสถานะเซลล์ที่ชำระ/ให้ไว้? (ไม่คืนเงินอัตโนมัติ)')) return
+    const { error } = await supabase.rpc('admin_seller_revoke', { p_user: userId })
+    toast(error ? 'ไม่สำเร็จ' : 'ยกเลิกสถานะเซลล์แล้ว'); load()
+  }
+  return (
+    <section className="space-y-2 rounded-2xl bg-white/5 p-3">
+      <p className="text-sm font-semibold">🤝 สถานะเซลล์</p>
+      <p className="text-sm">{info?.via ? <span className="text-green-300">เป็นเซลล์อยู่แล้ว ({info.via === 'vendor' ? 'เซลล์ที่มี OA' : 'ผู้ให้บริการ'})</span>
+        : info?.active ? <span className="text-green-300">เป็นเซลล์ ใช้ได้ถึง {new Date(info.until).toLocaleDateString('th-TH')}</span>
+        : <span className="text-neutral-400">ไม่ได้เป็นเซลล์</span>}</p>
+      {!info?.via && (
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={grant} className="rounded-xl bg-line py-2 text-sm font-bold text-black active:scale-95">ให้ฟรี (วัน)</button>
+          <button onClick={revoke} disabled={!info?.active} className="rounded-xl bg-red-500/20 py-2 text-sm font-bold text-red-300 active:scale-95 disabled:opacity-40">ยกเลิก</button>
+        </div>
       )}
     </section>
   )
