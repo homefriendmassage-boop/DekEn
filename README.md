@@ -474,3 +474,7 @@ Run `supabase/migration_047.sql` once, after migration_046. `draft_save`, `draft
 Run `supabase/migration_048.sql` once, after migration_047. The storage policies for `<draft id>/` folders read `application_drafts` directly, which is closed to the app's users ("permission denied for table application_drafts"); they now call the SECURITY DEFINER helper `draft_folder_writable()` (creator, or any admin for an admin draft).
 
 `PhotoUploader`: the first circle covers the face; up to 8 more mosaic spots can be added (tattoo, name tag, background), each draggable and resizable. Only the public copy is pixelated; the private original stays clear.
+
+## migration_049 — profile removal with a GPS location
+
+Run `supabase/migration_049.sql` once, after migration_048. `finish_profile_deletion()` (admin "ลบเลย" and the 24-hour automatic removal) failed with `BAD_LOCATION` for providers with a GPS-confirmed location, because blanking the location tripped `normalize_worker_profile`. The validation is now skipped for that one wipe (`app.profile_wipe`).
