@@ -464,3 +464,7 @@ Run `supabase/migration_046.sql` once, after migration_045. No Edge Function cha
 - Bulk entry of many girls: `supabase/bulk_girls_template.sql` (step 1: paste rows → `bulk_create_drafts()` makes admin drafts with prices / tags / province; step 2: add the photos in the admin tab "➕ แบบร่างให้น้อง", the face-cover circle stays manual; step 3: `bulk_publish_drafts()` publishes every draft that has photos with one age-check / consent attestation). Profiles are live but unclaimed (same as the single publish).
 - `supabase/remove_demo.sql`: hide (or delete) the demo girls of seed.sql / seed2.sql.
 - A lapsed seller sees a red notice on the categories page and in "🤝 ส่วนแบ่งของฉัน"; the report also shows how many invited customers' bookings paid nothing (`missed_count`, `missed_amount`). Behaviour unchanged: bookings work normally and the 40 % goes to the platform while the plan is lapsed.
+
+## migration_047 — any admin can edit an admin draft
+
+Run `supabase/migration_047.sql` once, after migration_046. `draft_save`, `draft_attach_photo`, `draft_remove_photo` and the draft storage policies accept any admin for drafts with `source = 'admin'` (before: only the admin who created the draft, so drafts made by `bulk_create_drafts()` under another admin id could be listed but not saved).
