@@ -12,7 +12,8 @@ const ERR = {
   LOCKED: 'แบบร่างนี้แก้ไม่ได้ในสถานะปัจจุบัน', NO_PHOTO: 'ต้องมีรูปอย่างน้อย 1 ภาพ', MIXED_GROUPS: 'เลือกหมวดชงเหล้า/ENT ปนกับหมอนวด/สปาไม่ได้',
   CONTACT_IN_PROFILE: 'ห้ามใส่เบอร์โทร ไอดี หรือลิงก์ในชื่อ/แนะนำตัว/ที่อยู่', BAD_PROVINCE: 'จังหวัดไม่ถูกต้อง', BAD_AGE_METHOD: 'เลือกวิธีตรวจอายุ', CONSENT_REQUIRED: 'ต้องระบุว่าได้รับความยินยอมแล้ว', BAD_AGE: 'อายุต้อง 20 ปีขึ้นไป',
 }
-const errText = (m = '') => ERR[Object.keys(ERR).find((k) => m.includes(k))] ?? 'บันทึกไม่สำเร็จ'
+// unknown errors show their technical text too, so a problem can be reported exactly
+const errText = (m = '') => ERR[Object.keys(ERR).find((k) => m.includes(k))] ?? `บันทึกไม่สำเร็จ (${String(m).slice(0, 160)})`
 
 // Application draft filled in for a provider (by an admin or a modelling agency). She only confirms afterwards.
 // props: draft (a draft_view json, or null for a new one), mode ('admin' | 'agency'), onClose(), onSaved(id, andThen)
