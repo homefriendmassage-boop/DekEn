@@ -494,3 +494,10 @@ Run `supabase/migration_051.sql` once, after migration_050. No Edge Function cha
 - `support_clear(thread)` + the red "🧹 ล้างแชต" button in the admin / staff chat room (deletes the room's messages; the room leaves the inbox until the customer writes again).
 - The red number on "แชทกับแอดมิน" is cleared as soon as the chat is opened and re-checked (after `support_mark_read`) when it is closed.
 - Provider detail: the picture is shown whole (`object-contain`, no cropping) and tapping it opens a full-screen viewer (tap to zoom, ‹ › between pictures).
+
+## migration_052 — clear faces: 6 / 3 / 0, covered photos need a package
+
+Run `supabase/migration_052.sql` once, after migration_051 (it replaces the "10 clear faces" of 051).
+
+- Free viewers see clear faces for bartender / ENT = 6 (bought places come first and can grow it up to 10, as before), massage = 3, spa = 0; reshuffled every midnight (Thailand). `can_view_category` lets the 3 massage sample faces through (details, booking, full-size photo) while the other massage girls and all spa girls stay covered.
+- Full-size photo (`ImageViewer`): only clear photos open (card photo or detail photo); a covered photo opens the package sheet instead.

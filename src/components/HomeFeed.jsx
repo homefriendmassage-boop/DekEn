@@ -3,6 +3,7 @@ import { FREE_RANK_LIMIT, MIN_TIER } from '../config'
 import { useI18n } from '../i18n'
 import { logoUrl } from '../lib/logo'
 import { withFee } from '../lib/booking'
+import ImageViewer from './ImageViewer'
 import WorkerDetail, { LocBadge, priceLabel } from './WorkerDetail'
 
 /**
@@ -21,6 +22,7 @@ export default function HomeFeed({ workers, category, tier, loading, onBook, onU
   const shown = province ? workers.filter((w) => w.province === province) : workers
   const canChat = tier >= 1 // paid members only: keeps casual chatting (and its cost) out
   const [detail, setDetail] = useState(null)
+  const [viewer, setViewer] = useState(null)      // { url, name } : the clear photo in full size
 
   return (
     <div>
@@ -55,10 +57,13 @@ export default function HomeFeed({ workers, category, tier, loading, onBook, onU
       ) : (
         <ul className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3 sm:gap-4">
           {shown.map((w) => (
-            <WorkerCard key={w.user_id} worker={w} onUnlock={onUnlock} onDetail={() => setDetail(w)} isMe={w.user_id === meId} paidGroup={MIN_TIER[category] > 0} />
+            <WorkerCard key={w.user_id} worker={w} onUnlock={onUnlock} onDetail={() => setDetail(w)} isMe={w.user_id === meId} paidGroup={MIN_TIER[category] > 0}
+              onPhoto={() => (w.canView ? w.image && setViewer({ url: w.image, name: w.display_name }) : onUnlock())} />
           ))}
         </ul>
       )}
+
+      {viewer && <ImageViewer images={[viewer.url]} alt={viewer.name} onClose={() => setViewer(null)} />}
 
       {detail && (
         <WorkerDetail worker={detail} isMe={detail.user_id === meId} onClose={() => setDetail(null)}
@@ -70,7 +75,7 @@ export default function HomeFeed({ workers, category, tier, loading, onBook, onU
   )
 }
 
-function WorkerCard({ worker: w, onUnlock, onDetail, isMe, paidGroup }) {
+function WorkerCard({ worker: w, onUnlock, onDetail, isMe, paidGroup, onPhoto }) {
   const { t, money, catName } = useI18n()
   const locked = !w.canView
 
@@ -83,18 +88,18 @@ function WorkerCard({ worker: w, onUnlock, onDetail, isMe, paidGroup }) {
       {/* overflow-hidden on the card stops the blur bleeding outside */}
       <div className="relative aspect-[3/4] w-full overflow-hidden bg-neutral-800">
         {w.image && (
-          <img
+          <img onClick={onPhoto}
             src={w.image}
             alt={locked ? '' : w.display_name}
             loading="lazy"
             draggable={false}
             // Real teasers are already mosaicked by the worker; `demo` rows get a CSS blur instead.
-            className={`h-full w-full select-none object-cover ${locked && w.demo ? 'filter blur-md scale-110' : ''}`}
+            className={`h-full w-full cursor-pointer select-none object-cover ${locked && w.demo ? 'filter blur-md scale-110' : ''}`}
           />
         )}
 
         {locked && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/25">
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/25">
             <span className="rounded-full bg-black/60 px-3 py-1 text-xs font-semibold">{t('vipOnly')}</span>
           </div>
         )}
