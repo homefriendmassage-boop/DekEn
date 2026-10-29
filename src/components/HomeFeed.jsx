@@ -55,7 +55,7 @@ export default function HomeFeed({ workers, category, tier, loading, onBook, onU
       ) : (
         <ul className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3 sm:gap-4">
           {shown.map((w) => (
-            <WorkerCard key={w.user_id} worker={w} onUnlock={onUnlock} onDetail={() => setDetail(w)} isMe={w.user_id === meId} />
+            <WorkerCard key={w.user_id} worker={w} onUnlock={onUnlock} onDetail={() => setDetail(w)} isMe={w.user_id === meId} paidGroup={MIN_TIER[category] > 0} />
           ))}
         </ul>
       )}
@@ -70,7 +70,7 @@ export default function HomeFeed({ workers, category, tier, loading, onBook, onU
   )
 }
 
-function WorkerCard({ worker: w, onUnlock, onDetail, isMe }) {
+function WorkerCard({ worker: w, onUnlock, onDetail, isMe, paidGroup }) {
   const { t, money, catName } = useI18n()
   const locked = !w.canView
 
@@ -146,6 +146,9 @@ function WorkerCard({ worker: w, onUnlock, onDetail, isMe }) {
         </p>
         {isMe ? (
           <p className="rounded-xl bg-white/10 py-2.5 text-center text-sm font-semibold text-neutral-300">{t('ownProfile')}</p>
+        ) : locked && paidGroup ? (
+          // massage / spa without the package: the covered photo is all there is; the details open after subscribing
+          <button onClick={onUnlock} className="w-full rounded-xl bg-amber-400 py-2.5 text-sm font-bold text-black transition active:scale-95">🔒 {t('unlockDetails')}</button>
         ) : locked ? (
           <div className="grid gap-1.5">
             <button onClick={onDetail} className="w-full rounded-xl bg-pink-500 py-2.5 text-sm font-bold text-white transition active:scale-95">{t('viewDetail')}</button>

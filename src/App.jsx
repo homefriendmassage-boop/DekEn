@@ -245,6 +245,9 @@ export default function App() {
   }
 
   const tier = session?.isMock && previewTier !== null ? previewTier : tierOf(me)
+  // a paid seller (or the owner of a seller OA) sees every group in full so he can share: the database widens what he sees
+  const sellerView = !!sellerSt?.is_seller && sellerSt?.via !== 'provider'
+  const viewTier = sellerView ? 3 : tier
 
   // ---- Feed: the server decides what we may see (list_workers); then we fetch
   //      signed URLs for the full photos of the workers we are allowed to view. ----
@@ -403,7 +406,7 @@ export default function App() {
               </button>
             )}
           </div>
-          <CategoryPicker tier={tier} onPick={openCategory} onLocked={() => setShowMembership(true)} />
+          <CategoryPicker tier={viewTier} onPick={openCategory} />
         </>
       )}
 

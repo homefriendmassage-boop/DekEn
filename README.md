@@ -478,3 +478,10 @@ Run `supabase/migration_048.sql` once, after migration_047. The storage policies
 ## migration_049 — profile removal with a GPS location
 
 Run `supabase/migration_049.sql` once, after migration_048. `finish_profile_deletion()` (admin "ลบเลย" and the 24-hour automatic removal) failed with `BAD_LOCATION` for providers with a GPS-confirmed location, because blanking the location tripped `normalize_worker_profile`. The validation is now skipped for that one wipe (`app.profile_wipe`).
+
+## migration_050 — covered photos for everyone, full view for sellers
+
+Run `supabase/migration_050.sql` once, after migration_049. No Edge Function change.
+
+- Category page: every tile opens its list. In the paid groups (massage / spa) a visitor without the package sees the girls with the face covered; the card has "สมัครแพ็กเกจเพื่อดูรายละเอียด" (opens the package sheet) instead of the details.
+- An active seller (paid plan, or owner of a seller OA) sees the faces and the details of ALL groups so he can share: `seller_can_view()` / `view_tier()` feed `list_workers` and `can_view_worker` (photos, bookings). Chat and the package tiers still follow the membership; providers who are sellers for free get nothing extra.
