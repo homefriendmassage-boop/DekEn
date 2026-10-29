@@ -1,9 +1,9 @@
 import { getVendor } from '../lib/vendor'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useI18n } from '../i18n'
 import { getPosition } from '../lib/geo'
-import { bookingErrorKey, feeFor, isPremium, withFee } from '../lib/booking'
+import { bookingErrorKey, feeFor, fmtWhen, isPremium, rateMinutes, withFee } from '../lib/booking'
 import { ratesOf } from './WorkerDetail'
 
 const input = 'mt-1 w-full rounded-xl bg-white/10 px-3 py-2.5 text-base outline-none ring-1 ring-white/10 focus:ring-line'
@@ -17,7 +17,7 @@ const localInput = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.g
  * Props: worker, walletBalance, onClose(), onBooked(), onTopUp()
  */
 export default function BookingModal({ worker, walletBalance, onClose, onBooked, onTopUp }) {
-  const { t, money } = useI18n()
+  const { t, money, lang } = useI18n()
   const rates = useMemo(() => ratesOf(worker, t), [worker, t])
   const [rate, setRate] = useState(worker.start_rate && rates.some((r) => r[0] === worker.start_rate) ? worker.start_rate : rates[0]?.[0])
   const soon = useMemo(() => { const d = new Date(Date.now() + 60 * 60000); d.setMinutes(0, 0, 0); return localInput(d) }, [])
@@ -34,8 +34,15 @@ export default function BookingModal({ worker, walletBalance, onClose, onBooked,
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
 
+  // time ranges she already has accepted bookings for: the customer decides whether to book another time
+  const [slots, setSlots] = useState([])
+  useEffect(() => { supabase.rpc('worker_booked_slots', { p_worker: worker.user_id }).then(({ data }) => setSlots(data ?? [])) }, [worker.user_id])
+
   const picked = rates.find((r) => r[0] === rate) ?? rates[0]
   const cash = Number(picked?.[2] ?? 0)
+  const startMs = when ? new Date(when).getTime() : NaN
+  const endMs = startMs + rateMinutes(rate) * 60000
+  const overlaps = slots.some((x) => startMs < new Date(x.end_at).getTime() && endMs > new Date(x.start_at).getTime())
   const fee = feeFor(worker.categories)                                   // 500, or 700 for massage / spa
   const insufficient = walletBalance < fee
 
@@ -93,6 +100,16 @@ export default function BookingModal({ worker, walletBalance, onClose, onBooked,
         <label className="block text-sm font-semibold">{t('bookWhen')}
           <input type="datetime-local" value={when} min={localInput(new Date(Date.now() + 15 * 60000))} onChange={(e) => setWhen(e.target.value)} className={input} />
         </label>
+        {slots.length > 0 && (
+          <div className="space-y-1 rounded-2xl bg-amber-400/10 p-3 ring-1 ring-amber-400/30">
+            <p className="text-sm font-semibold text-amber-200">🗓️ {t('slotsTitle')}</p>
+            <ul className="space-y-0.5 text-xs text-amber-100">
+              {slots.map((x, i) => <li key={i}>• {fmtWhen(x.start_at, lang)} – {new Date(x.end_at).toLocaleTimeString(lang === 'th' ? 'th-TH' : undefined, { hour: '2-digit', minute: '2-digit' })}</li>)}
+            </ul>
+            <p className="text-[11px] text-neutral-400">{t('slotsNote')}</p>
+            {overlaps && <p className="rounded-lg bg-red-500/15 p-2 text-xs font-semibold text-red-200">⚠️ {t('slotsOverlap')}</p>}
+          </div>
+        )}
 
         {canChooseTravel && (
           <fieldset className="space-y-2 rounded-2xl bg-white/5 p-3">

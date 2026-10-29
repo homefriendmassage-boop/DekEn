@@ -1,3 +1,4 @@
+import { rateMinutes } from '../lib/booking'
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useI18n } from '../i18n'
@@ -107,7 +108,7 @@ export default function WorkerDashboard({ userId, onTopUp, me, onWallet, openCha
         </span>
       </button>
 
-      {worker.is_online && jobs.some((j) => j.status === 'matched' && j.scheduled_at && Date.now() >= new Date(j.scheduled_at) - 3 * 3600e3 && Date.now() <= +new Date(j.scheduled_at) + 12 * 3600e3) && (
+      {worker.is_online && jobs.some((j) => j.status === 'matched' && j.scheduled_at && Date.now() >= new Date(j.scheduled_at) - 3600e3 && Date.now() <= +new Date(j.scheduled_at) + (rateMinutes(j.rate_label) + 120) * 60e3) && (
         <p className="rounded-xl bg-amber-400/15 p-3 text-sm font-semibold text-amber-200">🟠 {t('busyNow')} · {t('busyNote')}</p>
       )}
 

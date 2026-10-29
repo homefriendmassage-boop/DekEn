@@ -423,3 +423,10 @@ Run `supabase/migration_041.sql` once, after migration_040. **Redeploy** the Edg
 - Fee: `booking_fee_for(worker)` = 700 for `masseuse` / `spa`, else 500. The Wallet charge, refunds and the 40 / 40 / 20 split use the fee stored in the booking. The app shows prices + the right fee (`feeFor`).
 - Massage / spa bookings: the customer chooses `worker_goes` or `customer_goes` (`jobs.travel_mode`, `create_booking(..., p_travel)`). When the customer goes he gives no place; she gives name / room (+ optional map link) when she accepts (`job_accept`), shown to him in "My bookings" and in the accepted push.
 - Busy (`worker_busy`): shown on the card and the detail ("ไม่ว่าง", `is_busy` of `list_workers` / `get_worker`) while she has an ACCEPTED booking within 3 hours before to 12 hours after the appointment; pressing "finish" (or a cancel) frees her at once. Her own online switch is not touched.
+
+## migration_042 — busy window 1 hour, booked time ranges
+
+Run `supabase/migration_042.sql` once, after migration_041. No Edge Function change.
+
+- `worker_busy`: busy from 1 hour before an accepted appointment until she presses "finish" / cancels, or (if she forgets) 2 hours after the booked length. `rate_minutes()`: @60/@90/@120 = minutes, @4h/@6h/1h = hours, else 4 h.
+- `worker_booked_slots(worker)`: accepted booking ranges (no customer data). The booking form lists them ("ช่วงเวลาที่น้องมีงานแล้ว") and warns when the picked time overlaps; the customer can still send the request. Unchanged rule: she accepts or declines; no answer in 30 minutes = cancelled, fee refunded, customer told by Flex.

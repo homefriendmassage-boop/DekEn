@@ -22,3 +22,10 @@ export const BOOKING_ERRORS = {
   BAD_MAP_LINK: 'errBadMapLink', BAD_PHONE: 'errBadPhone', BAD_PLACE: 'errBadPlace', SUSPENDED: 'errSuspendedBooking',
 }
 export const bookingErrorKey = (msg = '') => BOOKING_ERRORS[Object.keys(BOOKING_ERRORS).find((k) => msg.includes(k))] ?? 'errGeneric'
+
+// How long a booked rate lasts (same rule as rate_minutes() in the database).
+export function rateMinutes(label) {
+  if (/^@(60|90|120)$/.test(label ?? '')) return Number(label.slice(1))
+  const h = /^@?(\d{1,2})h$/.exec(label ?? '')
+  return h ? Number(h[1]) * 60 : 240
+}
