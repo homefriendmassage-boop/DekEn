@@ -43,6 +43,26 @@ export function captureWorkerParam() {
   }
   try { if (id && UUID.test(id)) sessionStorage.setItem('open_worker', id) } catch { /* storage blocked */ }
 }
+// Link to an agency's page: ?agencypage=<agency id>
+export function captureAgencyPageParam() {
+  const params = new URLSearchParams(window.location.search)
+  let id = params.get('agencypage')
+  if (!id) {
+    const state = params.get('liff.state')
+    if (state) {
+      const q = state.indexOf('?')
+      id = new URLSearchParams(q >= 0 ? state.slice(q) : state).get('agencypage')
+    }
+  }
+  try { if (id && UUID.test(id)) sessionStorage.setItem('open_agencypage', id) } catch { /* storage blocked */ }
+}
+export function takeAgencyPageIntent() {
+  try {
+    const v = sessionStorage.getItem('open_agencypage')
+    sessionStorage.removeItem('open_agencypage')
+    return v
+  } catch { return null }
+}
 export function takeWorkerIntent() {
   try {
     const v = sessionStorage.getItem('open_worker')
@@ -218,6 +238,7 @@ export async function signIn() {
   captureRefCode()
   captureOpenParam()
   captureWorkerParam()
+  captureAgencyPageParam()
   captureChatParam()
   captureDraftParam()
   captureOnlyParam()
@@ -270,6 +291,7 @@ export async function signIn() {
 
   captureOpenParam()
   captureWorkerParam()
+  captureAgencyPageParam()
   captureChatParam()
   captureDraftParam()
   captureOnlyParam()

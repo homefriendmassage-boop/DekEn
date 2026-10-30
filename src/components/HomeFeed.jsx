@@ -5,6 +5,7 @@ import { logoUrl } from '../lib/logo'
 import { withFee } from '../lib/booking'
 import ImageViewer from './ImageViewer'
 import WorkerDetail, { LocBadge, priceLabel } from './WorkerDetail'
+import { AgencyStrip } from './AgencyStrip'
 
 /**
  * Grid of workers in one category. Mobile-first: 2 columns on phones, 3 on tablets+.
@@ -14,7 +15,7 @@ import WorkerDetail, { LocBadge, priceLabel } from './WorkerDetail'
  *  - !can_view : public teaser (the worker's own face-mosaicked photo) + lock + Unlock button
  * The browser never receives the full photo of a worker it isn't allowed to see.
  */
-export default function HomeFeed({ workers, category, tier, loading, onBook, onUnlock, onAsk, unreadByWorker = {}, meId, nearOn, nearBusy, onToggleNear }) {
+export default function HomeFeed({ workers, category, tier, loading, onBook, onUnlock, onAsk, unreadByWorker = {}, agencies = [], onAgency, header = null, meId, nearOn, nearBusy, onToggleNear }) {
   const { t } = useI18n()
   const freeCategory = MIN_TIER[category] === 0
   const [province, setProvince] = useState('')
@@ -25,6 +26,8 @@ export default function HomeFeed({ workers, category, tier, loading, onBook, onU
 
   return (
     <div>
+      {header}
+      {!header && onAgency && <AgencyStrip agencies={agencies} category={category} onOpen={onAgency} />}
       {tier === 0 && freeCategory && (
         <div className="mx-3 mt-3 rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-200 sm:text-sm">
           🔒 {t('freeLimitNote', { n: FREE_RANK_LIMIT })}
@@ -56,7 +59,7 @@ export default function HomeFeed({ workers, category, tier, loading, onBook, onU
       ) : (
         <ul className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3 sm:gap-4">
           {shown.map((w) => (
-            <WorkerCard key={w.user_id} worker={w} onUnlock={onUnlock} onDetail={() => setDetail(w)} onAsk={() => onAsk(w)} unread={unreadByWorker[w.user_id] ?? 0} isMe={w.user_id === meId} paidGroup={MIN_TIER[category] > 0}
+            <WorkerCard key={w.user_id} worker={w} onUnlock={onUnlock} onDetail={() => setDetail(w)} onAsk={() => onAsk(w)} onAgency={() => onAgency?.(w.agency_id)} unread={unreadByWorker[w.user_id] ?? 0} isMe={w.user_id === meId} paidGroup={MIN_TIER[category] > 0}
               onPhoto={() => (w.canView ? w.image && setViewer({ url: w.image, name: w.display_name }) : onUnlock())} />
           ))}
         </ul>
@@ -65,7 +68,7 @@ export default function HomeFeed({ workers, category, tier, loading, onBook, onU
       {viewer && <ImageViewer images={[viewer.url]} alt={viewer.name} onClose={() => setViewer(null)} />}
 
       {detail && (
-        <WorkerDetail worker={detail} isMe={detail.user_id === meId} onClose={() => setDetail(null)}
+        <WorkerDetail worker={detail} isMe={detail.user_id === meId} onClose={() => setDetail(null)} onAgency={onAgency && detail.agency_id ? () => { const id = detail.agency_id; setDetail(null); onAgency(id) } : undefined}
           onUnlock={() => { setDetail(null); onUnlock() }}
           onBook={() => { const w = detail; setDetail(null); onBook(w) }}
           onAsk={() => { const w = detail; setDetail(null); onAsk(w) }} />
@@ -74,7 +77,7 @@ export default function HomeFeed({ workers, category, tier, loading, onBook, onU
   )
 }
 
-function WorkerCard({ worker: w, onUnlock, onDetail, onAsk, unread, isMe, paidGroup, onPhoto }) {
+function WorkerCard({ worker: w, onUnlock, onDetail, onAsk, onAgency, unread, isMe, paidGroup, onPhoto }) {
   const { t, money, catName } = useI18n()
   const locked = !w.canView
 
@@ -114,10 +117,10 @@ function WorkerCard({ worker: w, onUnlock, onDetail, onAsk, unread, isMe, paidGr
         )}
 
         {w.agency_logo && (
-          <span className="absolute bottom-2 left-2 flex max-w-[80%] items-center gap-1 rounded-full bg-black/60 py-0.5 pl-0.5 pr-2 text-[10px] sm:text-xs">
+          <button onClick={(e) => { e.stopPropagation(); onAgency() }} className="absolute bottom-2 left-2 z-10 flex max-w-[80%] items-center gap-1 rounded-full bg-black/60 py-0.5 pl-0.5 pr-2 text-[10px] active:scale-95 sm:text-xs">
             <img src={logoUrl(w.agency_logo)} alt="" className="h-5 w-5 shrink-0 rounded-full object-cover" />
             <span className="truncate">{w.agency_name}</span>
-          </span>
+          </button>
         )}
 
         <span

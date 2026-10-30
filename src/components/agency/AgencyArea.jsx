@@ -297,7 +297,17 @@ function Settings({ ag, me, reload, flash }) {
   const [file, setFile] = useState(null)
   const [preview, setPreview] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [disp, setDisp] = useState(null)        // { show_badge, show_count, intro } as it is live now
+  const [intro, setIntro] = useState('')
   const input = 'mt-1 w-full rounded-xl bg-white/10 px-3 py-2.5 text-base outline-none ring-1 ring-white/10 focus:ring-line'
+  useEffect(() => { supabase.rpc('agency_display').then(({ data }) => { setDisp(data ?? null); setIntro(data?.intro ?? '') }) }, [])
+  async function toggle(key) {
+    const next = { ...disp, [key]: !disp[key] }
+    setDisp(next)
+    const { error } = await supabase.rpc('agency_set_display', { p_badge: next.show_badge, p_count: next.show_count })
+    if (error) { setDisp(disp); return flash('บันทึกไม่สำเร็จ') }
+    flash('บันทึกแล้ว')
+  }
   const loadReq = useCallback(() => supabase.rpc('agency_my_edit').then(({ data }) => setReq(data ?? null)), [])
   useEffect(() => { loadReq() }, [loadReq])
 
@@ -313,7 +323,7 @@ function Settings({ ag, me, reload, flash }) {
       const { error } = await supabase.storage.from('agency-logos').upload(path, blob, { contentType: 'image/jpeg' })
       if (error) { setBusy(false); return flash(`อัปโหลดโลโก้ไม่สำเร็จ: ${error.message}`.slice(0, 140)) }
     }
-    const { error } = await supabase.rpc('agency_request_edit', { p_name: name, p_logo_path: path })
+    const { error } = await supabase.rpc('agency_request_edit', { p_name: name, p_logo_path: path, p_intro: intro.trim() !== (disp?.intro ?? '') ? intro.trim() : null })
     setBusy(false)
     if (error) return flash(errText(error.message))
     flash('ส่งให้แอดมินอนุมัติแล้ว')
@@ -327,10 +337,22 @@ function Settings({ ag, me, reload, flash }) {
   const pending = req?.status === 'pending'
   return (
     <form onSubmit={submit} className="space-y-4">
-      <p className="text-sm text-neutral-400">แก้ชื่อหรือโลโก้สังกัดได้ แต่ต้องรอแอดมินอนุมัติ ระหว่างนั้นระบบยังใช้ชื่อและโลโก้เดิมอยู่</p>
+      {disp && (
+        <section className="space-y-2 rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
+          <p className="text-sm font-semibold">การแสดงผลหน้าลูกค้า (มีผลทันที)</p>
+          {[['show_badge', 'แสดงป้ายสังกัดบนการ์ดน้อง', 'ป้ายโลโก้และชื่อสังกัดมุมรูปน้อง กดแล้วเข้าหน้าสังกัด'], ['show_count', 'แสดงจำนวนน้องในสังกัด', 'ตัวเลขบนแถบสังกัดและหน้าสังกัด']].map(([k, label, hint]) => (
+            <button type="button" key={k} onClick={() => toggle(k)} className="flex w-full items-center justify-between gap-3 rounded-xl bg-white/5 px-3 py-2.5 text-left active:scale-[0.99]">
+              <span><span className="block text-sm font-semibold">{label}</span><span className="block text-[11px] text-neutral-400">{hint}</span></span>
+              <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${disp[k] ? 'bg-line text-black' : 'bg-white/10 text-neutral-300'}`}>{disp[k] ? 'เปิด' : 'ปิด'}</span>
+            </button>
+          ))}
+          <p className="text-[11px] text-neutral-500">หน้าสังกัดและน้องของคุณแสดงต่อลูกค้าเมื่อแพ็กเกจสังกัดชำระและยังไม่หมดอายุเท่านั้น</p>
+        </section>
+      )}
+      <p className="text-sm text-neutral-400">แก้ชื่อ โลโก้ หรือข้อความแนะนำสังกัดได้ แต่ต้องรอแอดมินอนุมัติ ระหว่างนั้นระบบยังใช้ของเดิมอยู่</p>
       {pending && (
         <div className="space-y-2 rounded-2xl bg-amber-400/10 p-3 text-sm text-amber-200">
-          <p>⏳ รอแอดมินอนุมัติ{req.new_name ? ` · ชื่อใหม่: ${req.new_name}` : ''}{req.new_logo_path ? ' · โลโก้ใหม่' : ''}</p>
+          <p>⏳ รอแอดมินอนุมัติ{req.new_name ? ` · ชื่อใหม่: ${req.new_name}` : ''}{req.new_logo_path ? ' · โลโก้ใหม่' : ''}{req.new_intro != null ? ' · ข้อความแนะนำใหม่' : ''}</p>
           {req.new_logo_path && <img src={logoUrl(req.new_logo_path)} alt="" className="h-14 w-14 rounded-full object-cover" />}
           <button type="button" onClick={cancel} className="rounded-lg bg-white/10 px-3 py-1 text-xs text-neutral-200 active:scale-95">ยกเลิกคำขอ</button>
         </div>
@@ -352,7 +374,10 @@ function Settings({ ag, me, reload, flash }) {
           </label>
         </div>
       </div>
-      <button disabled={busy || (!file && name.trim() === ag.name)} className="w-full rounded-xl bg-line py-3 font-bold text-black active:scale-95 disabled:opacity-40">{busy ? 'กำลังส่ง…' : 'ส่งให้แอดมินอนุมัติ'}</button>
+      <label className="block text-sm">ข้อความแนะนำสังกัด (ลูกค้าเห็นบนหน้าสังกัด สูงสุด 200 ตัวอักษร ต้องผ่านแอดมิน)
+        <textarea rows={3} maxLength={200} value={intro} onChange={(e) => setIntro(e.target.value)} className={input} placeholder="เช่น รับงานย่านพัทยา ดูแลโดยทีมงานมืออาชีพ" />
+      </label>
+      <button disabled={busy || (!file && name.trim() === ag.name && intro.trim() === (disp?.intro ?? ''))} className="w-full rounded-xl bg-line py-3 font-bold text-black active:scale-95 disabled:opacity-40">{busy ? 'กำลังส่ง…' : 'ส่งให้แอดมินอนุมัติ'}</button>
     </form>
   )
 }

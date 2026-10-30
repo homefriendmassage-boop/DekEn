@@ -58,6 +58,7 @@ export default function Agencies({ onChanged, toast }) {
                   {r.new_logo_path ? <img src={logoUrl(r.new_logo_path)} alt="" className="h-14 w-14 rounded-full object-cover ring-2 ring-line" /> : <span className="text-xs text-neutral-500">ไม่เปลี่ยนโลโก้</span>}
                 </div>
                 <p className="text-sm">ชื่อ: <b>{r.old_name}</b>{r.new_name ? <> → <b className="text-line">{r.new_name}</b></> : <span className="text-neutral-500"> (ไม่เปลี่ยน)</span>}</p>
+                {r.new_intro != null && <p className="whitespace-pre-wrap break-words rounded-lg bg-white/5 p-2 text-xs"><span className="text-neutral-500">ข้อความแนะนำ: {r.old_intro || '—'} → </span><b className="text-line">{r.new_intro || '(ลบข้อความ)'}</b></p>}
                 {rejecting === r.id ? (
                   <div className="space-y-2">
                     <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="เหตุผล (ไม่บังคับ)" className="w-full rounded-xl bg-white/10 px-3 py-2 text-sm" />

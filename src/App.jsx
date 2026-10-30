@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from './supabaseClient'
-import { signIn, takeOpenIntent, takeWorkerIntent, takeChatIntent, takeDraftIntent, takeJobIntent, takeSupportIntent, getAgencyCode, isApplyOnly, clearApplyOnly } from './lib/auth'
+import { signIn, takeOpenIntent, takeWorkerIntent, takeChatIntent, takeDraftIntent, takeJobIntent, takeSupportIntent, getAgencyCode, isApplyOnly, clearApplyOnly, takeAgencyPageIntent } from './lib/auth'
 import { getPosition } from './lib/geo'
 import { CATEGORIES, PLAN_META, canViewWorker, suspensionOf, tierOf } from './config'
 import { LangSwitcher, useI18n } from './i18n'
@@ -12,6 +12,7 @@ import CategoryPicker from './components/CategoryPicker'
 import HomeFeed from './components/HomeFeed'
 import BookingModal from './components/BookingModal'
 import MembershipModal from './components/MembershipModal'
+import { AgencyHeader } from './components/AgencyStrip'
 import WorkerApply from './components/WorkerApply'
 import WorkerDashboard from './components/WorkerDashboard'
 import ChatModal from './components/ChatModal'
@@ -76,6 +77,8 @@ export default function App() {
   const [chat, setChat] = useState(null)              // { id, other_name } of the open chat
   const [showThreads, setShowThreads] = useState(false)
   const [chatUnread, setChatUnread] = useState(0)
+  const [agDir, setAgDir] = useState({ agencies: [], members: {} })   // agencies a customer may see (active plan) and which girl belongs to which
+  const [agencyFilter, setAgencyFilter] = useState(null)             // id of the agency whose page is open
   const [custThreads, setCustThreads] = useState([])    // my chats with providers: who replied and I haven't read
   const [support, setSupport] = useState(null)       // { threadId } while the admin chat is open
   const [supportUnread, setSupportUnread] = useState(0)
@@ -168,6 +171,13 @@ export default function App() {
         }
         const draftTok = takeDraftIntent()     // a link an admin / modelling agency issued for her
         if (draftTok) setClaim(draftTok)
+        const { data: dir } = await supabase.rpc('agency_directory')
+        if (dir?.agencies) setAgDir(dir)
+        const agencyPage = takeAgencyPageIntent()      // a link to an agency's page
+        if (agencyPage) {
+          const ag = dir?.agencies?.find((a) => a.id === agencyPage)
+          if (ag) { setAgencyFilter(ag.id); setCategory(ag.cats[0]); setView('feed'); loadFeed(ag.cats[0]) } else showToast(t('agencyNotFound'))
+        }
         const sharedId = takeWorkerIntent()
         if (sharedId) { setView('categories'); setShared({ id: sharedId, friend: true, worker: null }) }   // no forced friend-adding for customers
         if (!cancelled) setPhase('ready')
@@ -232,6 +242,10 @@ export default function App() {
     const ch = supabase.channel('cust-threads').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, loadThreads).subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [me?.id, loadThreads])
+  useEffect(() => {
+    if (!me?.id || (view !== 'feed' && view !== 'categories')) return
+    supabase.rpc('agency_directory').then(({ data }) => { if (data?.agencies) setAgDir(data) })
+  }, [me?.id, view])
   const unreadByWorker = Object.fromEntries(custThreads.filter((x) => x.unread > 0).map((x) => [x.worker_id, x.unread]))
   const replyNotice = custThreads.some((x) => x.unread > 0) && (
     <div className="space-y-1.5 px-4 pt-3">
@@ -336,7 +350,19 @@ export default function App() {
     setChat({ id: data, other_name: w.display_name })
   }
 
+  function openAgency(id) {
+    const ag = agDir.agencies.find((a) => a.id === id)
+    if (!ag) return showToast(t('agencyNotFound'))
+    const cat = ag.cats.includes(category) && view === 'feed' ? category : ag.cats[0]
+    setAgencyFilter(id)
+    setCategory(cat)
+    setView('feed')
+    loadFeed(cat)
+  }
+  function openAgencyCategory(cat) { setCategory(cat); loadFeed(cat) }
+
   function openCategory(cat) {
+    setAgencyFilter(null)
     setCategory(cat)
     setView('feed')
     loadFeed(cat)
@@ -346,8 +372,13 @@ export default function App() {
   const feedRows = workers.map((w) => {
     const canView = w.can_view ?? canViewWorker(w.category, w.rank, tier)
     const full = canView && w.original_path ? signedUrls[w.original_path] : null
-    return { ...w, canView, image: full ?? w.profile_image }
-  })
+    const agencyId = agDir.members[w.user_id] ?? null
+    const ag = agencyId ? agDir.agencies.find((a) => a.id === agencyId) : null
+    // the badge shows only when the agency allows it; on an agency's own page it is redundant (the header says it)
+    const badge = ag?.show_badge && !agencyFilter
+    return { ...w, canView, image: full ?? w.profile_image, agency_id: agencyId, agency_logo: badge ? w.agency_logo : null, agency_name: badge ? w.agency_name : null }
+  }).filter((w) => !agencyFilter || w.agency_id === agencyFilter)
+  const openedAgency = agencyFilter ? agDir.agencies.find((a) => a.id === agencyFilter) : null
 
   if (phase === 'loading') {
     return (
@@ -462,7 +493,7 @@ export default function App() {
 
       {view === 'feed' && (
         <>
-          <Header {...headerProps} title={catName(category)} onBack={() => setView('categories')} />
+          <Header {...headerProps} title={openedAgency ? openedAgency.name : catName(category)} onBack={() => (agencyFilter ? setAgencyFilter(null) : setView('categories'))} />
           {replyNotice}
           <HomeFeed
             workers={feedRows}
@@ -474,6 +505,9 @@ export default function App() {
             nearOn={nearOn} nearBusy={nearBusy} onToggleNear={toggleNear}
             onAsk={askWorker}
             unreadByWorker={unreadByWorker}
+            agencies={agDir.agencies}
+            onAgency={openAgency}
+            header={openedAgency ? <AgencyHeader agency={openedAgency} category={category} onCategory={openAgencyCategory} catName={catName} /> : null}
             meId={me?.id}
           />
         </>

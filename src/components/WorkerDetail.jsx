@@ -27,7 +27,7 @@ export function ratesOf(w, t) {
 }
 
 // Full profile of one provider (only reached for providers the viewer may open). Chat and booking start from here.
-export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlock, isMe, agencyView }) {
+export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlock, onAgency, isMe, agencyView }) {
   const { t, money, catName } = useI18n()
   const [imgs, setImgs] = useState([])      // gallery: the clear picture where the viewer may see it, else the mosaic
   const [idx, setIdx] = useState(0)
@@ -108,9 +108,9 @@ export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlo
           {(imgs[idx]?.url ?? w.image) && <span className="pointer-events-none absolute bottom-3 right-3 rounded-full bg-black/60 px-2 py-0.5 text-[10px] text-neutral-200">{w.canView ? `🔍 ${t('viewFull')}` : `🔒 ${t('unlockPhoto')}`}</span>}
           <button onClick={onClose} aria-label={t('close')} className="absolute right-3 top-3 rounded-full bg-black/60 px-3 py-1 text-sm active:scale-95">✕</button>
           {w.agency_logo && (
-            <span className="absolute bottom-3 left-3 flex items-center gap-1 rounded-full bg-black/60 py-0.5 pl-0.5 pr-2 text-xs">
+            <button type="button" onClick={onAgency} disabled={!onAgency} className="absolute bottom-3 left-3 z-10 flex items-center gap-1 rounded-full bg-black/60 py-0.5 pl-0.5 pr-2 text-xs active:scale-95">
               <img src={logoUrl(w.agency_logo)} alt="" className="h-5 w-5 rounded-full object-cover" /> {w.agency_name}
-            </span>
+            </button>
           )}
         </div>
 
