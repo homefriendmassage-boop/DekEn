@@ -192,8 +192,37 @@ export function buildAdminFlex(o: { event: string; detail?: string; liffId: stri
   }
 }
 
+// "Are you still working?" for providers who have been silent: confirm (30 d) · last warning (45 d) · hidden (60 d)
+export function buildAliveFlex(o: { event: string; detail?: string; liffId: string; logo?: string }) {
+  const money = o.detail === 'forfeit' ? ' รวมถึงยอดเงินคงเหลือในบัญชี (Wallet / โบนัส) จะถูกยกเลิก' : ''
+  const e: Record<string, { head: string; color: string; title: string; text: string }> = {
+    confirm: { head: '⏰ ยังทำงานอยู่ไหม?', color: '#F59E0B', title: 'ยืนยันว่ายังทำงานอยู่', text: 'คุณไม่ได้ใช้งานมา 30 วันแล้ว กดปุ่มด้านล่างเพื่อยืนยัน โปรไฟล์จะแสดงให้ลูกค้าเห็นตามปกติ' },
+    final: { head: '⚠️ เตือนครั้งสุดท้าย', color: '#EF4444', title: 'ไม่ได้ใช้งานมา 45 วัน', text: `ถ้าไม่ยืนยันก่อนครบ 60 วัน โปรไฟล์จะถูกซ่อนจากหน้าลูกค้าและปิดแชต และเมื่อครบ 90 วันจะถูกลบถาวร${money}` },
+    hidden: { head: '🙈 โปรไฟล์ถูกซ่อนแล้ว', color: '#EF4444', title: 'ไม่ได้ใช้งานครบ 60 วัน', text: `โปรไฟล์ถูกซ่อนและปิดแชตไว้ กดปุ่มด้านล่างเพื่อกลับมาแสดงทันที ถ้าไม่เปิดแอปภายใน 30 วัน (ครบ 90 วัน) โปรไฟล์และรูปจะถูกลบถาวร${money}` },
+  }[o.event]
+  if (!e) return null
+  const uri = `https://liff.line.me/${o.liffId}?open=alive`
+  return {
+    type: 'flex', altText: `${e.head} ${e.title}`,
+    contents: {
+      type: 'bubble', size: 'kilo',
+      styles: { body: { backgroundColor: '#161616' }, footer: { backgroundColor: '#161616' } },
+      body: { type: 'box', layout: 'vertical', spacing: 'md', paddingAll: 'xl', contents: [
+        { type: 'box', layout: 'horizontal', spacing: 'md', alignItems: 'center', contents: [
+          ...(o.logo ? [{ type: 'image', url: o.logo, size: '40px', aspectMode: 'cover', aspectRatio: '1:1', flex: 0 }] : []),
+          { type: 'text', text: e.head, weight: 'bold', size: 'md', color: e.color, gravity: 'center', wrap: true },
+        ] },
+        { type: 'text', text: e.title, weight: 'bold', size: 'lg', color: '#FFFFFF', wrap: true },
+        { type: 'text', text: e.text, size: 'sm', color: '#DDDDDD', wrap: true },
+      ] },
+      footer: { type: 'box', layout: 'vertical', paddingAll: 'lg', contents: [{ type: 'button', style: 'primary', color: '#06C755', height: 'md', action: { type: 'uri', label: 'ยืนยันว่ายังทำงานอยู่', uri } }] },
+    },
+  }
+}
+
 // To the person who applied: approved / rejected
 export function buildApprovalFlex(o: { kind: string; event: string; detail?: string; liffId: string; logo?: string }) {
+  if (o.kind === 'alive') return buildAliveFlex(o)
   const ok = o.event === 'approved' || o.event === 'paid'
   const what: Record<string, { name: string; open: string; yes: string; no: string; button: string }> = {
     worker: { name: 'การสมัครเป็นผู้ให้บริการ', open: 'worker', yes: 'โปรไฟล์ของคุณแสดงในระบบแล้ว และสถานะ "ออนไลน์" เปิดให้อัตโนมัติ ลูกค้าจองได้ทันที', no: 'แอดมินยังไม่อนุมัติ แก้ข้อมูลตามเหตุผลแล้วสมัครใหม่ได้', button: 'เปิดหน้าผู้ให้บริการ' },

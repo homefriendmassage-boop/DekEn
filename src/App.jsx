@@ -136,6 +136,7 @@ export default function App() {
         if (openIntent === 'seller') { setView('categories'); setShowSeller(true) }     // seller plan reminder
         if (['bartender', 'ent', 'masseuse', 'spa'].includes(openIntent)) openCategory(openIntent)     // payment Flex: straight to that group
         if (openIntent === 'wallet') { setView('categories'); setShowWallet(true) }              // withdrawal / identity Flex
+        if (openIntent === 'alive') { setView('worker'); setWorkerTab('self'); showToast('ยืนยันแล้ว ขอบคุณค่ะ โปรไฟล์ของคุณแสดงตามปกติ') }   // "still working?" Flex: opening the app is the confirmation
         if (openIntent === 'worker') { setView('worker'); setWorkerTab('self') }     // approval Flex
         if (openIntent === 'agency') { setView('worker'); setWorkerTab('agency') }       // agency plan Flex / reminder
         const chatId = takeChatIntent()        // opened from the "new message" push: go straight to that chat room
