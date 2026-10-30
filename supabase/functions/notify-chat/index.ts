@@ -164,6 +164,8 @@ const ADMIN_EVENTS: Record<string, { head: string; text: string; tab: string; co
   draft: { head: '📝 โมเดลลิ่งส่งแบบร่างรออนุมัติ', text: 'ตรวจแบบร่างแล้วอนุมัติ/ตีกลับ', tab: 'drafts', color: '#EC4899', button: 'เปิดแบบร่างให้น้อง' },
   flag: { head: '🚩 ห้องแชตผิดกฎ (ธงเตือน)', text: 'มีการพยายามส่งข้อมูลติดต่อ ตรวจดูห้องที่ติดธง', tab: 'chats', color: '#EF4444', button: 'เปิดหน้าธง/รายงาน' },
   report: { head: '🚩 มีรายงานจากผู้ใช้', text: 'ตรวจรายงานแล้วดำเนินการ', tab: 'chats', color: '#EF4444', button: 'เปิดหน้าธง/รายงาน' },
+  identity: { head: '🪪 ขอยืนยันตัวตนเพื่อถอนเงิน', text: 'ตรวจข้อมูลและยืนยันตัวตนทาง LINE แล้วกดอนุมัติ', tab: 'withdrawals', color: '#F59E0B', button: 'เปิดหน้าถอนเงิน' },
+  withdraw: { head: '💸 มีคำขอถอนเงิน', text: 'โอนเงินตามยอดสุทธิ แล้วบันทึกเลขอ้างอิงสลิปเพื่อออกใบหัก ณ ที่จ่าย', tab: 'withdrawals', color: '#F59E0B', button: 'เปิดหน้าถอนเงิน' },
   slip: { head: '🔎 มีสลิปรอตรวจ', text: 'ระบบตรวจสลิปอัตโนมัติไม่ผ่าน ต้องให้แอดมินตัดสิน', tab: 'reviews', color: '#F59E0B', button: 'เปิดหน้าตรวจสลิป' },
 }
 export function buildAdminFlex(o: { event: string; detail?: string; liffId: string; logo?: string }) {
@@ -191,28 +193,31 @@ export function buildAdminFlex(o: { event: string; detail?: string; liffId: stri
 
 // To the person who applied: approved / rejected
 export function buildApprovalFlex(o: { kind: string; event: string; detail?: string; liffId: string; logo?: string }) {
-  const ok = o.event === 'approved'
+  const ok = o.event === 'approved' || o.event === 'paid'
   const what: Record<string, { name: string; open: string; yes: string; no: string; button: string }> = {
     worker: { name: 'การสมัครเป็นผู้ให้บริการ', open: 'worker', yes: 'โปรไฟล์ของคุณแสดงในระบบแล้ว และสถานะ "ออนไลน์" เปิดให้อัตโนมัติ ลูกค้าจองได้ทันที', no: 'แอดมินยังไม่อนุมัติ แก้ข้อมูลตามเหตุผลแล้วสมัครใหม่ได้', button: 'เปิดหน้าผู้ให้บริการ' },
     agency: { name: 'การสมัครโมเดลลิ่ง/สังกัด', open: 'agency', yes: 'ชำระแพ็กเกจเพื่อเปิดใช้งาน แล้วส่งลิงก์ชวนน้องเข้าสังกัดได้เลย', no: 'แอดมินยังไม่อนุมัติ แก้ข้อมูลตามเหตุผลแล้วส่งใหม่ได้', button: 'เปิดหลังบ้านสังกัด' },
+    identity: { name: 'การยืนยันตัวตนเพื่อถอนเงิน', open: 'wallet', yes: 'ยืนยันตัวตนเรียบร้อย กดถอนเงินได้ที่กระเป๋าโบนัส', no: 'ข้อมูลยังไม่ผ่านการตรวจ แก้ไขตามเหตุผลแล้วส่งใหม่ได้', button: 'เปิดกระเป๋าโบนัส' },
+    withdraw: { name: 'การถอนเงิน', open: 'wallet', yes: 'โอนเงินเข้าบัญชีพร้อมเพย์ของคุณแล้ว (ยอดสุทธิตามรายการ) ดูใบหัก ณ ที่จ่ายได้ที่ประวัติการถอน', no: 'คำขอถอนเงินถูกปฏิเสธ ยอดเงินคืนเข้ากระเป๋าโบนัสแล้ว', button: 'เปิดกระเป๋าโบนัส' },
     edit: { name: 'คำขอแก้ไขโปรไฟล์', open: 'worker', yes: 'ข้อมูลและรูปใหม่แสดงในระบบเรียบร้อยแล้ว', no: 'แอดมินยังไม่อนุมัติการแก้ไข ดูเหตุผลและส่งใหม่ได้', button: 'เปิดหน้าผู้ให้บริการ' },
   }
   const w = what[o.kind]
   if (!w) return null
   const uri = `https://liff.line.me/${o.liffId}?open=${w.open}`
   return {
-    type: 'flex', altText: `${ok ? '✅' : '❌'} ${w.name}${ok ? ' อนุมัติแล้ว' : ' ไม่ผ่าน'}`,
+    type: 'flex', altText: `${ok ? '✅' : '❌'} ${w.name}${o.event === 'paid' ? ' โอนแล้ว' : ok ? ' อนุมัติแล้ว' : ' ไม่ผ่าน'}`,
     contents: {
       type: 'bubble', size: 'kilo',
       styles: { body: { backgroundColor: '#161616' }, footer: { backgroundColor: '#161616' } },
       body: { type: 'box', layout: 'vertical', spacing: 'md', paddingAll: 'xl', contents: [
         { type: 'box', layout: 'horizontal', spacing: 'md', alignItems: 'center', contents: [
           ...(o.logo ? [{ type: 'image', url: o.logo, size: '40px', aspectMode: 'cover', aspectRatio: '1:1', flex: 0 }] : []),
-          { type: 'text', text: ok ? '✅ อนุมัติเรียบร้อย' : '❌ ยังไม่ผ่านการตรวจ', weight: 'bold', size: 'md', color: ok ? '#06C755' : '#EF4444', gravity: 'center', wrap: true },
+          { type: 'text', text: o.event === 'paid' ? '✅ โอนเงินแล้ว' : ok ? '✅ อนุมัติเรียบร้อย' : '❌ ยังไม่ผ่านการตรวจ', weight: 'bold', size: 'md', color: ok ? '#06C755' : '#EF4444', gravity: 'center', wrap: true },
         ] },
         { type: 'text', text: w.name, weight: 'bold', size: 'lg', color: '#FFFFFF', wrap: true },
         { type: 'text', text: ok ? w.yes : w.no, size: 'sm', color: '#DDDDDD', wrap: true },
         ...(!ok && o.detail ? [{ type: 'text', text: `เหตุผล: ${o.detail}`, size: 'sm', color: '#F59E0B', wrap: true }] : []),
+        ...(o.event === 'paid' && o.detail ? [{ type: 'text', text: `ยอดโอนสุทธิ ${o.detail} บาท`, weight: 'bold', size: 'md', color: '#FFFFFF', wrap: true }] : []),
       ] },
       footer: { type: 'box', layout: 'vertical', paddingAll: 'lg', contents: [{ type: 'button', style: 'primary', color: ok ? '#06C755' : '#EC4899', height: 'md', action: { type: 'uri', label: w.button, uri } }] },
     },

@@ -1,3 +1,4 @@
+import WithdrawModal from './WithdrawModal'
 import { rateMinutes } from '../lib/booking'
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
@@ -17,7 +18,7 @@ export default function WorkerDashboard({ userId, onTopUp, me, onWallet, openCha
   const [worker, setWorker] = useState(null)
   const [jobs, setJobs] = useState([])
   const [chat, setChat] = useState(openChat ?? null)      // openChat: arrived from a "new message" LINE push
-  const [wdNote, setWdNote] = useState(false)
+  const [showWd, setShowWd] = useState(false)
   const [friendGate, setFriendGate] = useState(false)   // she must follow the OA to receive job notifications
   const [note, setNote] = useState(null)
   const [invite, setInvite] = useState(() => getAgencyCode())      // invitation link opened earlier
@@ -93,9 +94,8 @@ export default function WorkerDashboard({ userId, onTopUp, me, onWallet, openCha
           <p className="text-[11px] text-neutral-400">{t('bonusWhere')}</p>
           <div className="grid grid-cols-2 gap-2">
             <button onClick={onWallet} className="rounded-xl bg-white/10 py-2 text-sm font-semibold active:scale-95">{t('walletHistory')}</button>
-            <button onClick={() => setWdNote((x) => !x)} className="rounded-xl bg-amber-400 py-2 text-sm font-bold text-black active:scale-95">{t('withdraw')}</button>
+            <button onClick={() => setShowWd(true)} className="rounded-xl bg-amber-400 py-2 text-sm font-bold text-black active:scale-95">{t('withdraw')}</button>
           </div>
-          {wdNote && <p className="rounded-lg bg-black/30 p-2 text-xs text-amber-100">{t('withdrawSoon')}</p>}
         </section>
       )}
 
@@ -180,6 +180,7 @@ export default function WorkerDashboard({ userId, onTopUp, me, onWallet, openCha
       <RankBoost worker={worker} userId={userId} onTopUp={onTopUp} />
 
       {chat && <ChatModal threadId={chat.id} title={chat.other_name} meId={userId} onClose={() => setChat(null)} />}
+      {showWd && <WithdrawModal onClose={() => setShowWd(false)} onChanged={() => { loadWorker() }} />}
     </div>
   )
 }

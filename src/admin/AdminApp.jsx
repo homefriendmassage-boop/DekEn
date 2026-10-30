@@ -10,13 +10,14 @@ import Agencies from './Agencies'
 import ProfileEdits from './ProfileEdits'
 import Chats from './Chats'
 import Vendors from './Vendors'
+import Withdrawals from './Withdrawals'
 import VendorSelect from './VendorSelect'
 import DraftsPanel from '../components/DraftsPanel'
 import { baht } from './format'
 
 // Separate back office (admin.html). Access is decided by the DATABASE: every admin_* function
 // A push button opens e.g. admin.html?tab=apps (LINE may tuck the query into liff.state on the first open)
-const TABS = ['apps', 'reviews', 'support', 'pay', 'drafts', 'chats', 'edits', 'agencies', 'vendors', 'members']
+const TABS = ['apps', 'reviews', 'support', 'pay', 'drafts', 'chats', 'edits', 'agencies', 'vendors', 'members', 'withdrawals']
 function tabFromUrl() {
   try {
     const params = new URLSearchParams(window.location.search)
@@ -37,6 +38,7 @@ export default function AdminApp() {
   const [draftCount, setDraftCount] = useState(0)    // agency drafts waiting for review
   const [supportVendor, setSupportVendor] = useState(null)   // null = central customers
   const [supportVendorName, setSupportVendorName] = useState(null)
+  const [wdCount, setWdCount] = useState(0)       // identity checks + withdrawals waiting
   const [chatCount, setChatCount] = useState(0)    // flagged / reported / suspended chats waiting for a decision
   const [prefill, setPrefill] = useState(null)   // { user, tier } from "renew" on the Members tab
   const [toast, setToast] = useState(null)
@@ -52,6 +54,8 @@ export default function AdminApp() {
     setDraftCount(Array.isArray(dr.data) ? dr.data.length : 0)
     const c = await supabase.rpc('admin_chat_pending_count')
     setChatCount(typeof c.data === 'number' ? c.data : 0)
+    const wd = await supabase.rpc('admin_withdraw_pending_count')
+    setWdCount(typeof wd.data === 'number' ? wd.data : 0)
   }, [])
 
   // A new customer message or a new slip review refreshes the counters (admins can read all support messages)
@@ -109,6 +113,7 @@ export default function AdminApp() {
     ['agencies', '🏢 สังกัด'],
     ['vendors', '🏪 เซลล์/OA'],
     ['members', '👑 สมาชิก'],
+    ['withdrawals', `💸 ถอนเงิน${wdCount ? ` (${wdCount})` : ''}`],
   ]
 
   return (
@@ -153,6 +158,7 @@ export default function AdminApp() {
         {tab === 'edits' && <ProfileEdits onChanged={loadStats} toast={showToast} />}
         {tab === 'vendors' && <Vendors toast={showToast} />}
         {tab === 'agencies' && <Agencies onChanged={loadStats} toast={showToast} />}
+        {tab === 'withdrawals' && <Withdrawals toast={showToast} onChanged={loadStats} />}
         {tab === 'members' && <Members toast={showToast} onRenew={(user) => { setPrefill({ user, tier: user.vip_tier }); setTab('pay') }} />}
       </main>
 

@@ -132,6 +132,7 @@ export default function App() {
         if (openIntent === 'share') { setView('categories'); setShowShare(true) }       // opened from the new seller's Flex
         if (openIntent === 'seller') { setView('categories'); setShowSeller(true) }     // seller plan reminder
         if (['bartender', 'ent', 'masseuse', 'spa'].includes(openIntent)) openCategory(openIntent)     // payment Flex: straight to that group
+        if (openIntent === 'wallet') { setView('categories'); setShowWallet(true) }              // withdrawal / identity Flex
         if (openIntent === 'worker') { setView('worker'); setWorkerTab('self') }     // approval Flex
         if (openIntent === 'agency') { setView('worker'); setWorkerTab('agency') }       // agency plan Flex / reminder
         const chatId = takeChatIntent()        // opened from the "new message" push: go straight to that chat room

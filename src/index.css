@@ -10,3 +10,10 @@
     overscroll-behavior-y: none;
   }
 }
+
+/* printing the withholding-tax certificate: hide everything except the certificate */
+@media print {
+  body * { visibility: hidden; }
+  .cert-print, .cert-print * { visibility: visible; }
+  .cert-print { position: absolute; left: 0; top: 0; width: 100%; box-shadow: none; }
+}
