@@ -23,10 +23,11 @@ export default function ShareModal({ onClose, agencyCode }) {
   }, [agencyCode])
 
   const param = agencyCode ? 'agency' : 'ref'
+  const extra = agencyCode ? '&only=apply' : ''     // an agency's invitation opens the application form and nothing else
   const link = stats?.code
     ? USE_MOCK_LIFF || !getActiveLiffId()
-      ? `${window.location.origin}${window.location.pathname}?${param}=${stats.code}`
-      : `https://liff.line.me/${getActiveLiffId()}?${param}=${stats.code}`
+      ? `${window.location.origin}${window.location.pathname}?${param}=${stats.code}${extra}`
+      : `https://liff.line.me/${getActiveLiffId()}?${param}=${stats.code}${extra}`
     : null
 
   const canFlex = !USE_MOCK_LIFF && (() => { try { return liff.isApiAvailable('shareTargetPicker') } catch { return false } })()

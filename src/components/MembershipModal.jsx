@@ -32,24 +32,28 @@ export default function MembershipModal({ tier, walletBalance = 0, onClose, onPa
                 </div>
                 {tier === p.tier && <p className="mt-1 text-xs text-green-300">✓ {t('yourPlan')}</p>}
                 <p className="mt-2 text-neutral-300">{t(`plan${p.tier}`)}</p>
-                {onPay && p.tier >= tier && (
-                  <>
-                    <button onClick={() => onPay(p.tier)} className={`mt-3 w-full rounded-xl py-2 text-sm font-bold shadow active:scale-95 ${m.badge}`}>
-                      {tier === p.tier ? t('renew') : tier > 0 ? t('upgrade') : t('pay')} · {tier > 0 && p.tier > tier ? p.price - curPrice : p.price} {t('currency')}
+                {onPay && p.tier >= tier && (() => {
+                  const price = tier > 0 && p.tier > tier ? p.price - curPrice : p.price
+                  const enough = Boolean(onPayWallet) && walletBalance >= price
+                  const walletBtn = onPayWallet && (
+                    <button disabled={!enough} onClick={() => onPayWallet(p.tier, price)}
+                      className={enough ? `mt-3 w-full rounded-xl py-2.5 text-sm font-bold shadow active:scale-95 ${m.badge}` : 'mt-2 w-full rounded-xl bg-white/10 py-2 text-sm font-semibold active:scale-95 disabled:opacity-40'}>
+                      💰 {t('payWallet')} · {price} {t('currency')}{!enough && ` (${t('payWalletShort')} · ${money(walletBalance)})`}
                     </button>
-                    {tier > 0 && p.tier > tier && <p className="mt-1 text-center text-[11px] text-neutral-400">{t('upgradeNote')}</p>}
-                    {onPayWallet && (() => {
-                      const price = tier > 0 && p.tier > tier ? p.price - curPrice : p.price
-                      const enough = walletBalance >= price
-                      return (
-                        <button disabled={!enough} onClick={() => onPayWallet(p.tier, price)}
-                          className="mt-2 w-full rounded-xl bg-white/10 py-2 text-sm font-semibold active:scale-95 disabled:opacity-40">
-                          💰 {t('payWallet')} · {price} {t('currency')}{!enough && ` (${t('payWalletShort')} · ${money(walletBalance)})`}
-                        </button>
-                      )
-                    })()}
-                  </>
-                )}
+                  )
+                  const qrBtn = (
+                    <button onClick={() => onPay(p.tier)} className={enough ? 'mt-2 w-full rounded-xl bg-white/10 py-2 text-sm font-semibold active:scale-95' : `mt-3 w-full rounded-xl py-2 text-sm font-bold shadow active:scale-95 ${m.badge}`}>
+                      {enough ? t('payQrInstead') : `${tier === p.tier ? t('renew') : tier > 0 ? t('upgrade') : t('pay')} · ${price} ${t('currency')}`}
+                    </button>
+                  )
+                  return (
+                    <>
+                      {enough && <p className="mt-3 rounded-lg bg-green-500/15 p-2 text-xs font-semibold text-green-200">{t('walletEnough', { amount: money(walletBalance) })}</p>}
+                      {enough ? <>{walletBtn}{qrBtn}</> : <>{qrBtn}{walletBtn}</>}
+                      {tier > 0 && p.tier > tier && <p className="mt-1 text-center text-[11px] text-neutral-400">{t('upgradeNote')}</p>}
+                    </>
+                  )
+                })()}
               </li>
             )
           })}

@@ -38,6 +38,7 @@ export default function AdminApp() {
   const [draftCount, setDraftCount] = useState(0)    // agency drafts waiting for review
   const [supportVendor, setSupportVendor] = useState(null)   // null = central customers
   const [supportVendorName, setSupportVendorName] = useState(null)
+  const [agCount, setAgCount] = useState(0)       // agency name / logo change requests waiting
   const [wdCount, setWdCount] = useState(0)       // identity checks + withdrawals waiting
   const [chatCount, setChatCount] = useState(0)    // flagged / reported / suspended chats waiting for a decision
   const [prefill, setPrefill] = useState(null)   // { user, tier } from "renew" on the Members tab
@@ -56,6 +57,8 @@ export default function AdminApp() {
     setChatCount(typeof c.data === 'number' ? c.data : 0)
     const wd = await supabase.rpc('admin_withdraw_pending_count')
     setWdCount(typeof wd.data === 'number' ? wd.data : 0)
+    const ag = await supabase.rpc('admin_agency_edit_count')
+    setAgCount(typeof ag.data === 'number' ? ag.data : 0)
   }, [])
 
   // A new customer message or a new slip review refreshes the counters (admins can read all support messages)
@@ -110,7 +113,7 @@ export default function AdminApp() {
     ['drafts', `➕ แบบร่างให้น้อง${draftCount ? ` (${draftCount})` : ''}`],
     ['chats', `🚩 ธง/รายงาน${chatCount ? ` (${chatCount})` : ''}`],
     ['edits', `✏️ แก้ไข/ลบโปรไฟล์${editCount ? ` (${editCount})` : ''}`],
-    ['agencies', '🏢 สังกัด'],
+    ['agencies', `🏢 สังกัด${agCount ? ` (${agCount})` : ''}`],
     ['vendors', '🏪 เซลล์/OA'],
     ['members', '👑 สมาชิก'],
     ['withdrawals', `💸 ถอนเงิน${wdCount ? ` (${wdCount})` : ''}`],

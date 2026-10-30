@@ -64,6 +64,21 @@ export function captureDraftParam() {
   }
   try { if (tok && DRAFT.test(tok)) sessionStorage.setItem('open_draft', tok) } catch { /* storage blocked */ }
 }
+// Registration-only link: ?only=apply -> the app shows nothing but the provider / modelling application form (kept for this session).
+export function captureOnlyParam() {
+  const params = new URLSearchParams(window.location.search)
+  let v = params.get('only')
+  if (!v) {
+    const state = params.get('liff.state')
+    if (state) {
+      const q = state.indexOf('?')
+      v = new URLSearchParams(q >= 0 ? state.slice(q) : state).get('only')
+    }
+  }
+  try { if (v === 'apply') sessionStorage.setItem('apply_only', '1') } catch { /* storage blocked */ }
+}
+export const isApplyOnly = () => { try { return sessionStorage.getItem('apply_only') === '1' } catch { return false } }
+export const clearApplyOnly = () => { try { sessionStorage.removeItem('apply_only') } catch { /* storage blocked */ } }
 export function takeDraftIntent() {
   try {
     const v = sessionStorage.getItem('open_draft')
@@ -205,6 +220,7 @@ export async function signIn() {
   captureWorkerParam()
   captureChatParam()
   captureDraftParam()
+  captureOnlyParam()
   captureJobParam()
   captureSupportParam()
   captureAgencyCode()
@@ -256,6 +272,7 @@ export async function signIn() {
   captureWorkerParam()
   captureChatParam()
   captureDraftParam()
+  captureOnlyParam()
   captureJobParam()
   captureSupportParam()
   captureAgencyCode()

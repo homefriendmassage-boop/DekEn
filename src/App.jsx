@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from './supabaseClient'
-import { signIn, takeOpenIntent, takeWorkerIntent, takeChatIntent, takeDraftIntent, takeJobIntent, takeSupportIntent, getAgencyCode } from './lib/auth'
+import { signIn, takeOpenIntent, takeWorkerIntent, takeChatIntent, takeDraftIntent, takeJobIntent, takeSupportIntent, getAgencyCode, isApplyOnly, clearApplyOnly } from './lib/auth'
 import { getPosition } from './lib/geo'
 import { CATEGORIES, PLAN_META, canViewWorker, suspensionOf, tierOf } from './config'
 import { LangSwitcher, useI18n } from './i18n'
@@ -76,6 +76,7 @@ export default function App() {
   const [chat, setChat] = useState(null)              // { id, other_name } of the open chat
   const [showThreads, setShowThreads] = useState(false)
   const [chatUnread, setChatUnread] = useState(0)
+  const [custThreads, setCustThreads] = useState([])    // my chats with providers: who replied and I haven't read
   const [support, setSupport] = useState(null)       // { threadId } while the admin chat is open
   const [supportUnread, setSupportUnread] = useState(0)
   const [showWallet, setShowWallet] = useState(false)
@@ -91,6 +92,7 @@ export default function App() {
   const [sellerSt, setSellerSt] = useState(null)       // my_seller_status: used for the "plan lapsed" notice
   const loadSellerSt = useCallback(() => supabase.rpc('my_seller_status').then(({ data }) => setSellerSt(data ?? null), () => {}), [])
   const [highlightJob, setHighlightJob] = useState(null)   // a booking opened from its push
+  const [applyOnly, setApplyOnly] = useState(false)    // opened from a registration-only link: nothing but the application form
   const [claim, setClaim] = useState(null)            // token of an application draft someone filled in for her
   const [openChat, setOpenChat] = useState(null)      // chat to open inside the provider side
   const [shared, setShared] = useState(null)         // { id, friend, worker } when the app was opened from a shared profile link
@@ -118,6 +120,7 @@ export default function App() {
         const s = await signIn()
         if (cancelled) return
         setSession(s)
+        setApplyOnly(isApplyOnly())
         try { await supabase.rpc('release_my_expired_holds') } catch { /* optional */ }   // chat holds that ran out go back to the Wallet
         const meRow = await loadMe()
         loadSellerSt()
@@ -216,6 +219,29 @@ export default function App() {
     return () => { supabase.removeChannel(ch) }
   }, [me?.id, loadSupportUnread])
 
+  const loadThreads = useCallback(async () => {
+    const { data } = await supabase.rpc('my_threads', { p_role: 'customer' })
+    const rows = data ?? []
+    setCustThreads(rows)
+    setChatUnread(rows.reduce((n, r) => n + r.unread, 0))
+  }, [])
+  useEffect(() => {
+    if (!me?.id) return
+    loadThreads()
+    const ch = supabase.channel('cust-threads').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, loadThreads).subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [me?.id, loadThreads])
+  const unreadByWorker = Object.fromEntries(custThreads.filter((x) => x.unread > 0).map((x) => [x.worker_id, x.unread]))
+  const replyNotice = custThreads.some((x) => x.unread > 0) && (
+    <div className="space-y-1.5 px-4 pt-3">
+      {custThreads.filter((x) => x.unread > 0).slice(0, 3).map((th) => (
+        <button key={th.id} onClick={() => setChat(th)} className="flex w-full animate-pulse items-center justify-between gap-2 rounded-xl bg-red-500/20 px-3 py-2.5 text-left text-sm font-bold text-red-100 ring-1 ring-red-400/50 active:scale-95">
+          <span className="min-w-0 truncate">{t('replyNotice', { name: th.other_name, n: th.unread })}</span>
+        </button>
+      ))}
+    </div>
+  )
+
   async function payWithWallet(planTier, price) {
     if (walletPaying) return
     if (!window.confirm(t('payWalletConfirm', { plan: PLAN_META[planTier].name, amount: money(price) }))) return
@@ -300,7 +326,7 @@ export default function App() {
   async function askWorker(w) {
     const { data, error } = await supabase.rpc('open_thread', { p_worker: w.user_id })
     if (error) {
-      if (error.message.includes('MEMBERS_ONLY')) return setShowMembership(true)      // not a paid member
+      if (error.message.includes('SUSPENDED')) return showToast(t('errGeneric'))
       if (error.message.includes('SELF_CHAT')) return showToast(t('errSelfChat'))
       if (error.message.includes('LOCKED')) return showToast(t('errLocked'))
       return showToast(t('errGeneric'))
@@ -356,6 +382,24 @@ export default function App() {
     )
   }
 
+  if (applyOnly && me) {
+    return (
+      <div className="mx-auto min-h-screen w-full max-w-3xl pb-[env(safe-area-inset-bottom)]">
+        <header className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+          <h1 className="text-lg font-bold">📝 {t('providerSide')}</h1>
+          <LangSwitcher />
+        </header>
+        {me.role === 'worker' ? (
+          <div className="space-y-3 p-6 text-center">
+            <p className="text-lg font-bold">คุณลงทะเบียนเป็นผู้ให้บริการแล้ว</p>
+            <p className="text-sm text-neutral-400">ลิงก์นี้ใช้สำหรับสมัครเท่านั้น กดปุ่มด้านล่างเพื่อเข้าหน้าผู้ให้บริการของคุณ</p>
+            <button onClick={() => { clearApplyOnly(); setApplyOnly(false); setView('worker'); setWorkerTab('self') }} className="rounded-full bg-line px-6 py-2.5 font-bold text-black active:scale-95">เข้าหน้าผู้ให้บริการ</button>
+          </div>
+        ) : <WorkerApply userId={me.id} defaultName={session.profile.displayName} />}
+      </div>
+    )
+  }
+
   const headerProps = {
     displayName: session.profile.displayName,
     tier,
@@ -366,8 +410,7 @@ export default function App() {
     onSupportClick: openSupport,
     onBookingsClick: () => setShowBookings(true),
     supportUnread,
-    // chat icon only for paid members (others have no chat to show)
-    onChatClick: tier >= 1 ? () => setShowThreads(true) : undefined,
+    onChatClick: () => setShowThreads(true),
     chatUnread,
   }
 
@@ -390,6 +433,7 @@ export default function App() {
       {view === 'categories' && (
         <>
           <Header {...headerProps} title={t('categories')} />
+          {replyNotice}
           <div className="space-y-2 px-4 pt-3">
             {session.vendor && <p className="text-center text-xs font-semibold text-amber-300">🏪 {t('viaVendor', { name: session.vendor.name })}</p>}
             {staffVendor && (
@@ -417,6 +461,7 @@ export default function App() {
       {view === 'feed' && (
         <>
           <Header {...headerProps} title={catName(category)} onBack={() => setView('categories')} />
+          {replyNotice}
           <HomeFeed
             workers={feedRows}
             category={category}
@@ -426,6 +471,7 @@ export default function App() {
             onUnlock={() => setShowMembership(true)}
             nearOn={nearOn} nearBusy={nearBusy} onToggleNear={toggleNear}
             onAsk={askWorker}
+            unreadByWorker={unreadByWorker}
             meId={me?.id}
           />
         </>
@@ -483,7 +529,7 @@ export default function App() {
         <WorkerDetail worker={shared.worker} isMe={shared.worker.user_id === me?.id} onClose={() => setShared(null)}
           onUnlock={() => { setShared(null); setShowMembership(true) }}
           onBook={() => { const w = shared.worker; setShared(null); setSelected(w) }}
-          onAsk={() => { const w = shared.worker; setShared(null); if (tier >= 1) askWorker(w); else setShowMembership(true) }} />
+          onAsk={() => { const w = shared.worker; setShared(null); askWorker(w) }} />
       )}
 
       {selected && (
@@ -509,13 +555,13 @@ export default function App() {
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 sm:items-center sm:p-4" onClick={() => setShowThreads(false)}>
           <div onClick={(e) => e.stopPropagation()} className="max-h-[80vh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-neutral-900 p-5 sm:rounded-3xl">
             <h2 className="mb-3 text-lg font-bold">💬 {t('messages')}</h2>
-            <ThreadList role="customer" onOpen={(th) => { setShowThreads(false); setChat(th) }} onChange={(rows) => setChatUnread(rows.reduce((n, r) => n + r.unread, 0))} />
+            <ThreadList role="customer" onOpen={(th) => { setShowThreads(false); setChat(th) }} onChange={(rows) => { setChatUnread(rows.reduce((n, r) => n + r.unread, 0)); setCustThreads(rows) }} />
             <button onClick={() => setShowThreads(false)} className="mt-4 w-full rounded-xl bg-white/10 py-3 font-semibold active:scale-95">{t('close')}</button>
           </div>
         </div>
       )}
 
-      {chat && view !== 'worker' && <ChatModal threadId={chat.id} title={chat.other_name} meId={me.id} onClose={() => setChat(null)}
+      {chat && view !== 'worker' && <ChatModal threadId={chat.id} title={chat.other_name} meId={me.id} onClose={() => { setChat(null); loadThreads() }}
           onTopUp={() => { setChat(null); setPay({ kind: 'wallet_topup' }) }} />}
 
       {showMembership && (

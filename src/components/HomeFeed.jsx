@@ -14,13 +14,12 @@ import WorkerDetail, { LocBadge, priceLabel } from './WorkerDetail'
  *  - !can_view : public teaser (the worker's own face-mosaicked photo) + lock + Unlock button
  * The browser never receives the full photo of a worker it isn't allowed to see.
  */
-export default function HomeFeed({ workers, category, tier, loading, onBook, onUnlock, onAsk, meId, nearOn, nearBusy, onToggleNear }) {
+export default function HomeFeed({ workers, category, tier, loading, onBook, onUnlock, onAsk, unreadByWorker = {}, meId, nearOn, nearBusy, onToggleNear }) {
   const { t } = useI18n()
   const freeCategory = MIN_TIER[category] === 0
   const [province, setProvince] = useState('')
   const provinces = [...new Set(workers.map((w) => w.province).filter(Boolean))].sort()
   const shown = province ? workers.filter((w) => w.province === province) : workers
-  const canChat = tier >= 1 // paid members only: keeps casual chatting (and its cost) out
   const [detail, setDetail] = useState(null)
   const [viewer, setViewer] = useState(null)      // { url, name } : the clear photo in full size
 
@@ -57,7 +56,7 @@ export default function HomeFeed({ workers, category, tier, loading, onBook, onU
       ) : (
         <ul className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3 sm:gap-4">
           {shown.map((w) => (
-            <WorkerCard key={w.user_id} worker={w} onUnlock={onUnlock} onDetail={() => setDetail(w)} isMe={w.user_id === meId} paidGroup={MIN_TIER[category] > 0}
+            <WorkerCard key={w.user_id} worker={w} onUnlock={onUnlock} onDetail={() => setDetail(w)} onAsk={() => onAsk(w)} unread={unreadByWorker[w.user_id] ?? 0} isMe={w.user_id === meId} paidGroup={MIN_TIER[category] > 0}
               onPhoto={() => (w.canView ? w.image && setViewer({ url: w.image, name: w.display_name }) : onUnlock())} />
           ))}
         </ul>
@@ -69,13 +68,13 @@ export default function HomeFeed({ workers, category, tier, loading, onBook, onU
         <WorkerDetail worker={detail} isMe={detail.user_id === meId} onClose={() => setDetail(null)}
           onUnlock={() => { setDetail(null); onUnlock() }}
           onBook={() => { const w = detail; setDetail(null); onBook(w) }}
-          onAsk={() => { const w = detail; setDetail(null); if (canChat) onAsk(w); else onUnlock() }} />
+          onAsk={() => { const w = detail; setDetail(null); onAsk(w) }} />
       )}
     </div>
   )
 }
 
-function WorkerCard({ worker: w, onUnlock, onDetail, isMe, paidGroup, onPhoto }) {
+function WorkerCard({ worker: w, onUnlock, onDetail, onAsk, unread, isMe, paidGroup, onPhoto }) {
   const { t, money, catName } = useI18n()
   const locked = !w.canView
 
@@ -108,6 +107,10 @@ function WorkerCard({ worker: w, onUnlock, onDetail, isMe, paidGroup, onPhoto })
           <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-300 to-orange-500 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-black shadow sm:text-xs">
             {t('topRank')}
           </span>
+        )}
+
+        {unread > 0 && (
+          <button onClick={onAsk} className="absolute bottom-2 right-2 z-10 animate-pulse rounded-full bg-red-500 px-2.5 py-1 text-[11px] font-bold shadow-lg active:scale-95">💬 {t('replied')} · {unread}</button>
         )}
 
         {w.agency_logo && (
@@ -153,16 +156,23 @@ function WorkerCard({ worker: w, onUnlock, onDetail, isMe, paidGroup, onPhoto })
           <p className="rounded-xl bg-white/10 py-2.5 text-center text-sm font-semibold text-neutral-300">{t('ownProfile')}</p>
         ) : locked && paidGroup ? (
           // massage / spa without the package: the covered photo is all there is; the details open after subscribing
-          <button onClick={onUnlock} className="w-full rounded-xl bg-amber-400 py-2.5 text-sm font-bold text-black transition active:scale-95">🔒 {t('unlockDetails')}</button>
+          <div className="grid gap-1.5">
+            <button onClick={onUnlock} className="w-full rounded-xl bg-amber-400 py-2.5 text-sm font-bold text-black transition active:scale-95">🔒 {t('unlockDetails')}</button>
+            <button onClick={onAsk} className="w-full rounded-xl bg-white/10 py-2 text-xs font-bold ring-1 ring-white/15 transition active:scale-95">💬 {t('chatDirect')}</button>
+          </div>
         ) : locked ? (
           <div className="grid gap-1.5">
             <button onClick={onDetail} className="w-full rounded-xl bg-pink-500 py-2.5 text-sm font-bold text-white transition active:scale-95">{t('viewDetail')}</button>
+            <button onClick={onAsk} className="w-full rounded-xl bg-white/10 py-2 text-xs font-bold ring-1 ring-white/15 transition active:scale-95">💬 {t('chatDirect')}</button>
             <button onClick={onUnlock} className="w-full rounded-xl bg-amber-400 py-2 text-xs font-bold text-black transition active:scale-95">👑 {t('unlock')}</button>
           </div>
         ) : (
-          <button onClick={onDetail} className="w-full rounded-xl bg-pink-500 py-2.5 text-sm font-bold text-white transition active:scale-95">
-            {t('viewDetail')}
-          </button>
+          <div className="grid gap-1.5">
+            <button onClick={onDetail} className="w-full rounded-xl bg-pink-500 py-2.5 text-sm font-bold text-white transition active:scale-95">
+              {t('viewDetail')}
+            </button>
+            <button onClick={onAsk} className="w-full rounded-xl bg-white/10 py-2 text-xs font-bold ring-1 ring-white/15 transition active:scale-95">💬 {t('chatDirect')}</button>
+          </div>
         )}
       </div>
     </li>

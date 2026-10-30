@@ -8,7 +8,7 @@ import { DRAFT_STATUS, draftLink } from '../lib/drafts'
 import { ago, fmtDateTime } from '../admin/format'
 
 const GROUP = { night: '🍸 ชงเหล้า/ENT', spa: '💆 หมอนวด/สปา' }
-const ERR = { PLAN_INACTIVE: 'แพ็กเกจสังกัดยังไม่เปิด/หมดอายุ', NOT_APPROVED: 'แอดมินยังไม่อนุมัติแบบร่างนี้', NO_PHOTO: 'ต้องมีรูปอย่างน้อย 1 ภาพ', LOCKED: 'ทำรายการนี้ไม่ได้ในสถานะปัจจุบัน' }
+const ERR = { TOO_MANY_DRAFTS: 'มีแบบร่างที่ใช้งานอยู่ครบ 40 ใบแล้ว ลบหรือซ่อนบางใบก่อน', PLAN_INACTIVE: 'แพ็กเกจสังกัดยังไม่เปิด/หมดอายุ', NOT_APPROVED: 'แอดมินยังไม่อนุมัติแบบร่างนี้', NO_PHOTO: 'ต้องมีรูปอย่างน้อย 1 ภาพ', LOCKED: 'ทำรายการนี้ไม่ได้ในสถานะปัจจุบัน' }
 const errText = (m = '') => ERR[Object.keys(ERR).find((k) => m.includes(k))] ?? 'ทำรายการไม่สำเร็จ'
 
 // Application drafts. mode 'agency': my own drafts (create, send to an admin, copy the link once approved).
@@ -16,6 +16,8 @@ const errText = (m = '') => ERR[Object.keys(ERR).find((k) => m.includes(k))] ?? 
 export default function DraftsPanel({ mode, toast }) {
   const { money, catName } = useI18n()
   const [filter, setFilter] = useState(mode === 'admin' ? 'review' : 'all')
+  const [showHidden, setShowHidden] = useState(false)   // agency: the hidden (cancelled) drafts
+  const hiddenView = mode === 'admin' ? filter === 'hidden' : showHidden
   const [rows, setRows] = useState(null)
   const [editing, setEditing] = useState(null)      // null | 'new' | draft
   const [open, setOpen] = useState(null)            // expanded draft id
@@ -23,9 +25,9 @@ export default function DraftsPanel({ mode, toast }) {
   const [clear, setClear] = useState({})            // photo id -> signed URL of the clear original (admin only)
 
   const load = useCallback(async () => {
-    const { data } = mode === 'admin' ? await supabase.rpc('admin_drafts_list', { p_filter: filter }) : await supabase.rpc('my_drafts')
+    const { data } = mode === 'admin' ? await supabase.rpc('admin_drafts_list', { p_filter: filter }) : await supabase.rpc('my_drafts', { p_hidden: showHidden })
     setRows(data ?? [])
-  }, [mode, filter])
+  }, [mode, filter, showHidden])
   useEffect(() => { load() }, [load])
 
   // the link the girl must open within 3 days: copy / Flex card / QR code
@@ -49,7 +51,16 @@ export default function DraftsPanel({ mode, toast }) {
     await run(() => supabase.rpc('admin_draft_review', { p_id: d.id, p_approve: false, p_reason: rejecting.reason }), 'ตีกลับแล้ว')
     setRejecting(null)
   }
-  const cancel = (d) => window.confirm(d.managed ? `ถอดโปรไฟล์ "${d.display_name}" ออกจากระบบและยกเลิกแบบร่าง?` : `ยกเลิกแบบร่างของ "${d.display_name}"?`) && run(() => supabase.rpc('draft_cancel', { p_id: d.id }), 'ยกเลิกแล้ว')
+  const cancel = (d) => window.confirm(d.managed ? `ถอดโปรไฟล์ "${d.display_name}" ออกจากระบบและซ่อนแบบร่าง?` : `ซ่อนแบบร่างของ "${d.display_name}"? (ไม่นับโควตา กู้คืนได้จากปุ่ม "ที่ซ่อนไว้")`) && run(() => supabase.rpc('draft_cancel', { p_id: d.id }), 'ซ่อนแล้ว (ไม่นับโควตา)')
+  const restore = (d) => run(() => supabase.rpc('draft_restore', { p_id: d.id }), 'กู้คืนเป็นแบบร่างแล้ว')
+  async function destroy(d) {
+    if (!window.confirm(`ลบ "${d.display_name}" ถาวร? กู้คืนไม่ได้ รูปทั้งหมดจะถูกลบด้วย`)) return
+    const paths = await run(() => supabase.rpc('draft_delete', { p_id: d.id }), 'ลบถาวรแล้ว')
+    for (const o of paths ?? []) {
+      supabase.storage.from('worker-originals').remove([o]).then(() => {}, () => {})
+      supabase.storage.from('worker-public').remove([o.replace(/\.jpg$/, '-public.jpg')]).then(() => {}, () => {})
+    }
+  }
 
   async function onSaved(id, andThen, pub) {
     setEditing(null)
@@ -75,19 +86,21 @@ export default function DraftsPanel({ mode, toast }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        {mode === 'admin' && [['review', 'รอตรวจจากโมเดลลิ่ง'], ['links', 'ลิงก์/ร่างของแอดมิน'], ['all', 'ทั้งหมด']].map(([k, label]) => (
+        {mode === 'admin' && [['review', 'รอตรวจจากโมเดลลิ่ง'], ['links', 'ลิงก์/ร่างของแอดมิน'], ['all', 'ทั้งหมด'], ['hidden', '🗂 ที่ซ่อนไว้']].map(([k, label]) => (
           <button key={k} onClick={() => setFilter(k)} className={`rounded-full px-3 py-1.5 text-sm font-semibold ${filter === k ? 'bg-line text-black' : 'bg-white/10'}`}>{label}</button>
         ))}
+        {mode === 'agency' && <button onClick={() => setShowHidden((v) => !v)} className={`rounded-full px-3 py-1.5 text-sm font-semibold ${showHidden ? 'bg-line text-black' : 'bg-white/10'}`}>🗂 {showHidden ? 'กลับไปแบบร่างปกติ' : 'ที่ซ่อนไว้'}</button>}
         <button onClick={() => setEditing('new')} className="ml-auto rounded-xl bg-pink-500 px-4 py-2 text-sm font-bold active:scale-95">➕ สร้างแบบร่างให้น้อง</button>
       </div>
       <p className="text-xs text-neutral-500">
-        {mode === 'agency'
+        {hiddenView ? 'แบบร่างที่ซ่อนไว้ ไม่แสดงในรายการปกติและไม่นับโควตา กู้คืนกลับมาเป็นแบบร่างได้ หรือลบถาวร (หายไปเลย)'
+          : mode === 'agency'
           ? 'กรอกข้อมูลแทนน้อง → แอดมินตรวจ/อนุมัติ → ได้ลิงก์ (3 วัน) ส่งให้น้องกดยืนยันพิกัดและเข้าสังกัดด้วย LINE ของน้อง น้องที่กดรับแล้วจึงนับในโควตาของสังกัด'
           : 'แบบร่างจากแอดมิน ออกลิงก์ได้ทันที น้องกดยืนยันพิกัดแล้วเลือกสมัครเองหรือเข้าสังกัด จากนั้นเป็นใบสมัครปกติ (ตรวจอายุ + อนุมัติ)'}
       </p>
 
       {rows === null ? <p className="py-10 text-center text-neutral-500">กำลังโหลด…</p> : rows.length === 0 ? (
-        <p className="rounded-2xl bg-white/5 p-6 text-center text-neutral-500">ยังไม่มีแบบร่าง</p>
+        <p className="rounded-2xl bg-white/5 p-6 text-center text-neutral-500">{hiddenView ? 'ไม่มีแบบร่างที่ซ่อนไว้' : 'ยังไม่มีแบบร่าง'}</p>
       ) : (
         <ul className="grid gap-3 md:grid-cols-2">
           {rows.map((d) => {
@@ -142,7 +155,13 @@ export default function DraftsPanel({ mode, toast }) {
                   {d.link_active && d.token && <button onClick={() => copy(d.token, d.display_name)} className="rounded-xl bg-green-500/80 px-3 py-1.5 text-sm font-bold text-black active:scale-95">🔗 ลิงก์ · Flex · QR</button>}
                   {['approved', 'expired'].includes(status) && mine && <button onClick={() => issue(d)} className="rounded-xl bg-white/10 px-3 py-1.5 text-sm font-semibold active:scale-95">🔄 ออกลิงก์ใหม่</button>}
                   {mode === 'admin' && d.source === 'agency' && ['approved', 'expired'].includes(status) && <button onClick={() => issue(d)} className="rounded-xl bg-white/10 px-3 py-1.5 text-sm font-semibold active:scale-95">🔄 ออกลิงก์ใหม่</button>}
-                  {['draft', 'rejected', 'approved', 'expired', 'submitted'].includes(status) && (mine || mode === 'admin') && <button onClick={() => cancel(d)} className="rounded-xl bg-red-500/10 px-3 py-1.5 text-sm text-red-300 active:scale-95">ยกเลิก</button>}
+                  {['draft', 'rejected', 'approved', 'expired', 'submitted'].includes(status) && (mine || mode === 'admin') && <button onClick={() => cancel(d)} className="rounded-xl bg-white/10 px-3 py-1.5 text-sm text-neutral-300 active:scale-95">🙈 ซ่อน (ยกเลิก)</button>}
+                  {status === 'cancelled' && (
+                    <>
+                      <button onClick={() => restore(d)} className="rounded-xl bg-line px-3 py-1.5 text-sm font-bold text-black active:scale-95">↩︎ กู้คืน</button>
+                      <button onClick={() => destroy(d)} className="rounded-xl bg-red-500/20 px-3 py-1.5 text-sm font-semibold text-red-300 active:scale-95">🗑 ลบถาวร</button>
+                    </>
+                  )}
                 </div>
 
                 {rejecting?.id === d.id && (

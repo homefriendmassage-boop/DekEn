@@ -3,6 +3,9 @@ import { supabase } from '../supabaseClient'
 import { CATEGORIES } from '../config'
 import { baht, fmtDateTime } from './format'
 import { PROVINCES } from '../provinces'
+import LinkSheet from '../components/LinkSheet'
+import { inviteBubble } from '../lib/flex'
+import { applyLink } from '../lib/drafts'
 import WorkerFields, { GROUP_CATEGORIES, groupOf, profileFromRow, profileToPayload, validateProfile } from '../components/WorkerFields'
 
 const CAT = { bartender: 'ชงเหล้า', ent: 'ENT', masseuse: 'หมอนวด', spa: 'สปา' }
@@ -11,6 +14,7 @@ const FILTERS = [['pending', 'รอตรวจ'], ['approved', 'อนุม�
 export default function Applications({ onChanged, toast }) {
   const [status, setStatus] = useState('pending')
   const [rows, setRows] = useState(null)
+  const [sheet, setSheet] = useState(false)   // registration-only link / Flex / QR
 
   const load = useCallback(async () => {
     setRows(null)
@@ -31,12 +35,25 @@ export default function Applications({ onChanged, toast }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {FILTERS.map(([id, label]) => (
           <button key={id} onClick={() => setStatus(id)}
             className={`rounded-full px-3 py-1 text-sm ${status === id ? 'bg-white text-black' : 'bg-white/10'}`}>{label}</button>
         ))}
+        <button onClick={() => setSheet(true)} className="ml-auto rounded-xl bg-line px-3 py-1.5 text-sm font-bold text-black active:scale-95">🔗 ลิงก์สมัครงาน · Flex · QR</button>
       </div>
+      {sheet && (
+        <LinkSheet
+          title="ลิงก์ลงทะเบียนสมัครงาน / โมเดลลิ่ง"
+          intro="ส่งให้น้องกดกรอกใบสมัคร เปิดลิงก์นี้แล้วจะเห็นแค่หน้าสมัคร ไปหน้าอื่นของแอปไม่ได้ (ส่งเป็นการ์ด Flex หรือให้สแกน QR ก็ได้)"
+          link={applyLink()}
+          flex={{
+            type: 'flex', altText: 'DekEn: สมัครงาน / โมเดลลิ่ง',
+            contents: inviteBubble({ tagline: 'DekEn', title: 'สมัครงาน / โมเดลลิ่ง', body: 'กดเพื่อกรอกใบสมัครเป็นผู้ให้บริการกับ DekEn ใช้เวลาไม่กี่นาที', button: 'กรอกใบสมัคร', uri: applyLink() }),
+          }}
+          onClose={() => setSheet(false)}
+        />
+      )}
 
       {rows === null ? <p className="py-10 text-center text-neutral-500">กำลังโหลด…</p>
         : rows.length === 0 ? <p className="rounded-2xl bg-white/5 p-6 text-center text-neutral-500">ไม่มีรายการ</p>

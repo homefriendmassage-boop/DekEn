@@ -104,7 +104,12 @@ export default function ChatModal({ threadId, title, meId, onClose, onTopUp }) {
         {room !== 'open' && (
           <p className="mx-4 mt-2 rounded-lg bg-red-500/15 p-2 text-sm font-semibold text-red-200">🚫 {t(room === 'closed' ? 'roomClosed' : 'roomSuspended')}</p>
         )}
-        {banner && <p className="mx-4 mt-2 rounded-lg bg-amber-400/10 p-2 text-xs text-amber-200">{banner}</p>}
+        {banner && (
+          <p className="mx-4 mt-2 rounded-lg bg-amber-400/10 p-2 text-xs text-amber-200">
+            {banner}
+            {fee?.role === 'customer' && fee.state === 'need_fee' && onTopUp && <button onClick={onTopUp} className="ml-2 rounded-full bg-line px-3 py-0.5 font-bold text-black">{t('chatTopUp')}</button>}
+          </p>
+        )}
 
         <div className="flex-1 space-y-2 overflow-y-auto px-4 py-3">
           {msgs.map((m) => {

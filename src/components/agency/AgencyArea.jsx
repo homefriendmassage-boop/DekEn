@@ -15,6 +15,7 @@ const ERRORS = {
   SUSPENDED: 'บัญชีถูกระงับ',
   BAD_INPUT: 'ข้อมูลไม่ถูกต้อง',
   NOT_FOUND: 'ไม่พบรายการ (อาจถูกจัดการไปแล้ว)',
+  NO_CHANGE: 'ยังไม่ได้เปลี่ยนชื่อหรือโลโก้',
 }
 const errText = (m = '') => Object.entries(ERRORS).find(([k]) => m.includes(k))?.[1] ?? 'ทำรายการไม่สำเร็จ'
 const fmtDate = (v) => new Date(v).toLocaleDateString('th-TH', { dateStyle: 'medium' })
@@ -112,7 +113,7 @@ function Apply({ ag, me, onDone, flash }) {
 
 function Dashboard({ ag, me, reload, flash, onTopUp, onWallet, onChanged }) {
   const [tab, setTab] = useState('girls')
-  const tabs = [['girls', '👯 น้อง'], ['reqs', '⏳ รออนุมัติ'], ['drafts', '📝 ร่างใบสมัคร'], ['chat', '💬 แชต'], ['plan', '🧾 แพ็กเกจ']]
+  const tabs = [['girls', '👯 น้อง'], ['reqs', '⏳ รออนุมัติ'], ['drafts', '📝 ร่างใบสมัคร'], ['chat', '💬 แชต'], ['plan', '🧾 แพ็กเกจ'], ['settings', '⚙️ ตั้งค่า']]
   return (
     <div>
       <nav className="flex gap-2 overflow-x-auto px-4 py-3">
@@ -128,6 +129,7 @@ function Dashboard({ ag, me, reload, flash, onTopUp, onWallet, onChanged }) {
         {tab === 'reqs' && <Requests flash={flash} reload={reload} />}
         {tab === 'drafts' && <DraftsPanel mode="agency" toast={flash} />}
         {tab === 'chat' && <AgencyChats me={me} onTopUp={onTopUp} />}
+        {tab === 'settings' && <Settings ag={ag} me={me} reload={reload} flash={flash} />}
         {tab === 'plan' && <Plan ag={ag} me={me} reload={reload} flash={flash} onTopUp={onTopUp} onWallet={onWallet} onChanged={onChanged} />}
       </div>
     </div>
@@ -285,5 +287,72 @@ function Plan({ ag, me, reload, flash, onTopUp, onWallet, onChanged }) {
       </section>
       {share && <ShareModal agencyCode={ag.code} onClose={() => setShare(false)} />}
     </div>
+  )
+}
+
+// Change the name / logo: the live ones stay until an admin approves the request.
+function Settings({ ag, me, reload, flash }) {
+  const [req, setReq] = useState(undefined)   // latest pending / rejected request
+  const [name, setName] = useState(ag.name)
+  const [file, setFile] = useState(null)
+  const [preview, setPreview] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const input = 'mt-1 w-full rounded-xl bg-white/10 px-3 py-2.5 text-base outline-none ring-1 ring-white/10 focus:ring-line'
+  const loadReq = useCallback(() => supabase.rpc('agency_my_edit').then(({ data }) => setReq(data ?? null)), [])
+  useEffect(() => { loadReq() }, [loadReq])
+
+  async function submit(e) {
+    e.preventDefault()
+    if (busy) return
+    setBusy(true)
+    let path = null
+    if (file) {
+      path = `${me.id}/pending-${Date.now()}.jpg`
+      let blob
+      try { blob = await logoBlob(file) } catch { setBusy(false); return flash('อ่านรูปนี้ไม่ได้ กรุณาเลือกรูป JPG หรือ PNG') }
+      const { error } = await supabase.storage.from('agency-logos').upload(path, blob, { contentType: 'image/jpeg' })
+      if (error) { setBusy(false); return flash(`อัปโหลดโลโก้ไม่สำเร็จ: ${error.message}`.slice(0, 140)) }
+    }
+    const { error } = await supabase.rpc('agency_request_edit', { p_name: name, p_logo_path: path })
+    setBusy(false)
+    if (error) return flash(errText(error.message))
+    flash('ส่งให้แอดมินอนุมัติแล้ว')
+    setFile(null); setPreview(null); loadReq()
+  }
+  async function cancel() {
+    await supabase.rpc('agency_cancel_edit')
+    flash('ยกเลิกคำขอแล้ว'); loadReq()
+  }
+
+  const pending = req?.status === 'pending'
+  return (
+    <form onSubmit={submit} className="space-y-4">
+      <p className="text-sm text-neutral-400">แก้ชื่อหรือโลโก้สังกัดได้ แต่ต้องรอแอดมินอนุมัติ ระหว่างนั้นระบบยังใช้ชื่อและโลโก้เดิมอยู่</p>
+      {pending && (
+        <div className="space-y-2 rounded-2xl bg-amber-400/10 p-3 text-sm text-amber-200">
+          <p>⏳ รอแอดมินอนุมัติ{req.new_name ? ` · ชื่อใหม่: ${req.new_name}` : ''}{req.new_logo_path ? ' · โลโก้ใหม่' : ''}</p>
+          {req.new_logo_path && <img src={logoUrl(req.new_logo_path)} alt="" className="h-14 w-14 rounded-full object-cover" />}
+          <button type="button" onClick={cancel} className="rounded-lg bg-white/10 px-3 py-1 text-xs text-neutral-200 active:scale-95">ยกเลิกคำขอ</button>
+        </div>
+      )}
+      {req?.status === 'rejected' && <p className="rounded-xl bg-red-500/10 p-2 text-sm text-red-300">คำขอล่าสุดไม่ผ่าน{req.reject_reason ? ` — ${req.reject_reason}` : ''} แก้ไขแล้วส่งใหม่ได้</p>}
+      <label className="block text-sm">ชื่อสังกัด
+        <input required minLength={2} maxLength={60} value={name} onChange={(e) => setName(e.target.value)} className={input} />
+      </label>
+      <div className="space-y-2 text-sm">
+        <span>โลโก้สังกัด</span>
+        <div className="flex items-center gap-3 rounded-2xl bg-white/5 p-3">
+          {preview || ag.logo_path
+            ? <img src={preview ?? logoUrl(ag.logo_path)} alt="logo" className="h-20 w-20 shrink-0 rounded-full object-cover ring-2 ring-white/20" />
+            : <span className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-white/10 text-3xl">🏢</span>}
+          <label className="flex-1 cursor-pointer rounded-xl bg-white/10 py-2.5 text-center font-semibold active:scale-95">
+            {preview ? 'เปลี่ยนรูปอีกครั้ง' : 'เลือกโลโก้ใหม่'}
+            <input type="file" accept="image/*" className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0] ?? null; setFile(f); setPreview((old) => { if (old) URL.revokeObjectURL(old); return f ? URL.createObjectURL(f) : null }) }} />
+          </label>
+        </div>
+      </div>
+      <button disabled={busy || (!file && name.trim() === ag.name)} className="w-full rounded-xl bg-line py-3 font-bold text-black active:scale-95 disabled:opacity-40">{busy ? 'กำลังส่ง…' : 'ส่งให้แอดมินอนุมัติ'}</button>
+    </form>
   )
 }

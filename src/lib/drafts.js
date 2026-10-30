@@ -37,3 +37,6 @@ export const DRAFT_STATUS = {
   expired: ['ลิงก์หมดอายุ', 'bg-orange-500/20 text-orange-200'],
   cancelled: ['ยกเลิก', 'bg-neutral-600/40 text-neutral-400'],
 }
+
+// Registration-only link: whoever opens it sees nothing but the application form (optionally under a modelling agency's code).
+export const applyLink = (agencyCode) => appLink(agencyCode ? { agency: agencyCode, only: 'apply' } : { only: 'apply' })

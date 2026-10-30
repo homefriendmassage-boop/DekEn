@@ -161,6 +161,7 @@ const ADMIN_EVENTS: Record<string, { head: string; text: string; tab: string; co
   edit: { head: '✏️ คำขอแก้ไขโปรไฟล์', text: 'รอตรวจและอนุมัติ', tab: 'edits', color: '#EC4899', button: 'เปิดหน้าคำขอแก้ไข' },
   deletion: { head: '🗑️ คำขอลบโปรไฟล์', text: 'รอแอดมินจัดการ (ไม่เช่นนั้นระบบลบเองใน 24 ชม.)', tab: 'edits', color: '#F59E0B', button: 'เปิดหน้าคำขอลบ' },
   agency: { head: '🏢 โมเดลลิ่ง/สังกัดสมัครใหม่', text: 'รอตรวจและอนุมัติ', tab: 'agencies', color: '#EC4899', button: 'เปิดหน้าสังกัด' },
+  agency_edit: { head: '✏️ สังกัดขอแก้ชื่อ/โลโก้', text: 'ตรวจแล้วอนุมัติ/ปฏิเสธ', tab: 'agencies', color: '#EC4899', button: 'เปิดหน้าสังกัด' },
   draft: { head: '📝 โมเดลลิ่งส่งแบบร่างรออนุมัติ', text: 'ตรวจแบบร่างแล้วอนุมัติ/ตีกลับ', tab: 'drafts', color: '#EC4899', button: 'เปิดแบบร่างให้น้อง' },
   flag: { head: '🚩 ห้องแชตผิดกฎ (ธงเตือน)', text: 'มีการพยายามส่งข้อมูลติดต่อ ตรวจดูห้องที่ติดธง', tab: 'chats', color: '#EF4444', button: 'เปิดหน้าธง/รายงาน' },
   report: { head: '🚩 มีรายงานจากผู้ใช้', text: 'ตรวจรายงานแล้วดำเนินการ', tab: 'chats', color: '#EF4444', button: 'เปิดหน้าธง/รายงาน' },
