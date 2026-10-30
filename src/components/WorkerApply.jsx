@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useI18n } from '../i18n'
 import PhotoManager from './PhotoManager'
@@ -30,6 +30,8 @@ export default function WorkerApply({ userId, defaultName }) {
   const [local, setLocal] = useState([])       // pictures picked before the application exists
   const [error, setError] = useState(null)
   const [note, setNote] = useState(null)
+  const [unlocked, setUnlocked] = useState(false)   // a sent application is shown greyed out; "แก้ไข" makes it editable until the admin approves
+  const topRef = useRef(null)
   const [invite, setInvite] = useState(() => getAgencyCode())   // code from the agency's own link, if any
   const [agency, setAgency] = useState(null)                     // { name, logo_path } of that agency (or of my application)
 
@@ -95,12 +97,15 @@ export default function WorkerApply({ userId, defaultName }) {
       setLocal([])
     }
     setNote(t('saved'))
-    load()
+    setUnlocked(false)                                  // back to the greyed read-only view, notice at the top
+    await load()
+    setTimeout(() => topRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
   }
 
   if (loading) return <p className="py-20 text-center text-neutral-500">{t('loading')}</p>
 
   const editing = app?.status === 'pending'
+  const locked = editing && !unlocked
   if (!editing && !grp) {
     // Step 1: which kind of provider? (separate forms, same listing for customers)
     return (
@@ -124,9 +129,17 @@ export default function WorkerApply({ userId, defaultName }) {
   const input = 'mt-1 w-full rounded-xl bg-white/10 px-3 py-2.5 text-base outline-none ring-1 ring-white/10 focus:ring-line'
 
   return (
-    <div className="space-y-5 p-4">
+    <div ref={topRef} className="space-y-5 p-4">
+      {note && editing && <p className="rounded-xl bg-green-500/10 p-3 text-sm font-semibold text-green-300">✓ {note}</p>}
       {editing ? (
-        <p className="rounded-2xl bg-amber-400/10 p-3 text-sm text-amber-200">{t('appPending')}</p>
+        <div className="space-y-2 rounded-2xl bg-amber-400/10 p-3 text-sm text-amber-200">
+          <p>{t('appPending')}</p>
+          {locked
+            ? <><p className="text-xs text-amber-100/80">{t('appLockedHint')}</p>
+                <button type="button" onClick={() => { setUnlocked(true); setNote(null); setTimeout(() => topRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50) }}
+                  className="rounded-xl bg-white/15 px-4 py-2 font-bold text-white active:scale-95">✏️ {t('editApplication')}</button></>
+            : <p className="text-xs text-amber-100/80">{t('appEditingHint')}</p>}
+        </div>
       ) : (
         <>
           <p className="text-sm text-neutral-400">{t('applySub')}</p>
@@ -142,6 +155,7 @@ export default function WorkerApply({ userId, defaultName }) {
       {editing && app.age_check_status === 'requested' && <AgeProof userId={userId} note={app.age_check_note} onDone={load} />}
       {editing && app.age_check_status === 'submitted' && <p className="rounded-2xl bg-white/5 p-3 text-sm text-neutral-300">🪪 {t('ageProofSent')}</p>}
 
+      <fieldset disabled={locked} className={`min-w-0 space-y-5 ${locked ? 'opacity-60' : ''}`}>
       {/* Promo pictures: 1-5, attached to the application so the admin can judge them together with the form */}
       <section className="space-y-3">
         <div className="flex items-center justify-between">
@@ -227,11 +241,14 @@ export default function WorkerApply({ userId, defaultName }) {
           </label>
         )}
         {error && <p className="rounded-lg bg-red-500/10 p-2 text-sm text-red-300">{error}</p>}
-        {note && <p className="text-sm text-green-400">{note}</p>}
-        <button disabled={busy} className="w-full rounded-xl bg-line py-3 font-bold text-black active:scale-95 disabled:opacity-50">
-          {busy ? t('submitting') : editing ? t('saveChanges') : t('submit')}
-        </button>
+        {note && !editing && <p className="text-sm text-green-400">{note}</p>}
+        {!locked && (
+          <button disabled={busy} className="w-full rounded-xl bg-line py-3 font-bold text-black active:scale-95 disabled:opacity-50">
+            {busy ? t('submitting') : editing ? t('saveChanges') : t('submit')}
+          </button>
+        )}
       </form>
+      </fieldset>
     </div>
   )
 }

@@ -218,6 +218,52 @@ export function buildApprovalFlex(o: { kind: string; event: string; detail?: str
     },
   }
 }
+// To the customer after a payment: the package he got (with a button for every group it opens) or the Wallet top-up
+const PLANS: Record<number, { name: string; icon: string; color: string; groups: [string, string][] }> = {
+  1: { name: 'Gold', icon: '🥇', color: '#F5B301', groups: [['bartender', 'ดูน้องชงเหล้า'], ['ent', 'ดูน้อง ENT']] },
+  2: { name: 'Platinum', icon: '💠', color: '#C9D1DB', groups: [['bartender', 'ดูน้องชงเหล้า'], ['ent', 'ดูน้อง ENT'], ['masseuse', 'ดูน้องหมอนวด']] },
+  3: { name: 'Diamond', icon: '💎', color: '#7DD3FC', groups: [['bartender', 'ดูน้องชงเหล้า'], ['ent', 'ดูน้อง ENT'], ['masseuse', 'ดูน้องหมอนวด'], ['spa', 'ดูน้องสปา']] },
+}
+export function buildPaymentFlex(o: { kind: string; tier?: number; until?: string; amount?: number; liffId: string; logo?: string }) {
+  const base = `https://liff.line.me/${o.liffId}`
+  const head = (t: string) => ({ type: 'box', layout: 'horizontal', spacing: 'md', alignItems: 'center', contents: [
+    ...(o.logo ? [{ type: 'image', url: o.logo, size: '40px', aspectMode: 'cover', aspectRatio: '1:1', flex: 0 }] : []),
+    { type: 'text', text: t, weight: 'bold', size: 'md', color: '#06C755', gravity: 'center', wrap: true },
+  ] })
+  const txt = (t: string, extra: Record<string, unknown> = {}) => ({ type: 'text', text: t, wrap: true, size: 'sm', color: '#DDDDDD', ...extra })
+  const styles = { body: { backgroundColor: '#161616' }, footer: { backgroundColor: '#161616' } }
+  if (o.kind === 'membership') {
+    const p = PLANS[o.tier ?? 1] ?? PLANS[1]
+    const day = o.until ? new Date(o.until).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok', dateStyle: 'medium' }) : ''
+    return {
+      type: 'flex', altText: `✅ ชำระเงินสำเร็จ แพ็กเกจ ${p.name} เปิดใช้งานแล้ว`,
+      contents: {
+        type: 'bubble', size: 'kilo', styles,
+        body: { type: 'box', layout: 'vertical', spacing: 'md', paddingAll: 'xl', contents: [
+          head('✅ ชำระเงินสำเร็จ'),
+          { type: 'text', text: `${p.icon} แพ็กเกจ ${p.name}`, weight: 'bold', size: 'xl', color: p.color, wrap: true },
+          ...(day ? [txt(`ใช้งานได้ถึง ${day}`, { weight: 'bold', color: '#FFFFFF' })] : []),
+          txt('กดปุ่มด้านล่างเพื่อเข้าไปดูน้องๆ ตามสิทธิ์ของแพ็กเกจที่คุณชำระ และทักแชตหาน้องได้เลย'),
+        ] },
+        footer: { type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: 'lg', contents: p.groups.map(([cat, label], i) => ({
+          type: 'button', style: i === 0 ? 'primary' : 'secondary', color: i === 0 ? '#EC4899' : undefined, height: 'md', action: { type: 'uri', label, uri: `${base}?open=${cat}` },
+        })) },
+      },
+    }
+  }
+  return {
+    type: 'flex', altText: `✅ เติม Wallet สำเร็จ ${Number(o.amount ?? 0).toLocaleString('en-US')} บาท`,
+    contents: {
+      type: 'bubble', size: 'kilo', styles,
+      body: { type: 'box', layout: 'vertical', spacing: 'md', paddingAll: 'xl', contents: [
+        head('✅ เติม Wallet สำเร็จ'),
+        { type: 'text', text: `+${Number(o.amount ?? 0).toLocaleString('en-US')} บาท`, weight: 'bold', size: 'xl', color: '#FFFFFF' },
+        txt('ใช้เป็นค่าธรรมเนียมจองน้อง ค่าแชต หรือซื้อแพ็กเกจในแอปได้ทันที'),
+      ] },
+      footer: { type: 'box', layout: 'vertical', paddingAll: 'lg', contents: [{ type: 'button', style: 'primary', color: '#06C755', height: 'md', action: { type: 'uri', label: 'เปิดแอป', uri: base } }] },
+    },
+  }
+}
 // ---- END pure rules -----------------------------------------------------------------------------
 
 // Who gets the push and through which OA: a vendor's customer is reached by the vendor's OA (his token and LIFF), everybody else by ours.
@@ -244,8 +290,9 @@ Deno.serve(async (req) => {
   const isSupport = input.type === 'support'
   const isAdminPush = input.type === 'admin'
   const isApproval = input.type === 'approval'
+  const isPayment = input.type === 'payment'
   const isSeller = input.type === 'seller' || input.type === 'agency'     // plan Flex (seller / agency): input.type tells which
-  if (!isBooking && !isSupport && !isSeller && !isAdminPush && !isApproval && (!thread_id || !recipient_id || !sender_id)) return json({ ok: false, code: 'BAD_INPUT' }, 400)
+  if (!isBooking && !isSupport && !isSeller && !isAdminPush && !isApproval && !isPayment && (!thread_id || !recipient_id || !sender_id)) return json({ ok: false, code: 'BAD_INPUT' }, 400)
   if (isSupport && !input.thread_id) return json({ ok: false, code: 'BAD_INPUT' }, 400)
   if (isSeller && !input.user_id) return json({ ok: false, code: 'BAD_INPUT' }, 400)
   if (isBooking && (!input.job_id || !input.event)) return json({ ok: false, code: 'BAD_INPUT' }, 400)
@@ -253,6 +300,21 @@ Deno.serve(async (req) => {
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
   const central = { token, liffId }
+  if (isPayment) {
+    const rp = await recipient(admin, input.user_id, central)
+    if (!rp || !/^U[0-9a-f]{32}$/.test(rp.lineId)) return json({ ok: true, status: 'NO_LINE_ID' })
+    const { data: pu } = await admin.from('users').select('vip_tier, vip_expires_at').eq('id', input.user_id).maybeSingle()
+    const appUrl = Deno.env.get('APP_URL')?.replace(/\/$/, '')
+    // the tier he holds now (an upgrade or a renewal keeps the higher plan)
+    const tier = Math.max(Number(input.tier ?? 0), Number(pu?.vip_tier ?? 0)) || 1
+    const message = buildPaymentFlex({ kind: input.kind === 'membership' ? 'membership' : 'topup', tier, until: pu?.vip_expires_at as string | undefined, amount: Number(input.amount ?? 0), liffId: rp.liffId, logo: appUrl ? `${appUrl}/dekn-logo.jpg?v=2` : undefined })
+    const r = await fetch('https://api.line.me/v2/bot/message/push', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${rp.token}`, 'Content-Type': 'application/json', 'X-Line-Retry-Key': crypto.randomUUID() },
+      body: JSON.stringify({ to: rp.lineId, messages: [message] }),
+    })
+    return json({ ok: r.ok, status: r.ok ? 'SENT' : 'FAILED' })
+  }
   if (isAdminPush) {
     // every admin with a LINE id gets the card through our OA
     const appUrl = Deno.env.get('APP_URL')?.replace(/\/$/, '')

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { CATEGORIES } from '../config'
 import { baht, fmtDateTime } from './format'
+import { PROVINCES } from '../provinces'
+import WorkerFields, { GROUP_CATEGORIES, groupOf, profileFromRow, profileToPayload, validateProfile } from '../components/WorkerFields'
 
 const CAT = { bartender: 'ชงเหล้า', ent: 'ENT', masseuse: 'หมอนวด', spa: 'สปา' }
 const FILTERS = [['pending', 'รอตรวจ'], ['approved', 'อนุมัติแล้ว'], ['rejected', 'ไม่ผ่าน']]
@@ -48,6 +50,7 @@ function Card({ a, onReview, onChanged, toast }) {
   const [reason, setReason] = useState('')
   const [fullUrl, setFullUrl] = useState(null)
   const [origs, setOrigs] = useState({})   // photo id -> signed URL of the private original
+  const [editing, setEditing] = useState(false)
 
   // Original (unmosaicked) photo, for verifying the person. Admin-only signed URL, 5 minutes.
   async function showOriginal() {
@@ -68,6 +71,7 @@ function Card({ a, onReview, onChanged, toast }) {
             {a.categories.filter((c) => CATEGORIES.includes(c)).map((c) => <span key={c} className="rounded-full bg-white/10 px-2 py-0.5 text-[11px]">{CAT[c]}</span>)}
           </div>
           <p className="mt-1">ราคาเริ่มต้น {baht(a.price)}</p>
+          <button onClick={() => setEditing(true)} className="mt-2 rounded-lg bg-pink-500/90 px-3 py-1 text-xs font-bold active:scale-95">✏️ แก้ไขข้อมูล{a.status === 'approved' ? ' (อัปเดตโปรไฟล์จริงด้วย)' : ''}</button>
         </div>
       </div>
 
@@ -108,6 +112,8 @@ function Card({ a, onReview, onChanged, toast }) {
         <button onClick={showOriginal} className="w-full rounded-xl bg-white/10 py-2 text-sm font-semibold active:scale-95">🔍 ดูรูปจริง (ไม่โมเสก)</button>
       ) : <p className="rounded-xl bg-red-500/10 p-2 text-xs text-red-300">ผู้สมัครยังไม่ได้แนบรูป</p>}
       {fullUrl && <img src={fullUrl} alt="" className="w-full rounded-xl" />}
+
+      {editing && <EditModal a={a} toast={toast} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); onChanged() }} />}
 
       {a.status === 'pending' && <AgeCheck a={a} onChanged={onChanged} toast={toast} />}
 
@@ -194,6 +200,81 @@ function AgeCheck({ a, onChanged, toast }) {
       <div className="grid grid-cols-2 gap-2">
         <button disabled={busy} onClick={verify} className="rounded-xl bg-line py-2 text-sm font-bold text-black active:scale-95 disabled:opacity-50">✓ ยืนยันอายุแล้ว</button>
         <button disabled={busy || a.age_check_status === 'requested'} onClick={request} className="rounded-xl bg-white/10 py-2 text-sm font-semibold active:scale-95 disabled:opacity-40">ขอเอกสารจากผู้สมัคร</button>
+      </div>
+    </div>
+  )
+}
+
+const field = 'mt-1 w-full rounded-xl bg-white/10 px-3 py-2.5 text-base outline-none ring-1 ring-white/10 focus:ring-line'
+
+// The admin corrects an applicant's data at any time, also after approval (then the live profile is updated too).
+function EditModal({ a, onClose, onSaved, toast }) {
+  const grp = a.grp ?? groupOf(a.categories)
+  const [form, setForm] = useState({
+    display_name: a.display_name ?? '', categories: a.categories ?? [], province: a.province ?? '', district: a.district ?? '',
+    nearby: a.nearby ?? '', phone: a.phone ?? '', line_id: a.line_id ?? '', note: a.note ?? '',
+  })
+  const [prof, setProf] = useState(() => profileFromRow(a))
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
+  const toggle = (c) => setForm((f) => ({ ...f, categories: f.categories.includes(c) ? f.categories.filter((x) => x !== c) : [...f.categories, c] }))
+
+  async function save() {
+    setError(null)
+    if (!form.display_name.trim()) return setError('กรุณาใส่ชื่อที่แสดง')
+    if (form.categories.length === 0) return setError('กรุณาเลือกประเภทงาน')
+    const bad = validateProfile(prof, grp, { needLocation: false })
+    if (bad) return setError({ errGender: 'กรุณาเลือกเพศ', errAge: 'อายุต้อง 20 ปีขึ้นไป', errPrice: 'กรอกราคาอย่างน้อย 1 ช่อง', errServiceMode: 'เลือกรูปแบบการให้บริการ' }[bad] ?? 'ข้อมูลไม่ครบ')
+    const payload = {
+      display_name: form.display_name.trim(), categories: form.categories, ...profileToPayload(prof, grp),
+      province: form.province || null, district: form.district.trim() || null, nearby: form.nearby.trim() || null,
+      phone: form.phone.trim() || null, line_id: form.line_id.trim() || null, note: form.note.trim() || null,
+    }
+    delete payload.loc_lat; delete payload.loc_lng
+    setBusy(true)
+    const { error: e } = await supabase.rpc('admin_edit_application', { p_app: a.id, p_data: payload })
+    setBusy(false)
+    if (e) return setError(e.message.includes('CONTACT_IN_PROFILE') ? 'ห้ามใส่เบอร์ ไอดี หรือลิงก์ในชื่อ/แนะนำตัว/ที่อยู่' : e.message.includes('BAD_PROVINCE') ? 'จังหวัดไม่ถูกต้อง' : e.message.includes('MIXED_GROUPS') ? 'เลือกหมวดชงเหล้า/ENT ปนกับหมอนวด/สปาไม่ได้' : `บันทึกไม่สำเร็จ (${e.message.slice(0, 120)})`)
+    toast(a.status === 'approved' ? 'แก้ไขแล้ว อัปเดตโปรไฟล์จริงและแจ้งน้องแล้ว' : 'แก้ไขใบสมัครแล้ว')
+    onSaved()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center sm:p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="max-h-[94vh] w-full max-w-lg space-y-3 overflow-y-auto rounded-t-3xl bg-neutral-900 p-5 shadow-2xl sm:rounded-3xl">
+        <div className="flex items-center justify-between"><h2 className="text-lg font-bold">✏️ แก้ไข: {a.display_name}</h2><button onClick={onClose} className="rounded-full bg-white/10 px-3 py-1 text-sm">✕</button></div>
+        {a.status === 'approved' && <p className="rounded-xl bg-amber-400/10 p-2 text-xs text-amber-200">ใบสมัครนี้อนุมัติแล้ว การบันทึกจะอัปเดตโปรไฟล์ที่ลูกค้าเห็นด้วย และส่งข้อความแจ้งน้อง (รูปแก้ในหน้านี้ไม่ได้)</p>}
+        <label className="block text-sm">ชื่อที่แสดง<input maxLength={40} value={form.display_name} onChange={set('display_name')} className={field} /></label>
+        <fieldset>
+          <legend className="text-sm">ประเภทงาน</legend>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {GROUP_CATEGORIES[grp].map((c) => (
+              <button type="button" key={c} onClick={() => toggle(c)} aria-pressed={form.categories.includes(c)}
+                className={`rounded-full px-4 py-1.5 text-sm font-semibold ring-1 ${form.categories.includes(c) ? 'bg-line text-black ring-line' : 'bg-white/10 ring-white/15'}`}>{form.categories.includes(c) ? '✓ ' : ''}{CAT[c]}</button>
+            ))}
+          </div>
+        </fieldset>
+        <WorkerFields v={prof} set={(p) => setProf((x) => ({ ...x, ...p }))} grp={grp} hideLocation />
+        <label className="block text-sm">จังหวัด
+          <select value={form.province} onChange={set('province')} className={field}>
+            <option value="" className="text-black">ไม่เปลี่ยน / ไม่ระบุ</option>
+            {PROVINCES.map((p) => <option key={p} value={p} className="text-black">{p}</option>)}
+          </select>
+          <span className="text-[11px] text-neutral-400">ถ้าเปลี่ยนจังหวัดของน้องที่ยืนยันพิกัด GPS แล้ว ระบบจะเปลี่ยนเป็น "จังหวัดที่น้องระบุเอง"</span>
+        </label>
+        <label className="block text-sm">อำเภอ / เขต<input maxLength={60} value={form.district} onChange={set('district')} className={field} /></label>
+        <label className="block text-sm">พื้นที่ใกล้เคียง<input maxLength={120} value={form.nearby} onChange={set('nearby')} className={field} /></label>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="block text-sm">เบอร์โทรศัพท์<input type="tel" maxLength={20} value={form.phone} onChange={set('phone')} className={field} /></label>
+          <label className="block text-sm">LINE ID<input maxLength={40} value={form.line_id} onChange={set('line_id')} className={field} /></label>
+        </div>
+        <label className="block text-sm">หมายเหตุ<textarea rows={2} maxLength={300} value={form.note} onChange={set('note')} className={field} /></label>
+        {error && <p className="rounded-xl bg-red-500/10 p-3 text-sm text-red-300">{error}</p>}
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={onClose} className="rounded-xl bg-white/10 py-3 font-semibold active:scale-95">ยกเลิก</button>
+          <button disabled={busy} onClick={save} className="rounded-xl bg-line py-3 font-bold text-black active:scale-95 disabled:opacity-50">{busy ? 'กำลังบันทึก…' : 'บันทึกการแก้ไข'}</button>
+        </div>
       </div>
     </div>
   )

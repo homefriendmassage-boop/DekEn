@@ -510,3 +510,11 @@ Run `supabase/migration_053.sql` once, after migration_052. **Redeploy** the Edg
 - Flex to every admin (LINE id of the `admins`, through the central OA) with a button to `https://liff.line.me/<LIFF_ID>/admin.html?tab=<tab>`: new application (apps), profile edit / removal request (edits), agency application (agencies), agency draft submitted (drafts), chat flag level orange / red and user reports (chats), slip waiting for a check (reviews). The admin page opens the tab from `?tab=` (also inside `liff.state`).
 - Flex to the applicant when approved / rejected (trigger on the status column): provider application, agency, profile edit; buttons open the provider side (`?open=worker`) or the agency area (`?open=agency`).
 - `LinkSheet`: copy / Flex card / QR (with a download link) for every link that is shared: the profile share button, the 3-day link the girl must accept (admin and agency drafts), the seller's customer link. The invite `ShareModal` (customers, sellers, agency invitations) already had all three.
+
+## migration_054 — payment Flex, admin edits applications, locked application form
+
+Run `supabase/migration_054.sql` once, after migration_053. **Redeploy** the Edge Function `notify-chat` (type `payment`, and the `?open=<category>` buttons).
+
+- Flex to the customer on every recorded payment (trigger on `payments`: slip approved, admin recorded, paid from the Wallet): membership → "✅ ชำระเงินสำเร็จ" with the package, expiry and one button per group it opens (Gold: bartender + ENT; Platinum: + massage; Diamond: + spa; `?open=bartender|ent|masseuse|spa` opens that list); Wallet top-up → "เติม Wallet สำเร็จ".
+- `admin_edit_application()` + "✏️ แก้ไขข้อมูล" on every application card (pending, approved, rejected): name, groups, details, prices, area, contact, note. When the application is approved the live profile is updated too and the provider gets a notice in her admin chat. Photos are not edited there.
+- New provider form: after "ส่งใบสมัคร" the data is shown greyed out (read-only), the page scrolls to the top notice, and "✏️ แก้ไข" unlocks it until the admin approves; saving locks it again.
