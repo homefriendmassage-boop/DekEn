@@ -155,6 +155,69 @@ export function buildPlanFlex(o: { kind: 'seller' | 'agency'; event: string; unt
     },
   }
 }
+// To the ADMINS: something waits for them; one button opens the right tab of the admin page
+const ADMIN_EVENTS: Record<string, { head: string; text: string; tab: string; color: string; button: string }> = {
+  application: { head: '🆕 มีผู้สมัครงานใหม่', text: 'รอตรวจและอนุมัติ', tab: 'apps', color: '#EC4899', button: 'เปิดหน้าใบสมัคร' },
+  edit: { head: '✏️ คำขอแก้ไขโปรไฟล์', text: 'รอตรวจและอนุมัติ', tab: 'edits', color: '#EC4899', button: 'เปิดหน้าคำขอแก้ไข' },
+  deletion: { head: '🗑️ คำขอลบโปรไฟล์', text: 'รอแอดมินจัดการ (ไม่เช่นนั้นระบบลบเองใน 24 ชม.)', tab: 'edits', color: '#F59E0B', button: 'เปิดหน้าคำขอลบ' },
+  agency: { head: '🏢 โมเดลลิ่ง/สังกัดสมัครใหม่', text: 'รอตรวจและอนุมัติ', tab: 'agencies', color: '#EC4899', button: 'เปิดหน้าสังกัด' },
+  draft: { head: '📝 โมเดลลิ่งส่งแบบร่างรออนุมัติ', text: 'ตรวจแบบร่างแล้วอนุมัติ/ตีกลับ', tab: 'drafts', color: '#EC4899', button: 'เปิดแบบร่างให้น้อง' },
+  flag: { head: '🚩 ห้องแชตผิดกฎ (ธงเตือน)', text: 'มีการพยายามส่งข้อมูลติดต่อ ตรวจดูห้องที่ติดธง', tab: 'chats', color: '#EF4444', button: 'เปิดหน้าธง/รายงาน' },
+  report: { head: '🚩 มีรายงานจากผู้ใช้', text: 'ตรวจรายงานแล้วดำเนินการ', tab: 'chats', color: '#EF4444', button: 'เปิดหน้าธง/รายงาน' },
+  slip: { head: '🔎 มีสลิปรอตรวจ', text: 'ระบบตรวจสลิปอัตโนมัติไม่ผ่าน ต้องให้แอดมินตัดสิน', tab: 'reviews', color: '#F59E0B', button: 'เปิดหน้าตรวจสลิป' },
+}
+export function buildAdminFlex(o: { event: string; detail?: string; liffId: string; logo?: string }) {
+  const e = ADMIN_EVENTS[o.event]
+  if (!e) return null
+  const detail = o.event === 'flag' ? `ระดับธง ${o.detail === '4' ? '🔴 แดง (ห้องถูกระงับ)' : '🟠 ส้ม'}` : o.detail
+  const uri = `https://liff.line.me/${o.liffId}/admin.html?tab=${e.tab}`
+  return {
+    type: 'flex', altText: `${e.head}${detail ? ` · ${detail}` : ''}`,
+    contents: {
+      type: 'bubble', size: 'kilo',
+      styles: { body: { backgroundColor: '#161616' }, footer: { backgroundColor: '#161616' } },
+      body: { type: 'box', layout: 'vertical', spacing: 'md', paddingAll: 'xl', contents: [
+        { type: 'box', layout: 'horizontal', spacing: 'md', alignItems: 'center', contents: [
+          ...(o.logo ? [{ type: 'image', url: o.logo, size: '40px', aspectMode: 'cover', aspectRatio: '1:1', flex: 0 }] : []),
+          { type: 'text', text: e.head, weight: 'bold', size: 'md', color: e.color, gravity: 'center', wrap: true },
+        ] },
+        ...(detail ? [{ type: 'text', text: detail, weight: 'bold', size: 'lg', color: '#FFFFFF', wrap: true }] : []),
+        { type: 'text', text: e.text, size: 'sm', color: '#DDDDDD', wrap: true },
+      ] },
+      footer: { type: 'box', layout: 'vertical', paddingAll: 'lg', contents: [{ type: 'button', style: 'primary', color: e.color, height: 'md', action: { type: 'uri', label: e.button, uri } }] },
+    },
+  }
+}
+
+// To the person who applied: approved / rejected
+export function buildApprovalFlex(o: { kind: string; event: string; detail?: string; liffId: string; logo?: string }) {
+  const ok = o.event === 'approved'
+  const what: Record<string, { name: string; open: string; yes: string; no: string; button: string }> = {
+    worker: { name: 'การสมัครเป็นผู้ให้บริการ', open: 'worker', yes: 'โปรไฟล์ของคุณแสดงในระบบแล้ว และสถานะ "ออนไลน์" เปิดให้อัตโนมัติ ลูกค้าจองได้ทันที', no: 'แอดมินยังไม่อนุมัติ แก้ข้อมูลตามเหตุผลแล้วสมัครใหม่ได้', button: 'เปิดหน้าผู้ให้บริการ' },
+    agency: { name: 'การสมัครโมเดลลิ่ง/สังกัด', open: 'agency', yes: 'ชำระแพ็กเกจเพื่อเปิดใช้งาน แล้วส่งลิงก์ชวนน้องเข้าสังกัดได้เลย', no: 'แอดมินยังไม่อนุมัติ แก้ข้อมูลตามเหตุผลแล้วส่งใหม่ได้', button: 'เปิดหลังบ้านสังกัด' },
+    edit: { name: 'คำขอแก้ไขโปรไฟล์', open: 'worker', yes: 'ข้อมูลและรูปใหม่แสดงในระบบเรียบร้อยแล้ว', no: 'แอดมินยังไม่อนุมัติการแก้ไข ดูเหตุผลและส่งใหม่ได้', button: 'เปิดหน้าผู้ให้บริการ' },
+  }
+  const w = what[o.kind]
+  if (!w) return null
+  const uri = `https://liff.line.me/${o.liffId}?open=${w.open}`
+  return {
+    type: 'flex', altText: `${ok ? '✅' : '❌'} ${w.name}${ok ? ' อนุมัติแล้ว' : ' ไม่ผ่าน'}`,
+    contents: {
+      type: 'bubble', size: 'kilo',
+      styles: { body: { backgroundColor: '#161616' }, footer: { backgroundColor: '#161616' } },
+      body: { type: 'box', layout: 'vertical', spacing: 'md', paddingAll: 'xl', contents: [
+        { type: 'box', layout: 'horizontal', spacing: 'md', alignItems: 'center', contents: [
+          ...(o.logo ? [{ type: 'image', url: o.logo, size: '40px', aspectMode: 'cover', aspectRatio: '1:1', flex: 0 }] : []),
+          { type: 'text', text: ok ? '✅ อนุมัติเรียบร้อย' : '❌ ยังไม่ผ่านการตรวจ', weight: 'bold', size: 'md', color: ok ? '#06C755' : '#EF4444', gravity: 'center', wrap: true },
+        ] },
+        { type: 'text', text: w.name, weight: 'bold', size: 'lg', color: '#FFFFFF', wrap: true },
+        { type: 'text', text: ok ? w.yes : w.no, size: 'sm', color: '#DDDDDD', wrap: true },
+        ...(!ok && o.detail ? [{ type: 'text', text: `เหตุผล: ${o.detail}`, size: 'sm', color: '#F59E0B', wrap: true }] : []),
+      ] },
+      footer: { type: 'box', layout: 'vertical', paddingAll: 'lg', contents: [{ type: 'button', style: 'primary', color: ok ? '#06C755' : '#EC4899', height: 'md', action: { type: 'uri', label: w.button, uri } }] },
+    },
+  }
+}
 // ---- END pure rules -----------------------------------------------------------------------------
 
 // Who gets the push and through which OA: a vendor's customer is reached by the vendor's OA (his token and LIFF), everybody else by ours.
@@ -179,8 +242,10 @@ Deno.serve(async (req) => {
   const { thread_id, recipient_id, sender_id } = input
   const isBooking = input.type === 'booking'
   const isSupport = input.type === 'support'
+  const isAdminPush = input.type === 'admin'
+  const isApproval = input.type === 'approval'
   const isSeller = input.type === 'seller' || input.type === 'agency'     // plan Flex (seller / agency): input.type tells which
-  if (!isBooking && !isSupport && !isSeller && (!thread_id || !recipient_id || !sender_id)) return json({ ok: false, code: 'BAD_INPUT' }, 400)
+  if (!isBooking && !isSupport && !isSeller && !isAdminPush && !isApproval && (!thread_id || !recipient_id || !sender_id)) return json({ ok: false, code: 'BAD_INPUT' }, 400)
   if (isSupport && !input.thread_id) return json({ ok: false, code: 'BAD_INPUT' }, 400)
   if (isSeller && !input.user_id) return json({ ok: false, code: 'BAD_INPUT' }, 400)
   if (isBooking && (!input.job_id || !input.event)) return json({ ok: false, code: 'BAD_INPUT' }, 400)
@@ -188,6 +253,39 @@ Deno.serve(async (req) => {
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
   const central = { token, liffId }
+  if (isAdminPush) {
+    // every admin with a LINE id gets the card through our OA
+    const appUrl = Deno.env.get('APP_URL')?.replace(/\/$/, '')
+    const message = buildAdminFlex({ event: String(input.event ?? ''), detail: input.detail ? String(input.detail) : undefined, liffId, logo: appUrl ? `${appUrl}/dekn-logo.jpg?v=2` : undefined })
+    if (!message) return json({ ok: true, status: 'UNKNOWN_EVENT' })
+    const { data: ads } = await admin.from('admins').select('user_id')
+    const ids = (ads ?? []).map((a: { user_id: string }) => a.user_id)
+    const { data: us } = ids.length ? await admin.from('users').select('line_user_id, vendor_id').in('id', ids) : { data: [] }
+    const results: unknown[] = []
+    for (const u of (us ?? []) as { line_user_id: string; vendor_id: string | null }[]) {
+      if (u.vendor_id || !/^U[0-9a-f]{32}$/.test(String(u.line_user_id))) continue
+      const r = await fetch('https://api.line.me/v2/bot/message/push', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'X-Line-Retry-Key': crypto.randomUUID() },
+        body: JSON.stringify({ to: u.line_user_id, messages: [message] }),
+      })
+      results.push({ status: r.ok ? 'SENT' : 'FAILED' })
+    }
+    return json({ ok: true, results })
+  }
+  if (isApproval) {
+    const ra = await recipient(admin, input.user_id, central)
+    if (!ra || !/^U[0-9a-f]{32}$/.test(ra.lineId)) return json({ ok: true, status: 'NO_LINE_ID' })
+    const appUrl = Deno.env.get('APP_URL')?.replace(/\/$/, '')
+    const message = buildApprovalFlex({ kind: String(input.kind ?? ''), event: String(input.event ?? ''), detail: input.detail ? String(input.detail) : undefined, liffId: ra.liffId, logo: appUrl ? `${appUrl}/dekn-logo.jpg?v=2` : undefined })
+    if (!message) return json({ ok: true, status: 'UNKNOWN_KIND' })
+    const r = await fetch('https://api.line.me/v2/bot/message/push', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${ra.token}`, 'Content-Type': 'application/json', 'X-Line-Retry-Key': crypto.randomUUID() },
+      body: JSON.stringify({ to: ra.lineId, messages: [message] }),
+    })
+    return json({ ok: r.ok, status: r.ok ? 'SENT' : 'FAILED' })
+  }
   if (isSeller) {
     // plan Flex: the member is reached through the OA he is a friend of (his seller's OA, else ours)
     const agency = input.type === 'agency'

@@ -1,11 +1,11 @@
 import ImageViewer from './ImageViewer'
+import LinkSheet from './LinkSheet'
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useI18n } from '../i18n'
-import liff from '@line/liff'
 import { logoUrl } from '../lib/logo'
 import { feeFor, withFee } from '../lib/booking'
-import { appLink, canShareFlex, workerBubble } from '../lib/flex'
+import { appLink, workerBubble } from '../lib/flex'
 
 export function LocBadge({ verified }) {
   const { t } = useI18n()
@@ -58,7 +58,8 @@ export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlo
     setRepMsg(t('reportSent'))
   }
 
-  // Flex only: the public photo + details, no price and no location. The button brings the friend back to this profile.
+  // The public photo + details, no price and no location. The link brings the friend back to this profile: Flex card, copy or QR.
+  const [shareSheet, setShareSheet] = useState(null)   // { link, flex }
   async function shareWorker() {
     setShareNote(null)
     try {
@@ -69,14 +70,17 @@ export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlo
         w.gender && t(`gender_${w.gender}`), w.age && `${w.age} ${t('yearsShort')}`,
         w.height_cm && `${t('fHeight')} ${w.height_cm}`, w.weight_kg && `${t('fWeight')} ${w.weight_kg}`, w.measurements,
       ].filter(Boolean).join(' · ')
-      await liff.shareTargetPicker([{
-        type: 'flex',
-        altText: t('shareWorkerAlt', { name: w.display_name, app: 'DekEn' }),
-        contents: workerBubble({
-          w, facts: lines, tags: (w.tags ?? []).map((k) => `#${t(`tag_${k}`)}`).join(' '), about: w.about,
-          button: t('shareWorkerBtn'), uri, logoLabel: 'DekEn',
-        }),
-      }])
+      setShareSheet({
+        link: uri,
+        flex: {
+          type: 'flex',
+          altText: t('shareWorkerAlt', { name: w.display_name, app: 'DekEn' }),
+          contents: workerBubble({
+            w, facts: lines, tags: (w.tags ?? []).map((k) => `#${t(`tag_${k}`)}`).join(' '), about: w.about,
+            button: t('shareWorkerBtn'), uri, logoLabel: 'DekEn',
+          }),
+        },
+      })
     } catch { setShareNote(t('shareFailed')) }
   }
 
@@ -168,7 +172,7 @@ export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlo
             <p className="mt-1 text-[11px] text-neutral-500">{t('priceNote', { fee: money(feeFor(w.categories)) })}</p>
           </div>
 
-          {canShareFlex() && (
+          {(
             <button onClick={shareWorker} className="w-full rounded-xl bg-white/10 py-2.5 text-sm font-bold active:scale-95">🔗 {t('shareWorker')}</button>
           )}
           {shareNote && <p className="text-xs text-amber-200">{shareNote}</p>}
@@ -194,6 +198,8 @@ export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlo
           )}
         </div>
       </div>
+
+      {shareSheet && <LinkSheet title={w.display_name} intro={t('shareWorkerHint')} link={shareSheet.link} flex={shareSheet.flex} onClose={() => setShareSheet(null)} />}
 
       {viewer && w.canView && <ImageViewer images={(imgs.length ? imgs.map((i) => i.url) : [w.image]).filter(Boolean)} index={Math.min(idx, Math.max(0, imgs.length - 1))} alt={w.display_name} onClose={() => setViewer(false)} />}
 

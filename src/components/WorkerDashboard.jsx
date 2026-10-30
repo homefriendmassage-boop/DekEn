@@ -38,6 +38,8 @@ export default function WorkerDashboard({ userId, onTopUp, me, onWallet, openCha
 
   const loadAff = useCallback(() => supabase.rpc('my_worker_agency').then(({ data }) => setAff(data?.[0] ?? null)), [])
   useEffect(() => { loadWorker(); loadJobs(); loadAff() }, [loadWorker, loadJobs, loadAff])
+  // approval puts her online by itself: if she has not added the OA yet, ask her to (she would miss the job pushes)
+  useEffect(() => { if (worker?.is_online) isOaFriend().then((ok) => { if (!ok) setFriendGate(true) }) }, [worker?.is_online]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!invite) return setInviteAgency(null)

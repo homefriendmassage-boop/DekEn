@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useI18n } from '../i18n'
 import DraftEditor from './DraftEditor'
+import LinkSheet from './LinkSheet'
+import { inviteBubble } from '../lib/flex'
 import { DRAFT_STATUS, draftLink } from '../lib/drafts'
 import { ago, fmtDateTime } from '../admin/format'
 
@@ -26,9 +28,12 @@ export default function DraftsPanel({ mode, toast }) {
   }, [mode, filter])
   useEffect(() => { load() }, [load])
 
-  async function copy(token) {
+  // the link the girl must open within 3 days: copy / Flex card / QR code
+  const [sheet, setSheet] = useState(null)
+  function copy(token, name) {
     const link = draftLink(token)
-    try { await navigator.clipboard.writeText(link); toast('คัดลอกลิงก์แล้ว ส่งให้น้องได้เลย (ใช้ได้ 3 วัน)') } catch { window.prompt('คัดลอกลิงก์นี้ส่งให้น้อง', link) }
+    setSheet({ link, name })
+    try { navigator.clipboard.writeText(link) } catch { /* the sheet shows the link */ }
   }
   async function run(fn, okText) {
     const { data, error } = await fn()
@@ -134,7 +139,7 @@ export default function DraftsPanel({ mode, toast }) {
                   {mine && ['draft', 'rejected', 'approved', 'expired'].includes(status) && <button onClick={() => setEditing(d)} className="rounded-xl bg-white/10 px-3 py-1.5 text-sm font-semibold active:scale-95">✏️ แก้ไข</button>}
                   {mode === 'agency' && ['draft', 'rejected'].includes(status) && <button onClick={() => submit(d)} className="rounded-xl bg-line px-3 py-1.5 text-sm font-bold text-black active:scale-95">ส่งให้แอดมินตรวจ</button>}
                   {mode === 'admin' && d.source === 'admin' && status === 'draft' && <button onClick={() => issue(d)} className="rounded-xl bg-line px-3 py-1.5 text-sm font-bold text-black active:scale-95">ออกลิงก์</button>}
-                  {d.link_active && d.token && <button onClick={() => copy(d.token)} className="rounded-xl bg-green-500/80 px-3 py-1.5 text-sm font-bold text-black active:scale-95">📋 คัดลอกลิงก์</button>}
+                  {d.link_active && d.token && <button onClick={() => copy(d.token, d.display_name)} className="rounded-xl bg-green-500/80 px-3 py-1.5 text-sm font-bold text-black active:scale-95">🔗 ลิงก์ · Flex · QR</button>}
                   {['approved', 'expired'].includes(status) && mine && <button onClick={() => issue(d)} className="rounded-xl bg-white/10 px-3 py-1.5 text-sm font-semibold active:scale-95">🔄 ออกลิงก์ใหม่</button>}
                   {mode === 'admin' && d.source === 'agency' && ['approved', 'expired'].includes(status) && <button onClick={() => issue(d)} className="rounded-xl bg-white/10 px-3 py-1.5 text-sm font-semibold active:scale-95">🔄 ออกลิงก์ใหม่</button>}
                   {['draft', 'rejected', 'approved', 'expired', 'submitted'].includes(status) && (mine || mode === 'admin') && <button onClick={() => cancel(d)} className="rounded-xl bg-red-500/10 px-3 py-1.5 text-sm text-red-300 active:scale-95">ยกเลิก</button>}
@@ -156,6 +161,19 @@ export default function DraftsPanel({ mode, toast }) {
       )}
 
       {editing && <DraftEditor draft={editing === 'new' ? null : editing} mode={mode} onClose={() => setEditing(null)} onSaved={onSaved} />}
+
+      {sheet && (
+        <LinkSheet
+          title="ลิงก์ให้น้องกดรับ (ใช้ได้ 3 วัน)"
+          intro={`ส่งให้ ${sheet.name ?? 'น้อง'} เปิดด้วย LINE ของตัวเองเพื่อยืนยันโปรไฟล์ ส่งเป็นการ์ด Flex หรือให้สแกน QR ก็ได้`}
+          link={sheet.link}
+          flex={{
+            type: 'flex', altText: 'DekEn: ยืนยันโปรไฟล์ของคุณ',
+            contents: inviteBubble({ tagline: 'DekEn', title: 'ยืนยันโปรไฟล์ของคุณ', body: 'มีผู้ดูแลสร้างโปรไฟล์ให้คุณแล้ว กดเพื่อตรวจข้อมูล ยืนยันตัวตน และเริ่มรับงาน (ลิงก์ใช้ได้ 3 วัน)', button: 'กดเพื่อยืนยัน', uri: sheet.link }),
+          }}
+          onClose={() => setSheet(null)}
+        />
+      )}
     </div>
   )
 }

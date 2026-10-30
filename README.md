@@ -501,3 +501,12 @@ Run `supabase/migration_052.sql` once, after migration_051 (it replaces the "10 
 
 - Free viewers see clear faces for bartender / ENT = 6 (bought places come first and can grow it up to 10, as before), massage = 3, spa = 0; reshuffled every midnight (Thailand). `can_view_category` lets the 3 massage sample faces through (details, booking, full-size photo) while the other massage girls and all spa girls stay covered.
 - Full-size photo (`ImageViewer`): only clear photos open (card photo or detail photo); a covered photo opens the package sheet instead.
+
+## migration_053 — online on approval, Flex to admins, approval Flex, QR everywhere
+
+Run `supabase/migration_053.sql` once, after migration_052. **Redeploy** the Edge Function `notify-chat` (new types `admin` and `approval`; same URL and secret).
+
+- A provider is online as soon as her profile goes live: `approve_worker` (new application, or re-registering after a removal) and `claim_draft` (the girl accepts a profile an admin published). If she has not added the OA yet, the provider home shows the "add the OA" notice.
+- Flex to every admin (LINE id of the `admins`, through the central OA) with a button to `https://liff.line.me/<LIFF_ID>/admin.html?tab=<tab>`: new application (apps), profile edit / removal request (edits), agency application (agencies), agency draft submitted (drafts), chat flag level orange / red and user reports (chats), slip waiting for a check (reviews). The admin page opens the tab from `?tab=` (also inside `liff.state`).
+- Flex to the applicant when approved / rejected (trigger on the status column): provider application, agency, profile edit; buttons open the provider side (`?open=worker`) or the agency area (`?open=agency`).
+- `LinkSheet`: copy / Flex card / QR (with a download link) for every link that is shared: the profile share button, the 3-day link the girl must accept (admin and agency drafts), the seller's customer link. The invite `ShareModal` (customers, sellers, agency invitations) already had all three.

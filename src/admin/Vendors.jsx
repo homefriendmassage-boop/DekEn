@@ -1,3 +1,4 @@
+import LinkSheet from '../components/LinkSheet'
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { fmtDate } from './format'
@@ -15,6 +16,7 @@ const CODE = { NO_TOKEN: 'ยังไม่ได้ใส่ token', LINE_REJE
 export default function Vendors({ toast }) {
   const [rows, setRows] = useState(null)
   const [editing, setEditing] = useState(null)      // null | 'new' | vendor row
+  const [linkOf, setLinkOf] = useState(null)         // seller whose customer link / QR is shown
   const [staffOf, setStaffOf] = useState(null)        // vendor row whose staff are being managed
   const load = useCallback(async () => { const { data } = await supabase.rpc('admin_vendor_list'); setRows(data ?? []) }, [])
   useEffect(() => { load() }, [load])
@@ -55,7 +57,7 @@ export default function Vendors({ toast }) {
               <p className="text-xs text-neutral-400">LIFF: {v.liff_id} · token: {v.has_token ? '✅ เก็บใน Vault' : '❌ ยังไม่มี'}{v.oa_basic_id ? ` · OA ${v.oa_basic_id}` : ''}</p>
               <div className="flex flex-wrap gap-2">
                 <button onClick={() => copy(endpoint(v.id), 'คัดลอก Endpoint URL แล้ว (ไปใส่ใน LIFF ของเซลล์)')} className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold active:scale-95">📋 Endpoint URL</button>
-                <button onClick={() => copy(`https://liff.line.me/${v.liff_id}`, 'คัดลอกลิงก์ลูกค้าแล้ว')} className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold active:scale-95">🔗 ลิงก์ลูกค้า</button>
+                <button onClick={() => setLinkOf(v)} className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold active:scale-95">🔗 ลิงก์ลูกค้า · QR</button>
                 <button onClick={() => test(v)} className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold active:scale-95">🧪 ทดสอบ token</button>
                 <button onClick={() => setStaffOf(v)} className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold active:scale-95">👥 แอดมินเซลล์</button>
                 <button onClick={() => setEditing(v)} className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold active:scale-95">✏️ แก้ไข</button>
@@ -66,6 +68,7 @@ export default function Vendors({ toast }) {
         </ul>
       )}
 
+      {linkOf && <LinkSheet title={`ลิงก์ลูกค้าของ ${linkOf.name}`} intro="ลูกค้าที่เปิดลิงก์/สแกน QR นี้จะเข้าแอปผ่าน OA ของเซลล์" link={`https://liff.line.me/${linkOf.liff_id}`} flex={null} onClose={() => setLinkOf(null)} />}
       {staffOf && <StaffModal vendor={staffOf} toast={toast} onClose={() => setStaffOf(null)} />}
       {editing && <VendorForm vendor={editing === 'new' ? null : editing} endpoint={endpoint} onClose={() => setEditing(null)} onSaved={(msg) => { setEditing(null); toast(msg); load() }} />}
     </div>
