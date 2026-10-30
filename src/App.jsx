@@ -235,7 +235,7 @@ export default function App() {
   const replyNotice = custThreads.some((x) => x.unread > 0) && (
     <div className="space-y-1.5 px-4 pt-3">
       {custThreads.filter((x) => x.unread > 0).slice(0, 3).map((th) => (
-        <button key={th.id} onClick={() => setChat(th)} className="flex w-full animate-pulse items-center justify-between gap-2 rounded-xl bg-red-500/20 px-3 py-2.5 text-left text-sm font-bold text-red-100 ring-1 ring-red-400/50 active:scale-95">
+        <button key={th.id} onClick={() => { setChat(th) }} className="flex w-full animate-pulse items-center justify-between gap-2 rounded-xl bg-red-500/20 px-3 py-2.5 text-left text-sm font-bold text-red-100 ring-1 ring-red-400/50 active:scale-95">
           <span className="min-w-0 truncate">{t('replyNotice', { name: th.other_name, n: th.unread })}</span>
         </button>
       ))}
@@ -561,7 +561,7 @@ export default function App() {
         </div>
       )}
 
-      {chat && view !== 'worker' && <ChatModal threadId={chat.id} title={chat.other_name} meId={me.id} onClose={() => { setChat(null); loadThreads() }}
+      {chat && view !== 'worker' && <ChatModal threadId={chat.id} title={chat.other_name} meId={me.id} onRead={loadThreads} onClose={() => { setChat(null); loadThreads() }}
           onTopUp={() => { setChat(null); setPay({ kind: 'wallet_topup' }) }} />}
 
       {showMembership && (

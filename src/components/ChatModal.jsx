@@ -7,7 +7,7 @@ const ERROR_KEYS = { MEMBERS_ONLY: 'errMembersOnly', RATE_LIMIT: 'errRate', BAD_
 const errorKey = (msg = '') => Object.entries(ERROR_KEYS).find(([k]) => msg.includes(k))?.[1] ?? 'errGeneric'
 
 // In-app chat (no LINE push => no OA message cost). New messages arrive via Realtime.
-export default function ChatModal({ threadId, title, meId, onClose, onTopUp }) {
+export default function ChatModal({ threadId, title, meId, onClose, onTopUp, onRead }) {
   const { t, money } = useI18n()
   const [msgs, setMsgs] = useState([])
   const [text, setText] = useState('')
@@ -37,8 +37,9 @@ export default function ChatModal({ threadId, title, meId, onClose, onTopUp }) {
       .select('id, sender_id, body, created_at, kind')
       .eq('thread_id', threadId).order('created_at', { ascending: true }).limit(200)
     setMsgs(data ?? [])
-    supabase.rpc('mark_read', { p_thread: threadId }) // fire and forget
-  }, [threadId])
+    await supabase.rpc('mark_read', { p_thread: threadId })
+    onRead?.()      // the parent's unread badges refresh only after the DB knows it is read
+  }, [threadId, onRead])
 
   useEffect(() => {
     load()
@@ -83,6 +84,12 @@ export default function ChatModal({ threadId, title, meId, onClose, onTopUp }) {
     loadFee()
   }
 
+  // close: make sure the thread is marked read BEFORE the parent reloads its badges
+  async function close() {
+    try { await supabase.rpc('mark_read', { p_thread: threadId }) } catch { /* ignore */ }
+    onClose()
+  }
+
   const fmtTime = (v) => new Date(v).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })
   const banner = !fee ? null
     : fee.role === 'customer'
@@ -93,11 +100,11 @@ export default function ChatModal({ threadId, title, meId, onClose, onTopUp }) {
         : fee.state === 'free' ? t('chatWorkerFree', { time: fmtTime(fee.until) }) : null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center sm:p-4" onClick={onClose} role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center sm:p-4" onClick={close} role="dialog" aria-modal="true">
       <div onClick={(e) => e.stopPropagation()} className="flex h-[85vh] w-full max-w-md flex-col rounded-t-3xl bg-neutral-900 shadow-2xl sm:rounded-3xl">
         <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
           <h2 className="truncate text-base font-bold">{t('chatTitle', { name: title })}</h2>
-          <button onClick={onClose} aria-label={t('close')} className="rounded-full bg-white/10 px-3 py-1 text-sm active:scale-95">✕</button>
+          <button onClick={close} aria-label={t('close')} className="rounded-full bg-white/10 px-3 py-1 text-sm active:scale-95">✕</button>
         </div>
 
         <p className="px-4 pt-2 text-[11px] text-neutral-500">{t('chatNote')} {t('chatReviewNote')}</p>
