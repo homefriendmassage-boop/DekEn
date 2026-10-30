@@ -134,6 +134,7 @@ export default function App() {
           if (data?.[0]) { setInvitedBy(data[0].name); setView('worker') }   // straight to the application form
         }
         const openIntent = takeOpenIntent()
+        if (openIntent === 'home') setView('categories')          // customer link: straight to the customer side, even for providers
         if (openIntent === 'plans') { setView('categories'); setShowMembership(true) } // opened from a renewal reminder
         if (openIntent === 'share') { setView('categories'); setShowShare(true) }       // opened from the new seller's Flex
         if (openIntent === 'seller') { setView('categories'); setShowSeller(true) }     // seller plan reminder

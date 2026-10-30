@@ -19,7 +19,7 @@ export function captureOpenParam() {
       open = new URLSearchParams(q >= 0 ? state.slice(q) : state).get('open')
     }
   }
-  try { if (open === 'plans' || open === 'share' || open === 'seller' || open === 'agency' || open === 'worker' || open === 'wallet' || open === 'alive' || ['bartender', 'ent', 'masseuse', 'spa'].includes(open)) sessionStorage.setItem('open_intent', open) } catch { /* storage blocked */ }
+  try { if (open === 'plans' || open === 'share' || open === 'seller' || open === 'agency' || open === 'worker' || open === 'wallet' || open === 'alive' || open === 'home' || ['bartender', 'ent', 'masseuse', 'spa'].includes(open)) sessionStorage.setItem('open_intent', open) } catch { /* storage blocked */ }
 }
 export function takeOpenIntent() {
   try {
