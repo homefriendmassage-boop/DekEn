@@ -328,6 +328,7 @@ export default function App() {
     if (error) {
       if (error.message.includes('SUSPENDED')) return showToast(t('errGeneric'))
       if (error.message.includes('SELF_CHAT')) return showToast(t('errSelfChat'))
+      if (error.message.includes('UNCLAIMED')) return showToast('น้องคนนี้ยังไม่ได้ยืนยันโปรไฟล์ ยังแชตไม่ได้')
       if (error.message.includes('LOCKED')) return showToast(t('errLocked'))
       return showToast(t('errGeneric'))
     }

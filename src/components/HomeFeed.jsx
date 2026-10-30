@@ -158,12 +158,12 @@ function WorkerCard({ worker: w, onUnlock, onDetail, onAsk, unread, isMe, paidGr
           // massage / spa without the package: the covered photo is all there is; the details open after subscribing
           <div className="grid gap-1.5">
             <button onClick={onUnlock} className="w-full rounded-xl bg-amber-400 py-2.5 text-sm font-bold text-black transition active:scale-95">🔒 {t('unlockDetails')}</button>
-            <button onClick={onAsk} className="w-full rounded-xl bg-white/10 py-2 text-xs font-bold ring-1 ring-white/15 transition active:scale-95">💬 {t('chatDirect')}</button>
+            {w.claimed !== false && <button onClick={onAsk} className="w-full rounded-xl bg-white/10 py-2 text-xs font-bold ring-1 ring-white/15 transition active:scale-95">💬 {t('chatDirect')}</button>}
           </div>
         ) : locked ? (
           <div className="grid gap-1.5">
             <button onClick={onDetail} className="w-full rounded-xl bg-pink-500 py-2.5 text-sm font-bold text-white transition active:scale-95">{t('viewDetail')}</button>
-            <button onClick={onAsk} className="w-full rounded-xl bg-white/10 py-2 text-xs font-bold ring-1 ring-white/15 transition active:scale-95">💬 {t('chatDirect')}</button>
+            {w.claimed !== false && <button onClick={onAsk} className="w-full rounded-xl bg-white/10 py-2 text-xs font-bold ring-1 ring-white/15 transition active:scale-95">💬 {t('chatDirect')}</button>}
             <button onClick={onUnlock} className="w-full rounded-xl bg-amber-400 py-2 text-xs font-bold text-black transition active:scale-95">👑 {t('unlock')}</button>
           </div>
         ) : (
@@ -171,7 +171,7 @@ function WorkerCard({ worker: w, onUnlock, onDetail, onAsk, unread, isMe, paidGr
             <button onClick={onDetail} className="w-full rounded-xl bg-pink-500 py-2.5 text-sm font-bold text-white transition active:scale-95">
               {t('viewDetail')}
             </button>
-            <button onClick={onAsk} className="w-full rounded-xl bg-white/10 py-2 text-xs font-bold ring-1 ring-white/15 transition active:scale-95">💬 {t('chatDirect')}</button>
+            {w.claimed !== false && <button onClick={onAsk} className="w-full rounded-xl bg-white/10 py-2 text-xs font-bold ring-1 ring-white/15 transition active:scale-95">💬 {t('chatDirect')}</button>}
           </div>
         )}
       </div>
