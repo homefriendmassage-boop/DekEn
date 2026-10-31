@@ -623,3 +623,7 @@ Run `supabase/migration_065.sql` once, after migration_064. No Edge Function cha
 ## migration_066 — recruiter first, agency sales slot only on its own girls
 
 Run `supabase/migration_066.sql` once, after migration_065. Recruiter slot order: the seller / provider who brought the girl (90-day window, renewing while she works, also after she joined an agency) → her agency (paid + another girl) → platform. An agency earns the sales slot only on a booking of one of its own girls (unless it is also a provider / paid seller).
+
+## migration_067 — the simple recruiter rule (paid agency first)
+
+Run `supabase/migration_067.sql` once, after migration_066. Recruiter slot (40 %): the girl's PAID agency (with another girl) first; else the seller / provider who brought her (90 days, renewing); else the platform. Sales slot as in 066.
