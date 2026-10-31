@@ -5,7 +5,7 @@ import { PROVINCES } from '../provinces'
 import { useI18n } from '../i18n'
 
 export const TAGS = ['playful', 'fun_talk', 'not_picky', 'sing', 'dance', 'drinks', 'friendly']
-export const SPA_TAGS = ['thai_massage', 'oil', 'foot', 'aroma', 'sports', 'scrub', 'polite', 'punctual', 'experienced']
+export const SPA_TAGS = ['girlfriend_feel', 'fun_talk', 'playful', 'sweet', 'attentive', 'relax_massage', 'drinks', 'no_drink', 'not_picky', 'anything']
 // Two application forms: night = bartender + ENT, spa = masseuse + spa (one profile never mixes them)
 export const GROUP_CATEGORIES = { night: ['bartender', 'ent'], spa: ['masseuse', 'spa'] }
 export const groupOf = (cats = []) => (cats.some((c) => GROUP_CATEGORIES.spa.includes(c)) && !cats.some((c) => GROUP_CATEGORIES.night.includes(c)) ? 'spa' : 'night')

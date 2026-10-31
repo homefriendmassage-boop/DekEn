@@ -2,6 +2,7 @@ import { useState } from 'react'
 import liff from '@line/liff'
 import { useI18n } from '../i18n'
 import { canShareFlex } from '../lib/flex'
+import { USE_MOCK_LIFF } from '../config'
 
 /**
  * One place for "a link somebody must open": copy it, send it as a LINE Flex card, or show a QR code to scan (with a download link).
@@ -17,7 +18,12 @@ export default function LinkSheet({ title, intro, link, flex = null, onClose }) 
     try { await navigator.clipboard.writeText(link); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch { setNote(link) }
   }
   async function sendFlex() {
-    try { await liff.shareTargetPicker([flex]) } catch { setNote(t('shareFailed')) }
+    try { await liff.shareTargetPicker([flex], { isMultiple: true }) } catch (e) { setNote(`${t('shareFailed')} (${e?.code ?? e?.message ?? 'error'}) — ใช้ปุ่ม "ส่งเป็นข้อความ LINE" แทนได้`) }
+  }
+  // Plain-text share through LINE's own share URL: needs no popup, so it still works where the Flex picker window is blocked
+  function sendText() {
+    const url = `https://line.me/R/share?text=${encodeURIComponent(`${title}\n${link}`)}`
+    try { liff.openWindow({ url, external: false }) } catch { window.location.href = url }
   }
   async function showQr() {
     if (qr) return setQr(null)
@@ -37,6 +43,7 @@ export default function LinkSheet({ title, intro, link, flex = null, onClose }) 
           <button onClick={copy} className="rounded-xl bg-white/10 py-2 text-sm font-semibold active:scale-95">{copied ? t('copied') : t('shareCopy')}</button>
           <button onClick={showQr} className="rounded-xl bg-white/10 py-2 text-sm font-semibold active:scale-95">{t('shareQr')}</button>
           {flex && canShareFlex() && <button onClick={sendFlex} className="col-span-2 rounded-xl bg-line py-2 text-sm font-bold text-black active:scale-95">{t('shareFlex')}</button>}
+          {!USE_MOCK_LIFF && <button onClick={sendText} className="col-span-2 rounded-xl bg-white/10 py-2 text-sm font-semibold active:scale-95">💬 ส่งเป็นข้อความ LINE (ถ้าปุ่ม Flex ขึ้นหน้าขาว)</button>}
         </div>
         {qr && (
           <div className="space-y-2 text-center">

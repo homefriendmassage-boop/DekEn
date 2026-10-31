@@ -16,6 +16,7 @@ const ERRORS = {
   BAD_INPUT: 'ข้อมูลไม่ถูกต้อง',
   NOT_FOUND: 'ไม่พบรายการ (อาจถูกจัดการไปแล้ว)',
   NO_CHANGE: 'ยังไม่ได้เปลี่ยนชื่อหรือโลโก้',
+  SLOTS_FULL: 'ที่ลำดับแรกเต็มแล้ว (3 ที่) รอให้มีที่ว่าง',
 }
 const errText = (m = '') => Object.entries(ERRORS).find(([k]) => m.includes(k))?.[1] ?? 'ทำรายการไม่สำเร็จ'
 const fmtDate = (v) => new Date(v).toLocaleDateString('th-TH', { dateStyle: 'medium' })
@@ -285,6 +286,7 @@ function Plan({ ag, me, reload, flash, onTopUp, onWallet, onChanged }) {
         <p className="text-xs text-neutral-400">ส่งลิงก์/QR/Flex ให้น้อง น้องกดสมัครด้วย LINE ของตัวเองแล้วเข้าสังกัดอัตโนมัติ (รอแอดมินอนุมัติโปรไฟล์) น้องที่เคยออกไปแล้วอยากกลับ ส่งลิงก์ให้อีกครั้งแล้วให้กด "ยอมรับเข้าสังกัด"</p>
         <button onClick={() => setShare(true)} className="w-full rounded-xl bg-line py-2 font-bold text-black active:scale-95">ส่งลิงก์เชิญน้อง</button>
       </section>
+      {ag.active && <BoostCard flash={flash} onChanged={onChanged} />}
       {share && <ShareModal agencyCode={ag.code} onClose={() => setShare(false)} />}
     </div>
   )
@@ -379,5 +381,37 @@ function Settings({ ag, me, reload, flash }) {
       </label>
       <button disabled={busy || (!file && name.trim() === ag.name && intro.trim() === (disp?.intro ?? ''))} className="w-full rounded-xl bg-line py-3 font-bold text-black active:scale-95 disabled:opacity-40">{busy ? 'กำลังส่ง…' : 'ส่งให้แอดมินอนุมัติ'}</button>
     </form>
+  )
+}
+
+// Buy the first places of the agency strip on the customers' provider lists (3 places at a time; bonus wallet first, then the Wallet).
+function BoostCard({ flash, onChanged }) {
+  const [st, setSt] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const load = useCallback(() => supabase.rpc('agency_boost_status').then(({ data }) => setSt(data ?? null)), [])
+  useEffect(() => { load() }, [load])
+  if (!st) return null
+  const packs = [[1, st.price_day, '1 วัน'], [3, st.price_3, '3 วัน'], [7, st.price_7, '7 วัน (จ่าย 5 วัน)']]
+  async function buy(days, price) {
+    if (busy || !window.confirm(`ซื้อลำดับแรกของแถบสังกัด ${days} วัน ราคา ${baht(price)} (หักจากกระเป๋าโบนัสก่อน ที่เหลือหักจาก Wallet)?`)) return
+    setBusy(true)
+    const { error } = await supabase.rpc('agency_buy_boost', { p_days: days })
+    setBusy(false)
+    if (error) return flash(errText(error.message))
+    flash('ซื้อลำดับแรกแล้ว'); load(); onChanged?.()
+  }
+  return (
+    <section className="space-y-2 rounded-2xl bg-amber-400/10 p-3 ring-1 ring-amber-400/30">
+      <p className="text-sm font-semibold text-amber-200">⭐ ซื้อลำดับแรกของแถบสังกัด</p>
+      <p className="text-xs text-neutral-300">สังกัดที่ซื้อจะขึ้นก่อนสังกัดอื่นในแถบบนหน้ารายชื่อน้องของลูกค้า พร้อมป้าย "⭐ แนะนำ" มีได้ครั้งละ {st.slots} สังกัด (ตอนนี้ใช้อยู่ {st.used}/{st.slots}) ถ้าซื้อต่อ วันจะบวกเพิ่ม</p>
+      {st.mine_until && <p className="text-xs font-semibold text-green-300">ของคุณใช้งานอยู่ถึง {new Date(st.mine_until).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })}</p>}
+      <div className="grid grid-cols-3 gap-2">
+        {packs.map(([d, price, label]) => (
+          <button key={d} disabled={busy || (!st.mine_until && st.used >= st.slots)} onClick={() => buy(d, price)} className="rounded-xl bg-amber-400 px-1 py-2 text-center text-xs font-bold text-black active:scale-95 disabled:opacity-40">
+            {label}<span className="block text-[11px] font-semibold">{baht(price)}</span>
+          </button>
+        ))}
+      </div>
+    </section>
   )
 }

@@ -16,8 +16,9 @@ export function AgencyStrip({ agencies, category, onOpen }) {
         {list.map((a) => (
           <li key={a.id} className="shrink-0">
             <button onClick={() => onOpen(a.id)} className="flex w-20 flex-col items-center gap-1 active:scale-95">
-              {a.logo ? <img src={logoUrl(a.logo)} alt="" className="h-14 w-14 rounded-full object-cover ring-2 ring-white/20" />
+              {a.logo ? <img src={logoUrl(a.logo)} alt="" className={`h-14 w-14 rounded-full object-cover ring-2 ${a.boosted ? 'ring-amber-400' : 'ring-white/20'}`} />
                 : <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10 text-2xl">🏢</span>}
+              {a.boosted && <span className="-mt-3 rounded-full bg-amber-400 px-1.5 text-[9px] font-extrabold text-black">⭐ {t('agencyFeatured')}</span>}
               <span className="w-full truncate text-center text-[11px] font-semibold">{a.name}</span>
               {a.girls && <span className="text-[10px] text-neutral-400">{t('agencyGirls', { n: a.girls[category] ?? 0 })}</span>}
             </button>

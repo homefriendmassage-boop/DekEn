@@ -4,6 +4,8 @@ import { CATEGORIES } from '../config'
 import { baht, fmtDateTime } from './format'
 import { PROVINCES } from '../provinces'
 import LinkSheet from '../components/LinkSheet'
+import ImageViewer from '../components/ImageViewer'
+import { useI18n } from '../i18n'
 import { inviteBubble } from '../lib/flex'
 import { applyLink } from '../lib/drafts'
 import WorkerFields, { GROUP_CATEGORIES, groupOf, profileFromRow, profileToPayload, validateProfile } from '../components/WorkerFields'
@@ -15,12 +17,15 @@ export default function Applications({ onChanged, toast }) {
   const [status, setStatus] = useState('pending')
   const [rows, setRows] = useState(null)
   const [sheet, setSheet] = useState(false)   // registration-only link / Flex / QR
+  const [pics, setPics] = useState({})         // user id -> LINE profile picture
 
   const load = useCallback(async () => {
     setRows(null)
     const { data, error } = await supabase.rpc('admin_list_applications', { p_status: status })
     if (error) { toast('โหลดไม่สำเร็จ'); return setRows([]) }
     setRows(data ?? [])
+    const ids = [...new Set((data ?? []).map((r) => r.user_id).filter(Boolean))]
+    if (ids.length) { const { data: p } = await supabase.rpc('admin_user_pictures', { p_ids: ids }); setPics(Object.fromEntries((p ?? []).map((x) => [x.id, x.picture_url]))) }
   }, [status, toast])
 
   useEffect(() => { load() }, [load])
@@ -57,22 +62,24 @@ export default function Applications({ onChanged, toast }) {
 
       {rows === null ? <p className="py-10 text-center text-neutral-500">กำลังโหลด…</p>
         : rows.length === 0 ? <p className="rounded-2xl bg-white/5 p-6 text-center text-neutral-500">ไม่มีรายการ</p>
-        : <ul className="grid gap-3 md:grid-cols-2">{rows.map((a) => <Card key={a.id} a={a} onReview={review} onChanged={load} toast={toast} />)}</ul>}
+        : <ul className="grid gap-3 md:grid-cols-2">{rows.map((a) => <Card key={a.id} a={a} linePic={pics[a.user_id]} onReview={review} onChanged={load} toast={toast} />)}</ul>}
     </div>
   )
 }
 
-function Card({ a, onReview, onChanged, toast }) {
+function Card({ a, linePic, onReview, onChanged, toast }) {
+  const { t } = useI18n()
+  const [viewer, setViewer] = useState(null)   // { urls, index }: the clear originals in a zoomable viewer
   const [rejecting, setRejecting] = useState(false)
   const [reason, setReason] = useState('')
-  const [fullUrl, setFullUrl] = useState(null)
-  const [origs, setOrigs] = useState({})   // photo id -> signed URL of the private original
   const [editing, setEditing] = useState(false)
 
   // Original (unmosaicked) photo, for verifying the person. Admin-only signed URL, 5 minutes.
-  async function showOriginal() {
-    const { data } = await supabase.storage.from('worker-originals').createSignedUrl(a.original_path, 300)
-    setFullUrl(data?.signedUrl ?? null)
+  async function openViewer(index = 0) {
+    const paths = a.photos?.length ? a.photos.map((p) => p.original_path) : [a.original_path]
+    const { data } = await supabase.storage.from('worker-originals').createSignedUrls(paths.filter(Boolean), 600)
+    const urls = (data ?? []).map((x) => x.signedUrl).filter(Boolean)
+    if (urls.length) setViewer({ urls, index: Math.min(index, urls.length - 1) })
   }
 
   return (
@@ -80,10 +87,12 @@ function Card({ a, onReview, onChanged, toast }) {
       <div className="flex gap-3">
         {a.profile_image
           ? <img src={a.profile_image} alt="" className="h-24 w-20 shrink-0 rounded-xl object-cover" />
-          : <div className="flex h-24 w-20 shrink-0 items-center justify-center rounded-xl bg-white/10 text-xs text-neutral-500">ไม่มีรูป</div>}
+          : linePic
+            ? <div className="relative h-24 w-20 shrink-0 overflow-hidden rounded-xl bg-white/10"><img src={linePic} alt="" className="h-full w-full object-cover" /><span className="absolute inset-x-0 bottom-0 bg-black/60 text-center text-[9px]">โปรไฟล์ LINE</span></div>
+            : <div className="flex h-24 w-20 shrink-0 items-center justify-center rounded-xl bg-white/10 text-xs text-neutral-500">ไม่มีรูป</div>}
         <div className="min-w-0 text-sm">
           <p className="truncate text-base font-bold">{a.display_name}</p>
-          <p className="truncate text-xs text-neutral-400">บัญชี LINE: {a.user_name ?? '—'}</p>
+          <p className="flex items-center gap-1.5 truncate text-xs text-neutral-400">{linePic && <img src={linePic} alt="" className="h-5 w-5 shrink-0 rounded-full object-cover" />}บัญชี LINE: {a.user_name ?? '—'}</p>
           <div className="mt-1 flex flex-wrap gap-1">
             {a.categories.filter((c) => CATEGORIES.includes(c)).map((c) => <span key={c} className="rounded-full bg-white/10 px-2 py-0.5 text-[11px]">{CAT[c]}</span>)}
           </div>
@@ -98,7 +107,7 @@ function Card({ a, onReview, onChanged, toast }) {
         <dt className="text-neutral-400">LINE ID</dt><dd>{a.line_id ?? '—'}</dd>
         {a.note && <><dt className="text-neutral-400">หมายเหตุ</dt><dd className="whitespace-pre-wrap break-words">{a.note}</dd></>}
         {a.gender && <><dt className="text-neutral-400">ข้อมูล</dt><dd>{{ female: 'หญิง', male: 'ชาย', lgbt: 'LGBT' }[a.gender]} · อายุ {a.age ?? '—'} · สูง {a.height_cm ?? '—'} ซม. · หนัก {a.weight_kg ?? '—'} กก. · สัดส่วน {a.measurements ?? '—'}</dd></>}
-        {a.tags?.length > 0 && <><dt className="text-neutral-400">บุคลิก</dt><dd>{a.tags.join(', ')}</dd></>}
+        {a.tags?.length > 0 && <><dt className="text-neutral-400">บุคลิก</dt><dd>{a.tags.map((k) => (t(`tag_${k}`) === `tag_${k}` ? k : t(`tag_${k}`))).join(', ')}</dd></>}
         {a.about && <><dt className="text-neutral-400">แนะนำตัว</dt><dd className="whitespace-pre-wrap break-words">{a.about}</dd></>}
         <dt className="text-neutral-400">กลุ่มงาน</dt><dd>{a.grp === 'spa' ? '💆 หมอนวด/สปา' : '🍸 ชงเหล้า/ENT'}{a.service_mode ? ` · ${{ shop: 'ที่ร้าน', outcall: 'ไปหาลูกค้า', both: 'ทั้งสองแบบ' }[a.service_mode]}` : ''}</dd>
         <dt className="text-neutral-400">ราคาเริ่มต้นครั้งแรก</dt><dd>{a.start_rate === '@60' ? '60 นาที' : a.start_rate === '@90' ? '90 นาที' : a.start_rate === '@120' ? '120 นาที' : a.start_rate === '1h' ? '1 ชม.' : a.start_rate === '@4h' ? '4 ชม.' : a.start_rate === '@6h' ? '6 ชม.' : a.start_rate}</dd>
@@ -116,19 +125,16 @@ function Card({ a, onReview, onChanged, toast }) {
           <ul className="grid grid-cols-3 gap-2">
             {a.photos.map((p) => (
               <li key={p.id} className="space-y-1">
-                <img src={origs[p.id] ?? p.public_url} alt="" className="aspect-[3/4] w-full rounded-xl object-cover" />
-                {!origs[p.id] && (
-                  <button onClick={async () => { const { data } = await supabase.storage.from('worker-originals').createSignedUrl(p.original_path, 300); if (data?.signedUrl) setOrigs((o) => ({ ...o, [p.id]: data.signedUrl })) }}
-                    className="w-full rounded-lg bg-white/10 py-1 text-[11px] active:scale-95">🔍 ต้นฉบับ</button>
-                )}
+                <img src={p.public_url} alt="" onClick={() => openViewer(a.photos.indexOf(p))} className="aspect-[3/4] w-full cursor-zoom-in rounded-xl object-cover" />
               </li>
             ))}
           </ul>
+          <button onClick={() => openViewer(0)} className="w-full rounded-xl bg-white/10 py-2 text-sm font-semibold active:scale-95">🔍 ขยายดูรูปจริง (ไม่โมเสก) ทั้ง {a.photos.length} ภาพ</button>
         </div>
       ) : a.original_path ? (
-        <button onClick={showOriginal} className="w-full rounded-xl bg-white/10 py-2 text-sm font-semibold active:scale-95">🔍 ดูรูปจริง (ไม่โมเสก)</button>
+        <button onClick={() => openViewer(0)} className="w-full rounded-xl bg-white/10 py-2 text-sm font-semibold active:scale-95">🔍 ขยายดูรูปจริง (ไม่โมเสก)</button>
       ) : <p className="rounded-xl bg-red-500/10 p-2 text-xs text-red-300">ผู้สมัครยังไม่ได้แนบรูป</p>}
-      {fullUrl && <img src={fullUrl} alt="" className="w-full rounded-xl" />}
+      {viewer && <ImageViewer images={viewer.urls} index={viewer.index} alt={a.display_name} onClose={() => setViewer(null)} />}
 
       {editing && <EditModal a={a} toast={toast} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); onChanged() }} />}
 
