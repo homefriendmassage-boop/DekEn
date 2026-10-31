@@ -12,6 +12,7 @@ export default function SellerPanel({ onClose, walletBalance = 0, onTopUp, onCha
   const [rep, setRep] = useState(null)
   const [busy, setBusy] = useState(false)
   const [share, setShare] = useState(false)
+  const [recruit, setRecruit] = useState(false)
   const [msg, setMsg] = useState(null)
 
   const load = async () => {
@@ -42,6 +43,7 @@ export default function SellerPanel({ onClose, walletBalance = 0, onTopUp, onCha
         </div>
 
         <button onClick={() => setShare(true)} className="w-full rounded-xl bg-line py-3 font-bold text-black active:scale-95">🔗 แชร์ลิงก์ชวนเพื่อน</button>
+        {st?.is_seller && <button onClick={() => setRecruit(true)} className="w-full rounded-xl bg-pink-500 py-3 font-bold active:scale-95">💃 ชวนเพื่อนมาสมัครงาน (ได้ 40% ค่าจองของเพื่อน 90 วัน)</button>}
 
         <ul className="space-y-1 rounded-2xl bg-white/5 p-3 text-xs text-neutral-300">
           <li>• <b>ค่าแพ็กเกจ 20%</b> ของคนที่คุณชวน (ครั้งแรก) เข้าโบนัสทุกครั้งที่เขาจ่ายหรือต่ออายุ</li>
@@ -86,6 +88,7 @@ export default function SellerPanel({ onClose, walletBalance = 0, onTopUp, onCha
         )}
       </div>
       {share && <ShareModal onClose={() => setShare(false)} />}
+      {recruit && <ShareModal recruit onClose={() => setRecruit(false)} />}
     </div>
   )
 }

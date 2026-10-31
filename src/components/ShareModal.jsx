@@ -10,7 +10,7 @@ const APP_NAME = 'DekEn'
 
 // Share my link: copy, LINE Flex message (share target picker) or QR code.
 // Whoever opens the link and registers / pays through it counts as my customer (server-side rules, migration_015).
-export default function ShareModal({ onClose, agencyCode }) {
+export default function ShareModal({ onClose, agencyCode, recruit = false }) {
   const { t, money } = useI18n()
   const [stats, setStats] = useState(null)
   const [qr, setQr] = useState(null)
@@ -23,7 +23,7 @@ export default function ShareModal({ onClose, agencyCode }) {
   }, [agencyCode])
 
   const param = agencyCode ? 'agency' : 'ref'
-  const extra = agencyCode ? '&only=apply' : ''     // an agency's invitation opens the application form and nothing else
+  const extra = agencyCode || recruit ? '&only=apply' : ''     // recruit = my own link that brings a friend straight to the application form     // an agency's invitation opens the application form and nothing else
   const link = stats?.code
     ? USE_MOCK_LIFF || !getActiveLiffId()
       ? `${window.location.origin}${window.location.pathname}?${param}=${stats.code}${extra}`
@@ -43,7 +43,7 @@ export default function ShareModal({ onClose, agencyCode }) {
         altText: t('shareFlexAlt', { app: APP_NAME }),
         contents: inviteBubble({
           tagline: t('shareLogoNote'), title: APP_NAME, uri: link,
-          body: t(agencyCode ? 'agencyFlexBody' : 'shareFlexBody'), button: t('shareFlexButton'),
+          body: t(agencyCode ? 'agencyFlexBody' : recruit ? 'recruitFlexBody' : 'shareFlexBody'), button: t('shareFlexButton'),
         }),
       }])
     } catch { setNote(t('shareFailed')) }
@@ -60,12 +60,12 @@ export default function ShareModal({ onClose, agencyCode }) {
       <div onClick={(e) => e.stopPropagation()}
         className="max-h-[92vh] w-full max-w-md space-y-4 overflow-y-auto rounded-t-3xl bg-neutral-900 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl sm:rounded-3xl">
         <div className="mx-auto h-1.5 w-10 rounded-full bg-white/20 sm:hidden" />
-        <h2 className="text-xl font-bold">{agencyCode ? '🏢' : '🎁'} {t(agencyCode ? 'agencyInviteTitle' : 'shareTitle')}</h2>
-        <p className="text-sm text-neutral-400">{t(agencyCode ? 'agencyInviteBody' : 'shareBody')}</p>
+        <h2 className="text-xl font-bold">{agencyCode ? '🏢' : recruit ? '💃' : '🎁'} {t(agencyCode ? 'agencyInviteTitle' : recruit ? 'recruitTitle' : 'shareTitle')}</h2>
+        <p className="text-sm text-neutral-400">{t(agencyCode ? 'agencyInviteBody' : recruit ? 'recruitBody' : 'shareBody')}</p>
 
         {!stats ? <p className="py-6 text-center text-neutral-500">{t('loading')}</p> : (
           <>
-            {!agencyCode && <div className="grid grid-cols-2 gap-2 text-center">
+            {!agencyCode && !recruit && <div className="grid grid-cols-2 gap-2 text-center">
               <div className="rounded-2xl bg-white/5 p-3"><p className="text-xs text-neutral-400">{t('shareFriends')}</p><p className="text-xl font-bold">{stats.friends}</p></div>
               <div className="rounded-2xl bg-amber-400/10 p-3"><p className="text-xs text-amber-200">{t('shareEarned')}</p><p className="text-xl font-bold text-amber-300">{money(stats.earned)}</p></div>
             </div>}
@@ -78,7 +78,7 @@ export default function ShareModal({ onClose, agencyCode }) {
             </div>
             {qr && <img src={qr} alt="QR" className="mx-auto w-56 rounded-xl bg-white p-2" />}
             {note && <p className="break-all text-xs text-amber-200">{note}</p>}
-            {!agencyCode && <p className="text-[11px] text-neutral-500">{t('shareRule')}</p>}
+            {!agencyCode && !recruit && <p className="text-[11px] text-neutral-500">{t('shareRule')}</p>}
           </>
         )}
         <button onClick={onClose} className="w-full rounded-xl bg-white/10 py-3 font-semibold active:scale-95">{t('close')}</button>

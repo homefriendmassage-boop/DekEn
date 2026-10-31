@@ -579,3 +579,11 @@ Redeploy the Edge Function `verify-slip`. `RECEIVER_NAME_CONTAINS` and `RECEIVER
 ## migration_060 — massage / spa details are locked in the database
 
 Run `supabase/migration_060.sql` once, after migration_059. No Edge Function or app change. `list_workers` (also behind `get_worker` and `list_workers_near`) now returns age, height, weight, measurements, tags, introduction and the full price list ONLY to people who may see that massage / spa group (membership, paid seller, the girl's own agency); everyone else gets empty values plus the card data (name, covered photo, area, online, "starting from" price). Bartender / ENT are unchanged.
+
+## migration_061 — seller = a live provider; recruiter share only for sellers; "invite a friend to work" link
+
+Run `supabase/migration_061.sql` once, after migration_060. No Edge Function change.
+
+- A provider is a (free) seller only while her profile is alive: not deleted, not admin-hidden, not hidden for inactivity (`provider_alive`). `seller_free_via` / `is_seller_at` follow.
+- The 40 % "recruiter" share (booking fee of a girl who applied through somebody's link) goes only to a seller — checked when she applies (`applications_set_recruiter`) and again at every booking (`booking_recruiter`). A link shared by anybody else is the central link: the platform keeps the share. The 20 % package share is unchanged (first inviter).
+- App: "💃 ชวนเพื่อนมาสมัครงาน" on the provider home and in "ส่วนแบ่งของฉัน" (sellers only): the user's own `?ref=<code>&only=apply` link (copy / Flex / QR) that shows the application form only.
