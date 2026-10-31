@@ -420,6 +420,8 @@ export default function App() {
   }
 
   if (applyOnly && me) {
+    // Registration-only link: the same screen as the provider side (self application / modelling agency tabs) but no way out to the rest of the app
+    const leaveLock = () => { clearApplyOnly(); setApplyOnly(false) }
     return (
       <div className="mx-auto min-h-screen w-full max-w-3xl pb-[env(safe-area-inset-bottom)]">
         <header className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
@@ -430,9 +432,21 @@ export default function App() {
           <div className="space-y-3 p-6 text-center">
             <p className="text-lg font-bold">คุณลงทะเบียนเป็นผู้ให้บริการแล้ว</p>
             <p className="text-sm text-neutral-400">ลิงก์นี้ใช้สำหรับสมัครเท่านั้น กดปุ่มด้านล่างเพื่อเข้าหน้าผู้ให้บริการของคุณ</p>
-            <button onClick={() => { clearApplyOnly(); setApplyOnly(false); setView('worker'); setWorkerTab('self') }} className="rounded-full bg-line px-6 py-2.5 font-bold text-black active:scale-95">เข้าหน้าผู้ให้บริการ</button>
+            <button onClick={() => { leaveLock(); setView('worker'); setWorkerTab('self') }} className="rounded-full bg-line px-6 py-2.5 font-bold text-black active:scale-95">เข้าหน้าผู้ให้บริการ</button>
           </div>
-        ) : <WorkerApply userId={me.id} defaultName={session.profile.displayName} />}
+        ) : (
+          <>
+            <nav className="grid grid-cols-2 gap-2 px-4 pt-3">
+              {[['self', t('tabSelf')], ['agency', t('tabAgency')]].map(([id, label]) => (
+                <button key={id} onClick={() => setWorkerTab(id)} aria-pressed={workerTab === id}
+                  className={`rounded-xl py-2.5 text-sm font-bold active:scale-95 ${workerTab === id ? 'bg-line text-black' : 'bg-white/10 text-neutral-200'}`}>{label}</button>
+              ))}
+            </nav>
+            {workerTab === 'agency'
+              ? <AgencyArea embedded me={me} onChanged={loadMe} onTopUp={leaveLock} onWallet={leaveLock} />
+              : <WorkerApply userId={me.id} defaultName={session.profile.displayName} />}
+          </>
+        )}
       </div>
     )
   }
