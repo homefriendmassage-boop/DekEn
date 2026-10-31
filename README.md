@@ -619,3 +619,7 @@ Run `supabase/migration_065.sql` once, after migration_064. No Edge Function cha
 - New profiles (approved in the last N days, up to the cap per group) are placed right after the bought places, rotating daily; "🆕" badge (`new_worker_ids`).
 - An agency without a paid plan: cannot read / answer its girls' chats (`is_agency_of`, `agency_threads`), cannot open their photos and details (`can_view_worker`, `list_workers`, `agency_girls`); its back office shows the 40 % it missed this month (`agency_missed`).
 - Everybody now sees "💃 ชวนเพื่อนมาสมัครงาน" on the categories page; the text says which reward applies to them (`recruit_rewards`).
+
+## migration_066 — recruiter first, agency sales slot only on its own girls
+
+Run `supabase/migration_066.sql` once, after migration_065. Recruiter slot order: the seller / provider who brought the girl (90-day window, renewing while she works, also after she joined an agency) → her agency (paid + another girl) → platform. An agency earns the sales slot only on a booking of one of its own girls (unless it is also a provider / paid seller).
