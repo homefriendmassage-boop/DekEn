@@ -575,3 +575,7 @@ Redeploy the Edge Function `verify-slip`. `RECEIVER_NAME_CONTAINS` and `RECEIVER
 - `verify-slip` (redeploy): a slip whose bank time is earlier than the payment request it would pay (same amount, else the newest request of the last 24 h) is refused as `SLIP_TOO_OLD` and stays unused; 2 minutes of tolerance because banks print the time to the minute. If the bank's answer has no time field the check is skipped.
 - The payment sheet retries by itself every 15 s (up to 13 tries) when the bank has not released the slip yet (`SLIP_PENDING`, Bangkok Bank); no need to leave the app and attach again.
 - Package-paid Flex (`notify-chat`, redeploy): groups the package opens are pink buttons; groups above the package are grey "🔒 … · ต้อง <package>" buttons that open the package list.
+
+## migration_060 — massage / spa details are locked in the database
+
+Run `supabase/migration_060.sql` once, after migration_059. No Edge Function or app change. `list_workers` (also behind `get_worker` and `list_workers_near`) now returns age, height, weight, measurements, tags, introduction and the full price list ONLY to people who may see that massage / spa group (membership, paid seller, the girl's own agency); everyone else gets empty values plus the card data (name, covered photo, area, online, "starting from" price). Bartender / ENT are unchanged.
