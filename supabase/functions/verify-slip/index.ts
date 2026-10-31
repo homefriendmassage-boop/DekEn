@@ -297,7 +297,7 @@ Deno.serve(async (req) => {
       return json({ ok: false, code })
     }
 
-    await log('OK', check.transRef, { paid: check.amount })
+    await log('OK', check.transRef, { paid: check.amount, slip_at: check.slipAt ? new Date(check.slipAt).toISOString() : null })   // null = the bank's answer had no readable time
     const row = Array.isArray(applied) ? applied[0] : applied
     return json({ ok: true, code: 'OK', kind: row?.kind, tier: row?.tier, days: row?.days, paid: row?.paid })
   } catch (e) {
