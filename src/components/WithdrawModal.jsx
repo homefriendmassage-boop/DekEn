@@ -139,7 +139,7 @@ export default function WithdrawModal({ onClose, onChanged }) {
                     <p className="flex justify-between border-t border-white/10 pt-1 text-base font-bold text-green-300"><span>รับสุทธิ</span><span>{baht(Math.max(0, net))}</span></p>
                   </div>
                 )}
-                <p className="text-[11px] text-neutral-400">ต้องได้รับสุทธิไม่ต่ำกว่า {baht(st.min_net)} (ขอถอนอย่างน้อย {baht(st.min)}) · ถอนได้วันละ 1 ครั้ง · โอนเข้าพร้อมเพย์ที่ลงทะเบียนไว้</p>
+                <p className="text-[11px] text-neutral-400">{Number(st.min_net) > 0 ? `ต้องได้รับสุทธิไม่ต่ำกว่า ${baht(st.min_net)} (ขอถอนอย่างน้อย ${baht(st.min)})` : `ขอถอนขั้นต่ำ ${baht(st.min)}`} · ถอนได้วันละ 1 ครั้ง · โอนเข้าพร้อมเพย์ที่ลงทะเบียนไว้</p>
                 <button disabled={busy || n < Number(st.min) || net < Number(st.min_net) || st.today_used} onClick={withdraw} className="w-full rounded-xl bg-amber-400 py-3 font-bold text-black active:scale-95 disabled:bg-neutral-700 disabled:text-neutral-400">
                   {st.today_used ? 'วันนี้ถอนไปแล้ว' : busy ? '…' : 'ขอถอนเงิน'}
                 </button>

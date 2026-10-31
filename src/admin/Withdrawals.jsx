@@ -159,10 +159,10 @@ function Settings({ toast }) {
     <div className="max-w-lg space-y-4">
       <section className="space-y-3 rounded-2xl bg-white/5 p-4">
         <p className="text-sm font-bold">อัตราและเงื่อนไข</p>
-        {num('withdraw_min_net', 'ขั้นต่ำที่สมาชิกต้องได้รับสุทธิ (บาท)', `หลังหักค่าธรรมเนียมแล้ว ตอนนี้ขอถอนได้อย่างน้อย ${Number(v.withdraw_min_gross ?? 0).toLocaleString('en-US')} บาท โบนัสที่ต่ำกว่านี้ถอนไม่ได้ โอนเข้า Wallet ได้เท่านั้น`)}
-        {num('withdraw_fee_percent', 'ค่าธรรมเนียมถอน (% ของยอดที่ถอน)')}
+        {num('withdraw_min', 'ถอนขั้นต่ำ (บาท ก่อนหักค่าธรรมเนียม)', 'โบนัสที่ต่ำกว่านี้ถอนเป็นเงินสดไม่ได้ โอนเข้า Wallet ได้เท่านั้น')}
+        {num('withdraw_fee_percent', 'ค่าธรรมเนียมถอน (% ของยอดที่ถอน)', 'เช่น 10 = ถอน 150 หัก 15 โอน 135')}
         {num('withdraw_fee', 'ค่าธรรมเนียมถอนคงที่ต่อครั้ง (บาท) 0 = ไม่เก็บ')}
-        {num('withdraw_tax_percent', 'ภาษีที่หักจากสมาชิก (% ของยอดถอน) 0 = แพลตฟอร์มรับภาษีเอง', 'ตั้ง 0 ไว้ ผู้ทำบัญชีทำใบหัก ณ ที่จ่ายรวมทีเดียวภายหลัง ถ้าตั้งมากกว่า 0 จะหักจากสมาชิกทุกครั้ง')}
+        <p className="text-[11px] text-neutral-500">ไม่หักภาษีจากสมาชิก (แพลตฟอร์มรับเอง) ผู้ทำบัญชีทำเอกสารรวมภายหลัง</p>
       </section>
       <section className="space-y-3 rounded-2xl bg-white/5 p-4">
         <p className="text-sm font-bold">ข้อมูลผู้จ่ายเงิน (ไม่จำเป็นแล้ว ใช้เฉพาะใบหักเดิมที่ออกไว้)</p>

@@ -595,3 +595,7 @@ Run `supabase/migration_062.sql` once, after migration_061. **Redeploy** the Edg
 - Fee = 10 % of the requested amount (+ a flat fee, 0). No tax is taken from the member (the platform bears it; the accountant makes the withholding documents later in one batch): `withdraw_tax_percent` = 0, so no per-withdrawal certificate is issued and the payer details are not needed to record a payout (old certificates stay readable).
 - Minimum is on what the member receives: net ≥ 100 THB (`withdraw_min_net`), i.e. at least 111.12 requested. A Bonus balance below that minimum cannot be withdrawn; the sheet shows a "🔄 โอนเข้า Wallet" button (`transfer_bonus_to_wallet`). Identity verification is unchanged.
 - All numbers are settings in the admin tab 💸 ถอนเงิน → ⚙️ ตั้งค่า (min net, fee %, flat fee, tax %).
+
+## migration_063 — withdrawals, final numbers
+
+Run `supabase/migration_063.sql` once, after migration_062. Minimum 100 THB requested (before the fee), fee 10 %, no tax: 150 → 135, 100 → 90. The net minimum of migration_062 is set to 0; the admin settings now show minimum / fee % / flat fee only.
