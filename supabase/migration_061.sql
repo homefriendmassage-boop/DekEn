@@ -40,12 +40,31 @@ begin
   return new;
 end $$;
 
--- and again when a booking pays out
-do $do$
-declare d text;
+-- and again when a booking pays out (the whole function is written out: the agency rule of migration_019 + the seller check)
+create or replace function public.booking_recruiter(p_worker uuid)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare w public.workers; v_until timestamptz;
 begin
-  d := pg_get_functiondef('public.booking_recruiter(uuid)'::regprocedure);
-  d := replace(d, E'  return w.recruiter_id;\n', E'  if not public.is_seller_at(w.recruiter_id, now()) then return null; end if;\n  return w.recruiter_id;\n');
-  if d not like '%is_seller_at(w.recruiter_id%' then raise exception 'booking_recruiter() was not patched'; end if;
-  execute d;
-end $do$;
+  select * into w from public.workers where user_id = p_worker for update;
+  if not found then return null; end if;
+  if w.agency_id is not null then return w.agency_id; end if;
+  if w.recruiter_id is null or w.recruiter_lapsed then return null; end if;
+  v_until := w.recruiter_until;
+  while v_until <= now() loop
+    if exists (select 1 from public.jobs j
+                where j.worker_id = p_worker and j.status in ('matched', 'completed')
+                  and j.created_at >= v_until - make_interval(days => public.recruiter_active_days())
+                  and j.created_at <  v_until) then
+      v_until := v_until + make_interval(days => public.recruiter_window_days());
+    else
+      update public.workers set recruiter_lapsed = true where user_id = p_worker;
+      return null;
+    end if;
+  end loop;
+  if v_until is distinct from w.recruiter_until then
+    update public.workers set recruiter_until = v_until where user_id = p_worker;
+  end if;
+  -- only a seller earns the recruiter share; for anybody else it stays with the platform (the window is not used up)
+  if not public.is_seller_at(w.recruiter_id, now()) then return null; end if;
+  return w.recruiter_id;
+end $$;
