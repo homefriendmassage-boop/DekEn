@@ -31,7 +31,7 @@ const json = (body: unknown, status = 200) =>
 
 // ---- BEGIN pure rules (unit-tested without Deno) ----------------------------------------------
 export type SlipCheck =
-  | { ok: true; transRef: string; amount: number; receiverBank: string | null; receiverName: string | null; receiver: unknown; uncertain?: boolean }
+  | { ok: true; transRef: string; amount: number; receiverBank: string | null; receiverName: string | null; receiver: unknown; uncertain?: boolean; slipAt?: number | null }
   | { ok: false; code: string; receiverBank?: string | null; receiverName?: string | null; receiver?: unknown }
 
 const norm = (s: unknown) =>
@@ -77,6 +77,22 @@ function nameMatches(slipName: unknown, want: string): boolean {
   if (s.length < 3 || w.length < 3) return false
   return s.includes(w) || w.includes(s)
 }
+
+// When the transfer was made (ms since epoch) as the bank reports it; null if the field is missing. The bank's time has no zone in some
+// answers: those are Thailand time (+07:00).
+export function slipTimeMs(d: any): number | null {
+  const raw = d?.date ?? d?.transTimestamp ?? d?.dateTime ?? d?.transDate
+  if (typeof raw !== 'string' && typeof raw !== 'number') return null
+  let str = String(raw).trim()
+  if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(str)) str = str.replace(' ', 'T') + '+07:00'
+  const ms = typeof raw === 'number' ? raw : Date.parse(str)
+  return Number.isFinite(ms) ? ms : null
+}
+// A slip made BEFORE the payment request was created cannot be the payment for it (an old transfer for something else).
+// The bank prints the time to the minute, so allow 2 minutes of rounding / clock difference and nothing more.
+export const SLIP_EARLY_TOLERANCE_MS = 120_000
+export const slipBeforeRequest = (slipAt: number | null, requestAt: number | null) =>
+  slipAt != null && requestAt != null && slipAt < requestAt - SLIP_EARLY_TOLERANCE_MS
 
 // The slip fields may sit directly under `data` or one level deeper (e.g. data.rawSlip): find the object holding transRef.
 function findSlip(v: any, depth = 0): any | null {
@@ -130,7 +146,7 @@ export function evaluateSlip(
     if (visible < 3) uncertain = true
     else if (!wantDigits.some((w) => accountMatches(d.receiver?.account, w))) return { ok: false, code: 'WRONG_RECEIVER', receiverBank, receiverName, receiver }
   }
-  return { ok: true, transRef, amount: Math.round(amount * 100) / 100, receiverBank, receiverName, receiver, uncertain }
+  return { ok: true, transRef, amount: Math.round(amount * 100) / 100, receiverBank, receiverName, receiver, uncertain, slipAt: slipTimeMs(d) }
 }
 // ---- END pure rules ---------------------------------------------------------------------------
 
@@ -166,7 +182,7 @@ Deno.serve(async (req) => {
     if ((count ?? 0) >= 8 || (pendingCount ?? 0) >= 20) return json({ ok: false, code: 'RATE_LIMIT' })
 
     // 3) Only spend a Thunder call if the user actually has an open payment request
-    const { data: pending } = await admin.from('payment_intents').select('amount')
+    const { data: pending } = await admin.from('payment_intents').select('amount, created_at')
       .eq('user_id', userId).eq('status', 'pending').gt('expires_at', new Date().toISOString())
     const expected = (pending ?? []).map((p: any) => Number(p.amount))
     if (!pending?.length) {
@@ -225,6 +241,19 @@ Deno.serve(async (req) => {
     if (!check.ok) {
       await log(check.code, null, { status, receiver: receiverInfo, response: snippet })
       return json({ ok: false, code: check.code })
+    }
+
+    // 5a) A slip made before the payment request existed is an old transfer for something else: refuse it (the slip stays unused).
+    //     The request it pays = the one with the same amount, else the newest request of the last 24 h.
+    {
+      const { data: recentIntents } = await admin.from('payment_intents').select('amount, created_at')
+        .eq('user_id', userId).gte('created_at', new Date(Date.now() - 24 * 3600_000).toISOString()).order('created_at', { ascending: false })
+      const list = (recentIntents ?? []) as { amount: number; created_at: string }[]
+      const ref = list.find((p) => Math.abs(Number(p.amount) - check.amount) < 0.005) ?? list[0]
+      if (slipBeforeRequest(check.slipAt ?? null, ref ? Date.parse(ref.created_at) : null)) {
+        await log('SLIP_TOO_OLD', check.transRef, { slip_at: check.slipAt ? new Date(check.slipAt).toISOString() : null, request_at: ref?.created_at })
+        return json({ ok: false, code: 'SLIP_TOO_OLD' })
+      }
     }
 
     // 5b) The bank hid too much of the receiving account to confirm it: a human decides (admin "ตรวจสลิป").

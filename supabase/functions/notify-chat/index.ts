@@ -259,6 +259,7 @@ const PLANS: Record<number, { name: string; icon: string; color: string; groups:
   2: { name: 'Platinum', icon: '💠', color: '#C9D1DB', groups: [['bartender', 'ดูน้องชงเหล้า'], ['ent', 'ดูน้อง ENT'], ['masseuse', 'ดูน้องหมอนวด']] },
   3: { name: 'Diamond', icon: '💎', color: '#7DD3FC', groups: [['bartender', 'ดูน้องชงเหล้า'], ['ent', 'ดูน้อง ENT'], ['masseuse', 'ดูน้องหมอนวด'], ['spa', 'ดูน้องสปา']] },
 }
+const ALL_GROUPS: [string, string, number][] = [['bartender', 'ดูน้องชงเหล้า', 1], ['ent', 'ดูน้อง ENT', 1], ['masseuse', 'ดูน้องหมอนวด', 2], ['spa', 'ดูน้องสปา', 3]]
 export function buildPaymentFlex(o: { kind: string; tier?: number; until?: string; amount?: number; liffId: string; logo?: string }) {
   const base = `https://liff.line.me/${o.liffId}`
   const head = (t: string) => ({ type: 'box', layout: 'horizontal', spacing: 'md', alignItems: 'center', contents: [
@@ -278,11 +279,13 @@ export function buildPaymentFlex(o: { kind: string; tier?: number; until?: strin
           head('✅ ชำระเงินสำเร็จ'),
           { type: 'text', text: `${p.icon} แพ็กเกจ ${p.name}`, weight: 'bold', size: 'xl', color: p.color, wrap: true },
           ...(day ? [txt(`ใช้งานได้ถึง ${day}`, { weight: 'bold', color: '#FFFFFF' })] : []),
-          txt('กดปุ่มด้านล่างเพื่อเข้าไปดูน้องๆ ตามสิทธิ์ของแพ็กเกจที่คุณชำระ และทักแชตหาน้องได้เลย'),
+          txt('กดปุ่มสีชมพูเพื่อเข้าไปดูน้องๆ ตามสิทธิ์ของแพ็กเกจที่คุณชำระ และทักแชตหาน้องได้เลย'),
+          ...((o.tier ?? 1) < 3 ? [txt('ปุ่มสีเทา 🔒 = ต้องอัปเกรดแพ็กเกจก่อนจึงจะดูได้ กดเพื่อดูแพ็กเกจ', { size: 'xs', color: '#999999' })] : []),
         ] },
-        footer: { type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: 'lg', contents: p.groups.map(([cat, label], i) => ({
-          type: 'button', style: i === 0 ? 'primary' : 'secondary', color: i === 0 ? '#EC4899' : undefined, height: 'md', action: { type: 'uri', label, uri: `${base}?open=${cat}` },
-        })) },
+        // pink = this package opens it; grey with a lock = needs a higher package (the button opens the package list)
+        footer: { type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: 'lg', contents: ALL_GROUPS.map(([cat, label, need]) => (o.tier ?? 1) >= need
+          ? { type: 'button', style: 'primary', color: '#EC4899', height: 'md', action: { type: 'uri', label, uri: `${base}?open=${cat}` } }
+          : { type: 'button', style: 'secondary', height: 'md', action: { type: 'uri', label: `🔒 ${label} · ต้อง ${PLANS[need].name}`.slice(0, 40), uri: `${base}?open=plans` } }) },
       },
     }
   }

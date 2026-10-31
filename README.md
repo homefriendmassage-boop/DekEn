@@ -569,3 +569,9 @@ Run `supabase/migration_059.sql` once, after migration_058. No Edge Function cha
 Redeploy the Edge Function `verify-slip`. `RECEIVER_NAME_CONTAINS` and `RECEIVER_ACCOUNT_DIGITS` accept several comma-separated values (e.g. `RECEIVER_ACCOUNT_DIGITS=0887,4479`: the bank account and the PromptPay phone); ณ / ญ count as the same letter in names; a slip that carries no bank (PromptPay shows the proxy) is no longer rejected by `RECEIVER_BANK`, the name and digits checks decide.
 
 `verify-slip` also handles banks that print too few digits of the receiving account (fewer than 3 visible): if the receiver NAME matches, the slip is not refused and not credited by itself — it goes to the admin "ตรวจสลิป" queue (`REVIEW_RECEIVER`, detail reason `RECEIVER_UNVERIFIED`). If 3 or more digits are visible they must match one of `RECEIVER_ACCOUNT_DIGITS`. Redeploy `verify-slip`; the app shows the new message (no SQL).
+
+## Payments: slip timing, bank delays, package Flex
+
+- `verify-slip` (redeploy): a slip whose bank time is earlier than the payment request it would pay (same amount, else the newest request of the last 24 h) is refused as `SLIP_TOO_OLD` and stays unused; 2 minutes of tolerance because banks print the time to the minute. If the bank's answer has no time field the check is skipped.
+- The payment sheet retries by itself every 15 s (up to 13 tries) when the bank has not released the slip yet (`SLIP_PENDING`, Bangkok Bank); no need to leave the app and attach again.
+- Package-paid Flex (`notify-chat`, redeploy): groups the package opens are pink buttons; groups above the package are grey "🔒 … · ต้อง <package>" buttons that open the package list.

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { BANK, LINE_OA_URL, MEMBERSHIP_DAYS, PLAN_META, PROMPTPAY_ID } from '../config'
 import { promptPayPayload } from '../lib/promptpay'
@@ -7,7 +7,7 @@ import { decodeSlipQr } from '../lib/slipQr'
 
 const TOPUP_CHOICES = [100, 300, 500, 1000]
 const KNOWN_ERRORS = ['SLIP_REJECTED', 'WRONG_RECEIVER', 'AMOUNT_MISMATCH', 'DUPLICATE_SLIP', 'NO_PENDING_INTENT',
-  'REVIEW_RECEIVER', 'RATE_LIMIT', 'UPSTREAM_ERROR', 'CONFIG_MISSING', 'BAD_PAYLOAD', 'SERVER_ERROR', 'UNAUTHORIZED', 'ALREADY_UNDER_REVIEW', 'SLIP_PENDING']
+  'REVIEW_RECEIVER', 'SLIP_TOO_OLD', 'RATE_LIMIT', 'UPSTREAM_ERROR', 'CONFIG_MISSING', 'BAD_PAYLOAD', 'SERVER_ERROR', 'UNAUTHORIZED', 'ALREADY_UNDER_REVIEW', 'SLIP_PENDING']
 
 const HAS_QR = Boolean(PROMPTPAY_ID)
 const HAS_BANK = Boolean(BANK.no)
@@ -60,6 +60,9 @@ export default function PaymentModal({ kind, tier, upgrade, onClose, onPaid, onO
   const [result, setResult] = useState(null)
   const [expiryOn, setExpiryOn] = useState(false)   // wallet expiry rule active -> show the terms next to top-ups
   useEffect(() => { if (kind === 'wallet_topup') supabase.rpc('my_wallet_rules').then(({ data }) => setExpiryOn(!!data?.[0]?.expiry_enabled)) }, [kind])
+  const retryTimer = useRef(null)
+  const [waiting, setWaiting] = useState(null)   // { n, payload } while the bank has not released the slip and we retry by ourselves
+  useEffect(() => () => clearTimeout(retryTimer.current), [])
   const [review, setReview] = useState(null) // { paid, expected } when the slip was sent to the admin
 
   const create = useCallback(async () => {
@@ -106,9 +109,22 @@ export default function PaymentModal({ kind, tier, upgrade, onClose, onPaid, onO
       setError(t('payErr_NO_QR'))
       return setStep('pay')
     }
+    return verify(payload, 0)
+  }
+
+  // Ask the server. When the bank has not released the slip yet (Bangkok Bank often takes minutes) keep trying by itself every 15 s for ~3 minutes.
+  async function verify(payload, attempt) {
+    clearTimeout(retryTimer.current)
+    setWaiting(null)
+    setStep('verifying')
     const { data, error } = await supabase.functions.invoke('verify-slip', { body: { payload } })
     if (error || !data) {
       setError(t('errGeneric'))
+      return setStep('pay')
+    }
+    if (data.code === 'SLIP_PENDING' && attempt < 12) {
+      setWaiting({ n: attempt + 1, payload })
+      retryTimer.current = setTimeout(() => verify(payload, attempt + 1), 15000)
       return setStep('pay')
     }
     if (data.code === 'REVIEW_SUBMITTED') {
@@ -201,6 +217,12 @@ export default function PaymentModal({ kind, tier, upgrade, onClose, onPaid, onO
                 </label>
                 <p className="text-center text-[11px] text-neutral-500">{t('attachSlipHint')}</p>
               </>
+            )}
+            {waiting && (
+              <div className="space-y-2 rounded-lg bg-amber-400/10 p-3 text-center text-sm text-amber-200">
+                <p>⏳ {t('payWaitingBank', { n: waiting.n })}</p>
+                <button onClick={() => { clearTimeout(retryTimer.current); setWaiting(null) }} className="rounded-full bg-white/10 px-4 py-1 text-xs font-semibold text-neutral-200 active:scale-95">{t('payStopWaiting')}</button>
+              </div>
             )}
             {error && <p className="rounded-lg bg-red-500/10 p-2 text-sm text-red-300">{error}</p>}
             <button onClick={onClose} className="w-full rounded-xl bg-white/10 py-2.5 text-sm font-semibold active:scale-95">{t('close')}</button>
