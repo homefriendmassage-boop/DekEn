@@ -89,10 +89,10 @@ function WithdrawCard({ w, sub, toast, onDone, onCert }) {
     setQr(await QR.toDataURL(promptPayPayload(w.promptpay, Number(w.net)), { width: 300, margin: 2 }))
   }
   async function pay() {
-    if (!window.confirm(`ยืนยันว่าโอน ${baht(w.net)} ให้ ${w.payee_name} แล้ว? ระบบจะออกใบหัก ณ ที่จ่าย`)) return
+    if (!window.confirm(`ยืนยันว่าโอน ${baht(w.net)} ให้ ${w.payee_name} แล้ว?`)) return
     const { error } = await supabase.rpc('admin_withdraw_pay', { p_id: w.id, p_ref: ref })
     if (error) return toast(errText(error.message))
-    onDone('บันทึกการโอนแล้ว ออกใบหัก ณ ที่จ่ายแล้ว')
+    onDone('บันทึกการโอนแล้ว')
   }
   async function reject() {
     const { error } = await supabase.rpc('admin_withdraw_reject', { p_id: w.id, p_reason: reason })
@@ -110,7 +110,7 @@ function WithdrawCard({ w, sub, toast, onDone, onCert }) {
         <div><p className="font-bold">{w.payee_name ?? w.user_name}</p><p className="text-xs text-neutral-400">LINE: {w.user_name ?? '—'} · {new Date(w.created_at).toLocaleString('th-TH')}</p></div>
         <div className="text-right"><p className="text-xs text-neutral-400">โอนสุทธิ</p><p className="text-lg font-extrabold text-green-300">{baht(w.net)}</p></div>
       </div>
-      <p className="text-xs text-neutral-300">ยอดถอน {baht(w.gross)} − ภาษี {w.tax_percent}% {baht(w.tax_amount)} − ค่าธรรมเนียม {baht(w.fee)}</p>
+      <p className="text-xs text-neutral-300">ยอดถอน {baht(w.gross)} − ค่าธรรมเนียม {baht(w.fee)}{Number(w.tax_amount) > 0 ? ` − ภาษี ${w.tax_percent}% ${baht(w.tax_amount)}` : ' · ไม่หักภาษีจากสมาชิก (แพลตฟอร์มรับเอง)'}</p>
       {sub === 'pending' && (
         <>
           <p className="text-sm">พร้อมเพย์: <span className="font-mono">{w.promptpay}</span></p>
@@ -159,16 +159,17 @@ function Settings({ toast }) {
     <div className="max-w-lg space-y-4">
       <section className="space-y-3 rounded-2xl bg-white/5 p-4">
         <p className="text-sm font-bold">อัตราและเงื่อนไข</p>
-        {num('withdraw_min', 'ถอนขั้นต่ำ (บาท)')}
-        {num('withdraw_fee', 'ค่าธรรมเนียมถอนต่อครั้ง (บาท)')}
-        {num('withdraw_tax_percent', 'ภาษีหัก ณ ที่จ่าย (% ของยอดถอน)', 'ต้องให้ผู้ทำบัญชียืนยันอัตราก่อนใช้จริง (ตั้งเป็น 0 ถ้าไม่หัก)')}
+        {num('withdraw_min_net', 'ขั้นต่ำที่สมาชิกต้องได้รับสุทธิ (บาท)', `หลังหักค่าธรรมเนียมแล้ว ตอนนี้ขอถอนได้อย่างน้อย ${Number(v.withdraw_min_gross ?? 0).toLocaleString('en-US')} บาท โบนัสที่ต่ำกว่านี้ถอนไม่ได้ โอนเข้า Wallet ได้เท่านั้น`)}
+        {num('withdraw_fee_percent', 'ค่าธรรมเนียมถอน (% ของยอดที่ถอน)')}
+        {num('withdraw_fee', 'ค่าธรรมเนียมถอนคงที่ต่อครั้ง (บาท) 0 = ไม่เก็บ')}
+        {num('withdraw_tax_percent', 'ภาษีที่หักจากสมาชิก (% ของยอดถอน) 0 = แพลตฟอร์มรับภาษีเอง', 'ตั้ง 0 ไว้ ผู้ทำบัญชีทำใบหัก ณ ที่จ่ายรวมทีเดียวภายหลัง ถ้าตั้งมากกว่า 0 จะหักจากสมาชิกทุกครั้ง')}
       </section>
       <section className="space-y-3 rounded-2xl bg-white/5 p-4">
-        <p className="text-sm font-bold">ผู้จ่ายเงิน (ปรากฏในใบหัก ณ ที่จ่าย)</p>
+        <p className="text-sm font-bold">ข้อมูลผู้จ่ายเงิน (ไม่จำเป็นแล้ว ใช้เฉพาะใบหักเดิมที่ออกไว้)</p>
         {txt('payer_name', 'ชื่อบริษัท/บุคคลผู้จ่าย')}
         {txt('payer_tax_id', 'เลขประจำตัวผู้เสียภาษี')}
         {txt('payer_address', 'ที่อยู่')}
-        <p className="text-[11px] text-amber-200">ต้องตั้งชื่อผู้จ่ายก่อน จึงจะบันทึกการโอนและออกใบหัก ณ ที่จ่ายได้</p>
+        <p className="text-[11px] text-neutral-500">ระบบไม่ออกใบหัก ณ ที่จ่ายรายครั้งแล้ว ไม่ต้องกรอกส่วนนี้ก็บันทึกการโอนได้</p>
       </section>
     </div>
   )

@@ -53,12 +53,21 @@ export default function WithdrawModal({ onClose, onChanged }) {
     setMsg(null)
     const n = Number(amount)
     if (!(n > 0)) return
-    if (!window.confirm(`ถอน ${baht(n)} ? หักภาษี ${baht(tax)} และค่าธรรมเนียม ${baht(st.fee)} รับสุทธิ ${baht(net)}`)) return
+    if (!window.confirm(`ถอน ${baht(n)} ? ค่าธรรมเนียม ${baht(feeAmt)}${tax > 0 ? ` ภาษี ${baht(tax)}` : ''} รับสุทธิ ${baht(net)}`)) return
     setBusy(true)
     const { error } = await supabase.rpc('request_withdrawal', { p_amount: n })
     setBusy(false)
     if (error) return setMsg(errText(error.message))
     setAmount(''); setMsg('ส่งคำขอถอนเงินแล้ว แอดมินจะโอนเข้าพร้อมเพย์ของคุณ'); load(); onChanged?.()
+  }
+  async function toWallet() {
+    const amt = Math.floor(Number(st.bonus) * 100) / 100
+    if (!(amt > 0) || !window.confirm(`โอนยอดโบนัส ${baht(amt)} เข้า Wallet เพื่อใช้บริการในแอป? (โอนกลับเป็นเงินสดไม่ได้)`)) return
+    setBusy(true)
+    const { error } = await supabase.rpc('transfer_bonus_to_wallet', { p_amount: amt })
+    setBusy(false)
+    if (error) return setMsg(errText(error.message))
+    setMsg('โอนเข้า Wallet แล้ว'); load(); onChanged?.()
   }
   async function cancel(w) {
     if (!window.confirm('ยกเลิกคำขอถอนเงินนี้? ยอดคืนเข้ากระเป๋าโบนัส')) return
@@ -73,8 +82,10 @@ export default function WithdrawModal({ onClose, onChanged }) {
   }
 
   const n = Number(amount) || 0
-  const tax = st ? Math.round(n * Number(st.tax_percent)) / 100 : 0
-  const net = st ? n - tax - Number(st.fee) : 0
+  const feeAmt = st ? Math.round(n * Number(st.fee_percent ?? 0)) / 100 + Number(st.fee ?? 0) : 0
+  const tax = st ? Math.round(n * Number(st.tax_percent ?? 0)) / 100 : 0
+  const net = st ? n - feeAmt - tax : 0
+  const tooLow = st ? Number(st.bonus) < Number(st.min) : false      // the whole balance is below the minimum: Wallet only
   const p = st?.profile
 
   return (
@@ -92,7 +103,7 @@ export default function WithdrawModal({ onClose, onChanged }) {
               <form onSubmit={submitIdentity} className="space-y-3 rounded-2xl bg-white/5 p-3">
                 <p className="text-sm font-semibold">ยืนยันตัวตนก่อนถอนครั้งแรก (ทำครั้งเดียว)</p>
                 {p?.status === 'rejected' && <p className="rounded-lg bg-red-500/10 p-2 text-xs text-red-300">ข้อมูลก่อนหน้าไม่ผ่าน{p.reject_reason ? `: ${p.reject_reason}` : ''} กรุณาแก้ไขแล้วส่งใหม่</p>}
-                <p className="text-[11px] text-neutral-400">ใช้ออกใบหัก ณ ที่จ่ายและโอนเงินเข้าพร้อมเพย์ ข้อมูลบัตรประชาชนและที่อยู่เข้ารหัสเก็บไว้ แอดมินเท่านั้นที่เห็น และต้องเป็นชื่อเดียวกับพร้อมเพย์</p>
+                <p className="text-[11px] text-neutral-400">ใช้ยืนยันผู้รับเงินและทำเอกสารทางบัญชี ข้อมูลบัตรประชาชนและที่อยู่เข้ารหัสเก็บไว้ แอดมินเท่านั้นที่เห็น และต้องเป็นชื่อเดียวกับพร้อมเพย์</p>
                 <label className="block text-sm">ชื่อ-นามสกุล (ตามบัตรประชาชน)<input required maxLength={80} value={form.name} onChange={set('name')} className={input} /></label>
                 <label className="block text-sm">เลขบัตรประชาชน 13 หลัก<input required inputMode="numeric" maxLength={17} value={form.id} onChange={set('id')} className={input} /></label>
                 <label className="block text-sm">ที่อยู่ตามบัตร/ที่ติดต่อได้<textarea required rows={2} maxLength={300} value={form.address} onChange={set('address')} className={input} /></label>
@@ -111,21 +122,28 @@ export default function WithdrawModal({ onClose, onChanged }) {
             {p?.status === 'verified' && (
               <div className="space-y-3 rounded-2xl bg-white/5 p-3">
                 <p className="text-xs text-green-300">✓ ยืนยันตัวตนแล้ว: {p.full_name} (บัตรลงท้าย {p.id_last4})</p>
+                {tooLow ? (
+                  <div className="space-y-2 rounded-xl bg-amber-400/10 p-3 text-sm text-amber-200">
+                    <p>ยอดโบนัสของคุณ ({baht(st.bonus)}) ยังต่ำกว่าขั้นต่ำที่ถอนเป็นเงินสดได้ ({baht(st.min)}) ตอนนี้โอนเข้า <b>Wallet</b> เพื่อใช้บริการในแอปได้เท่านั้น ถ้าสะสมถึงขั้นต่ำแล้วจึงถอนเป็นเงินสดได้</p>
+                    <button disabled={busy || Number(st.bonus) <= 0} onClick={toWallet} className="w-full rounded-xl bg-line py-2.5 font-bold text-black active:scale-95 disabled:opacity-40">🔄 โอนเข้า Wallet {baht(st.bonus)}</button>
+                  </div>
+                ) : (<>
                 <label className="block text-sm font-semibold">จำนวนที่ต้องการถอน (บาท)
                   <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ''))} placeholder={`ขั้นต่ำ ${Number(st.min)}`} className={input} />
                 </label>
                 {n > 0 && (
                   <div className="space-y-1 rounded-xl bg-black/30 p-3 text-sm">
                     <p className="flex justify-between"><span>ยอดถอน</span><b>{baht(n)}</b></p>
-                    <p className="flex justify-between text-neutral-300"><span>หักภาษี ณ ที่จ่าย {Number(st.tax_percent)}%</span><span>-{baht(tax)}</span></p>
-                    <p className="flex justify-between text-neutral-300"><span>ค่าธรรมเนียมถอน</span><span>-{baht(st.fee)}</span></p>
+                    <p className="flex justify-between text-neutral-300"><span>ค่าธรรมเนียมถอน{Number(st.fee_percent) > 0 ? ` ${Number(st.fee_percent)}%` : ''}</span><span>-{baht(feeAmt)}</span></p>
+                    {Number(st.tax_percent) > 0 && <p className="flex justify-between text-neutral-300"><span>หักภาษี ณ ที่จ่าย {Number(st.tax_percent)}%</span><span>-{baht(tax)}</span></p>}
                     <p className="flex justify-between border-t border-white/10 pt-1 text-base font-bold text-green-300"><span>รับสุทธิ</span><span>{baht(Math.max(0, net))}</span></p>
                   </div>
                 )}
-                <p className="text-[11px] text-neutral-400">ขั้นต่ำ {baht(st.min)} · ถอนได้วันละ 1 ครั้ง · โอนเข้าพร้อมเพย์ที่ลงทะเบียนไว้ · ได้รับใบหัก ณ ที่จ่ายเมื่อโอนแล้ว</p>
-                <button disabled={busy || n < Number(st.min) || net <= 0 || st.today_used} onClick={withdraw} className="w-full rounded-xl bg-amber-400 py-3 font-bold text-black active:scale-95 disabled:bg-neutral-700 disabled:text-neutral-400">
+                <p className="text-[11px] text-neutral-400">ต้องได้รับสุทธิไม่ต่ำกว่า {baht(st.min_net)} (ขอถอนอย่างน้อย {baht(st.min)}) · ถอนได้วันละ 1 ครั้ง · โอนเข้าพร้อมเพย์ที่ลงทะเบียนไว้</p>
+                <button disabled={busy || n < Number(st.min) || net < Number(st.min_net) || st.today_used} onClick={withdraw} className="w-full rounded-xl bg-amber-400 py-3 font-bold text-black active:scale-95 disabled:bg-neutral-700 disabled:text-neutral-400">
                   {st.today_used ? 'วันนี้ถอนไปแล้ว' : busy ? '…' : 'ขอถอนเงิน'}
                 </button>
+                </>)}
               </div>
             )}
 
@@ -138,7 +156,7 @@ export default function WithdrawModal({ onClose, onChanged }) {
                   {list.map((w) => (
                     <li key={w.id} className="space-y-1 rounded-xl bg-white/5 p-3 text-sm">
                       <div className="flex items-center justify-between"><b>{baht(w.gross)}</b><span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${ST[w.status][1]}`}>{ST[w.status][0]}</span></div>
-                      <p className="text-xs text-neutral-400">รับสุทธิ {baht(w.net)} (ภาษี {baht(w.tax_amount)} · ค่าธรรมเนียม {baht(w.fee)}) · {new Date(w.created_at).toLocaleDateString('th-TH')}</p>
+                      <p className="text-xs text-neutral-400">รับสุทธิ {baht(w.net)} (ค่าธรรมเนียม {baht(w.fee)}{Number(w.tax_amount) > 0 ? ` · ภาษี ${baht(w.tax_amount)}` : ''}) · {new Date(w.created_at).toLocaleDateString('th-TH')}</p>
                       {w.reject_reason && <p className="text-xs text-red-300">เหตุผล: {w.reject_reason}</p>}
                       <div className="flex gap-2">
                         {w.status === 'pending' && <button onClick={() => cancel(w)} className="rounded-lg bg-white/10 px-3 py-1 text-xs active:scale-95">ยกเลิกคำขอ</button>}

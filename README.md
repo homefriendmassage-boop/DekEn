@@ -587,3 +587,11 @@ Run `supabase/migration_061.sql` once, after migration_060. No Edge Function cha
 - A provider is a (free) seller only while her profile is alive: not deleted, not admin-hidden, not hidden for inactivity (`provider_alive`). `seller_free_via` / `is_seller_at` follow.
 - The 40 % "recruiter" share (booking fee of a girl who applied through somebody's link) goes only to a seller — checked when she applies (`applications_set_recruiter`) and again at every booking (`booking_recruiter`). A link shared by anybody else is the central link: the platform keeps the share. The 20 % package share is unchanged (first inviter).
 - App: "💃 ชวนเพื่อนมาสมัครงาน" on the provider home and in "ส่วนแบ่งของฉัน" (sellers only): the user's own `?ref=<code>&only=apply` link (copy / Flex / QR) that shows the application form only.
+
+## migration_062 — withdrawals: 10 % fee, no tax taken, net minimum 100, Wallet-only below it
+
+Run `supabase/migration_062.sql` once, after migration_061. **Redeploy** the Edge Function `notify-chat` (the "paid" Flex no longer mentions the certificate).
+
+- Fee = 10 % of the requested amount (+ a flat fee, 0). No tax is taken from the member (the platform bears it; the accountant makes the withholding documents later in one batch): `withdraw_tax_percent` = 0, so no per-withdrawal certificate is issued and the payer details are not needed to record a payout (old certificates stay readable).
+- Minimum is on what the member receives: net ≥ 100 THB (`withdraw_min_net`), i.e. at least 111.12 requested. A Bonus balance below that minimum cannot be withdrawn; the sheet shows a "🔄 โอนเข้า Wallet" button (`transfer_bonus_to_wallet`). Identity verification is unchanged.
+- All numbers are settings in the admin tab 💸 ถอนเงิน → ⚙️ ตั้งค่า (min net, fee %, flat fee, tax %).
