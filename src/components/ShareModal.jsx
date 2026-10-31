@@ -16,6 +16,8 @@ export default function ShareModal({ onClose, agencyCode, recruit = false }) {
   const [qr, setQr] = useState(null)
   const [copied, setCopied] = useState(false)
   const [note, setNote] = useState(null)
+  const [rw, setRw] = useState(null)       // recruit rewards: { seller_bonus, customer_bonus, is_seller }
+  useEffect(() => { if (recruit) supabase.rpc('recruit_rewards').then(({ data }) => setRw(data ?? null)) }, [recruit])
 
   useEffect(() => {
     if (agencyCode) return setStats({ code: agencyCode })     // agency invitation: no referral numbers
@@ -61,7 +63,7 @@ export default function ShareModal({ onClose, agencyCode, recruit = false }) {
         className="max-h-[92vh] w-full max-w-md space-y-4 overflow-y-auto rounded-t-3xl bg-neutral-900 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl sm:rounded-3xl">
         <div className="mx-auto h-1.5 w-10 rounded-full bg-white/20 sm:hidden" />
         <h2 className="text-xl font-bold">{agencyCode ? '🏢' : recruit ? '💃' : '🎁'} {t(agencyCode ? 'agencyInviteTitle' : recruit ? 'recruitTitle' : 'shareTitle')}</h2>
-        <p className="text-sm text-neutral-400">{t(agencyCode ? 'agencyInviteBody' : recruit ? 'recruitBody' : 'shareBody')}</p>
+        <p className="text-sm text-neutral-400">{(recruit ? t(rw?.is_seller ? 'recruitBodySeller' : 'recruitBodyCustomer', { bonus: rw ? (rw.is_seller ? rw.seller_bonus : rw.customer_bonus) : '' }) : t(agencyCode ? 'agencyInviteBody' : 'shareBody'))}</p>
 
         {!stats ? <p className="py-6 text-center text-neutral-500">{t('loading')}</p> : (
           <>

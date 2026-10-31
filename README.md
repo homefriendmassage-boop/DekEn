@@ -609,3 +609,13 @@ Run `supabase/migration_064.sql` once, after migration_063. No Edge Function cha
 - Unpaid plan: the agency's 40 % recruiter share of its girls' bookings goes to the platform (`booking_recruiter`); no strip tile / no agency page; slots and boosts still need an active plan.
 - An approved agency counts as a seller (`is_seller_at`): customers who came through its link (`?ref=<its code>`, also the agency page link a logged-in agency shares) give it the 40 % sales share and the 20 % package share, plan or not.
 - `agency_directory()` also returns `members` (every listed girl of every approved agency), `badges` and `paid`.
+
+## migration_065 — final booking-fee rules, growth offers, unpaid-agency locks
+
+Run `supabase/migration_065.sql` once, after migration_064. No Edge Function change.
+
+- Recruiter slot (40 %): the girl's agency when it is PAID and has a girl besides its owner (`agency_recruiter_eligible`); otherwise her recruiter (a seller / provider who brought her, 90 days renewing); otherwise the platform. Sales slot (40 %): the customer's first inviter if a seller / provider / approved agency (an unpaid agency counts), else the platform. One person, one slot per booking: only an eligible agency may hold both (`pay_booking_shares`).
+- One-time bonus when a girl accepts her FIRST booking (`recruit_bonuses`, trigger on `jobs`): 100 THB to a seller / provider / agency who brought her, 50 THB to a plain customer who brought her (never when that person is the booking's customer). `worker_applications.referrer_id` = whoever's link she opened first (24 h click, else `referred_by`); `recruiter_id` stays sellers only. Amounts, plus the "new profile" days (3) and cap (6), are admin settings: tab 🚀 ชวนสมาชิก.
+- New profiles (approved in the last N days, up to the cap per group) are placed right after the bought places, rotating daily; "🆕" badge (`new_worker_ids`).
+- An agency without a paid plan: cannot read / answer its girls' chats (`is_agency_of`, `agency_threads`), cannot open their photos and details (`can_view_worker`, `list_workers`, `agency_girls`); its back office shows the 40 % it missed this month (`agency_missed`).
+- Everybody now sees "💃 ชวนเพื่อนมาสมัครงาน" on the categories page; the text says which reward applies to them (`recruit_rewards`).

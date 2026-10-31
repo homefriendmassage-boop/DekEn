@@ -92,6 +92,8 @@ export default function App() {
   const [showBookings, setShowBookings] = useState(false)
   const [showSeller, setShowSeller] = useState(false)
   const [showShare, setShowShare] = useState(false)
+  const [showRecruit, setShowRecruit] = useState(false)     // my own link that brings a friend to the application form
+  const [newIds, setNewIds] = useState([])                   // profiles approved in the last days (badge "new")
   const [sellerSt, setSellerSt] = useState(null)       // my_seller_status: used for the "plan lapsed" notice
   const loadSellerSt = useCallback(() => supabase.rpc('my_seller_status').then(({ data }) => setSellerSt(data ?? null), () => {}), [])
   const [highlightJob, setHighlightJob] = useState(null)   // a booking opened from its push
@@ -246,6 +248,7 @@ export default function App() {
   useEffect(() => {
     if (!me?.id || (view !== 'feed' && view !== 'categories')) return
     supabase.rpc('agency_directory').then(({ data }) => { if (data?.agencies) setAgDir(data) })
+    supabase.rpc('new_worker_ids').then(({ data }) => setNewIds(Array.isArray(data) ? data : []))
   }, [me?.id, view])
   const unreadByWorker = Object.fromEntries(custThreads.filter((x) => x.unread > 0).map((x) => [x.worker_id, x.unread]))
   const replyNotice = custThreads.some((x) => x.unread > 0) && (
@@ -377,7 +380,7 @@ export default function App() {
     const hasPage = Boolean(agencyId) && agDir.agencies.some((a) => a.id === agencyId)      // only an agency with a paid plan has a page
     // the badge stays on the photo while she belongs to the agency (paid or not) unless the agency hides it; on the agency's own page it is redundant
     const badge = (agDir.badges?.[agencyId] ?? true) && !agencyFilter
-    return { ...w, canView, image: full ?? w.profile_image, agency_id: hasPage ? agencyId : null, agency_logo: badge ? w.agency_logo : null, agency_name: badge ? w.agency_name : null }
+    return { ...w, canView, is_new: newIds.includes(w.user_id), image: full ?? w.profile_image, agency_id: hasPage ? agencyId : null, agency_logo: badge ? w.agency_logo : null, agency_name: badge ? w.agency_name : null }
   }).filter((w) => !agencyFilter || w.agency_id === agencyFilter)
   const openedAgency = agencyFilter ? agDir.agencies.find((a) => a.id === agencyFilter) : null
 
@@ -482,6 +485,7 @@ export default function App() {
               </button>
             )}
             <button onClick={() => setShowSeller(true)} className="w-full rounded-xl bg-white/10 py-2.5 text-sm font-semibold text-neutral-100 ring-1 ring-white/15 active:scale-95">🤝 ส่วนแบ่งของฉัน</button>
+            <button onClick={() => setShowRecruit(true)} className="w-full rounded-xl bg-pink-500/90 py-2.5 text-sm font-bold active:scale-95">💃 {t('recruitButton')}</button>
             {!session.vendor && (
               <button onClick={() => setView('worker')} className="w-full rounded-xl bg-white/10 py-2.5 text-sm font-semibold text-neutral-100 ring-1 ring-white/15 active:scale-95">
                 {me?.role === 'worker' ? `💼 ${t('workerArea')}` : `📝 ${t('applyPartnerHere')}`}
@@ -553,6 +557,7 @@ export default function App() {
 
       {showSeller && <SellerPanel walletBalance={me?.wallet_balance ?? 0} onTopUp={() => { setShowSeller(false); setPay({ kind: 'wallet_topup' }) }} onChanged={() => { loadMe(); loadSellerSt() }} onClose={() => setShowSeller(false)} />}
       {showShare && <ShareModal onClose={() => setShowShare(false)} />}
+      {showRecruit && <ShareModal recruit onClose={() => setShowRecruit(false)} />}
 
       {claim && <ClaimDraft token={claim} onClose={() => setClaim(null)} onDone={async () => { setClaim(null); setView('worker'); setWorkerTab('self'); await loadMe() }} />}
 

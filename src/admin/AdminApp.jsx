@@ -14,6 +14,7 @@ import ProfileEdits from './ProfileEdits'
 import Chats from './Chats'
 import Vendors from './Vendors'
 import Inactive from './Inactive'
+import Growth from './Growth'
 import Withdrawals from './Withdrawals'
 import VendorSelect from './VendorSelect'
 import DraftsPanel from '../components/DraftsPanel'
@@ -21,7 +22,7 @@ import { baht } from './format'
 
 // Separate back office (admin.html). Access is decided by the DATABASE: every admin_* function
 // A push button opens e.g. admin.html?tab=apps (LINE may tuck the query into liff.state on the first open)
-const TABS = ['apps', 'reviews', 'support', 'pay', 'drafts', 'chats', 'edits', 'agencies', 'vendors', 'members', 'withdrawals', 'inactive']
+const TABS = ['apps', 'reviews', 'support', 'pay', 'drafts', 'chats', 'edits', 'agencies', 'vendors', 'members', 'withdrawals', 'inactive', 'growth']
 function tabFromUrl() {
   try {
     const params = new URLSearchParams(window.location.search)
@@ -121,6 +122,7 @@ export default function AdminApp() {
     ['vendors', '🏪 เซลล์/OA'],
     ['members', '👑 สมาชิก'],
     ['inactive', '😴 ไม่ใช้งาน'],
+    ['growth', '🚀 ชวนสมาชิก'],
     ['withdrawals', `💸 ถอนเงิน${wdCount ? ` (${wdCount})` : ''}`],
   ]
 
@@ -173,6 +175,7 @@ export default function AdminApp() {
         {tab === 'vendors' && <Vendors toast={showToast} />}
         {tab === 'agencies' && <Agencies onChanged={loadStats} toast={showToast} />}
         {tab === 'inactive' && <Inactive toast={showToast} />}
+        {tab === 'growth' && <Growth toast={showToast} />}
         {tab === 'withdrawals' && <Withdrawals toast={showToast} onChanged={loadStats} />}
         {tab === 'members' && <Members toast={showToast} onRenew={(user) => { setPrefill({ user, tier: user.vip_tier }); setTab('pay') }} />}
       </main>

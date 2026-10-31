@@ -114,6 +114,8 @@ function Apply({ ag, me, onDone, flash }) {
 
 function Dashboard({ ag, me, reload, flash, onTopUp, onWallet, onChanged }) {
   const [tab, setTab] = useState('girls')
+  const [missed, setMissed] = useState(null)      // what this agency missed this month while it is not eligible for the 40 %
+  useEffect(() => { supabase.rpc('agency_missed').then(({ data }) => setMissed(data ?? null)) }, [ag.active])
   const tabs = [['girls', '👯 น้อง'], ['reqs', '⏳ รออนุมัติ'], ['drafts', '📝 ร่างใบสมัคร'], ['chat', '💬 แชต'], ['plan', '🧾 แพ็กเกจ'], ['settings', '⚙️ ตั้งค่า']]
   return (
     <div>
@@ -122,14 +124,21 @@ function Dashboard({ ag, me, reload, flash, onTopUp, onWallet, onChanged }) {
           <button key={id} onClick={() => setTab(id)} className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-semibold ${tab === id ? 'bg-line text-black' : 'bg-white/10'}`}>{label}</button>
         ))}
       </nav>
-      {!ag.active && (
-        <p className="mx-4 mb-3 rounded-xl bg-amber-400/10 p-3 text-xs text-amber-200">ยังไม่ได้ชำระแพ็กเกจสังกัด: สร้างแบบร่างและส่งลิงก์ให้น้องได้ตามปกติ น้องยังแสดงให้ลูกค้าเห็น และป้ายสังกัดยังอยู่บนรูปน้อง แต่ <b>ส่วนแบ่ง 40% ค่าจองของน้องในสังกัดตกเป็นของแพลตฟอร์ม</b> และโลโก้ยังไม่ขึ้นแถบ/หน้าสังกัดของลูกค้า (ส่วนแบ่ง 40% จากลูกค้าที่จองผ่านลิงก์ของคุณ ได้เหมือนเซลล์) ชำระที่แท็บ "แพ็กเกจ"</p>
+      {(!ag.active || (missed && !missed.eligible)) && (
+        <div className="mx-4 mb-3 space-y-1 rounded-xl bg-amber-400/10 p-3 text-xs text-amber-200">
+          {!ag.active ? (
+            <p>ยังไม่ได้ชำระแพ็กเกจสังกัด: สร้างแบบร่างและส่งลิงก์ให้น้องได้ น้องในสังกัด (สูงสุด 10 คน) ยังแสดงให้ลูกค้าเห็นและมีป้ายสังกัดบนรูป แต่ <b>ส่วนแบ่ง 40% ค่าจองของน้องตกเป็นของแพลตฟอร์ม ไม่มีโลโก้ในแถบ/หน้าสังกัด และอ่าน/ตอบแชต/ดูรายละเอียดน้องไม่ได้</b> (ส่วนแบ่ง 40% จากลูกค้าที่จองผ่านลิงก์ของคุณ ได้เหมือนเซลล์) ชำระที่แท็บ "แพ็กเกจ"</p>
+          ) : (
+            <p>แพ็กเกจชำระแล้ว แต่ส่วนแบ่ง 40% ค่าจองน้องจะเริ่มเมื่อมีน้องในสังกัดอย่างน้อย 1 คนที่ไม่ใช่บัญชีของคุณเอง</p>
+          )}
+          {missed && missed.jobs > 0 && <p className="text-sm font-bold text-amber-100">เดือนนี้น้องของคุณมีงาน {missed.jobs} งาน คุณพลาดส่วนแบ่ง {Number(missed.amount).toLocaleString('en-US')} บาท</p>}
+        </div>
       )}
       <div className="px-4">
-        {tab === 'girls' && <Girls flash={flash} reload={reload} />}
+        {tab === 'girls' && <Girls flash={flash} reload={reload} paid={ag.active} />}
         {tab === 'reqs' && <Requests flash={flash} reload={reload} />}
         {tab === 'drafts' && <DraftsPanel mode="agency" toast={flash} />}
-        {tab === 'chat' && <AgencyChats me={me} onTopUp={onTopUp} />}
+        {tab === 'chat' && (ag.active ? <AgencyChats me={me} onTopUp={onTopUp} /> : <p className="rounded-2xl bg-white/5 p-6 text-center text-sm text-neutral-300">🔒 ชำระแพ็กเกจสังกัดก่อน จึงจะอ่านและตอบแชตแทนน้องได้ (ค่าแชต 30 บาทเข้าบัญชีน้องผู้ลงทะเบียนเท่านั้น)</p>)}
         {tab === 'settings' && <Settings ag={ag} me={me} reload={reload} flash={flash} />}
         {tab === 'plan' && <Plan ag={ag} me={me} reload={reload} flash={flash} onTopUp={onTopUp} onWallet={onWallet} onChanged={onChanged} />}
       </div>
@@ -137,10 +146,11 @@ function Dashboard({ ag, me, reload, flash, onTopUp, onWallet, onChanged }) {
   )
 }
 
-function Girls({ flash, reload }) {
+function Girls({ flash, reload, paid }) {
   const [rows, setRows] = useState(null)
   const [detail, setDetail] = useState(null)       // her full profile (photos + details): an agency sees its own girls only
   async function openDetail(g) {
+    if (!paid) return flash('ชำระแพ็กเกจสังกัดก่อน จึงจะดูรูปและรายละเอียดน้องได้')
     const { data } = await supabase.rpc('get_worker', { p_worker: g.user_id })
     const r = data?.[0]
     if (!r) return flash('เปิดโปรไฟล์ไม่ได้ (น้องอาจยังไม่แสดงในระบบ)')
@@ -171,7 +181,7 @@ function Girls({ flash, reload }) {
           </div>
           <p className="mt-1 text-xs text-neutral-400">จองเดือนนี้ {g.jobs_month} ครั้ง · ส่วนแบ่งสะสม {baht(g.earned)}</p>
           <div className="mt-2 flex gap-2">
-            <button onClick={() => openDetail(g)} className="rounded-lg bg-pink-500 px-3 py-1 text-xs font-semibold active:scale-95">ดูรูปและรายละเอียด</button>
+            <button onClick={() => openDetail(g)} className={`rounded-lg px-3 py-1 text-xs font-semibold active:scale-95 ${paid ? 'bg-pink-500' : 'bg-white/10 text-neutral-400'}`}>{paid ? 'ดูรูปและรายละเอียด' : '🔒 ดูรูปและรายละเอียด'}</button>
             <button onClick={() => remove(g)} className="rounded-lg bg-white/10 px-3 py-1 text-xs active:scale-95">นำออกจากสังกัด</button>
           </div>
         </li>

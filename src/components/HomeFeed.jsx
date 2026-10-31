@@ -106,6 +106,9 @@ function WorkerCard({ worker: w, onUnlock, onDetail, onAsk, onAgency, unread, is
           </div>
         )}
 
+        {w.is_new && !w.is_boosted && (
+          <span className="absolute left-2 top-2 rounded-full bg-pink-500 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide shadow sm:text-xs">🆕 {t('newBadge')}</span>
+        )}
         {w.is_boosted && (
           <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-300 to-orange-500 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-black shadow sm:text-xs">
             {t('topRank')}
