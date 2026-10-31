@@ -69,9 +69,11 @@ function accountMatches(account: unknown, want: string): boolean {
 // Thunder may shorten the receiver name ("นาง สำราญ อ" = first name + surname initial): ignore the title and
 // accept when one side contains the other (min 3 chars so a stray letter never matches).
 const TITLE = /^(นางสาว|นส|นาง|นาย|mrs|mr|ms|miss)/
+// ณ and ญ are treated as the same letter: people mistype one for the other (a bank holds "สำราณ", the shop typed "สำราญ").
+const unify = (x: string) => x.replace(/ณ/g, 'ญ')
 function nameMatches(slipName: unknown, want: string): boolean {
-  const s = norm(slipName).replace(TITLE, '')
-  const w = norm(want).replace(TITLE, '')
+  const s = unify(norm(slipName).replace(TITLE, ''))
+  const w = unify(norm(want).replace(TITLE, ''))
   if (s.length < 3 || w.length < 3) return false
   return s.includes(w) || w.includes(s)
 }
@@ -108,15 +110,19 @@ export function evaluateSlip(
   const receiverBank = d.receiver?.bank?.short ?? null
   const receiverName = d.receiver?.account?.name?.th ?? d.receiver?.account?.name?.en ?? null
 
-  if (cfg.receiverBank && norm(receiverBank) !== norm(cfg.receiverBank)) {
+  // A PromptPay slip names a proxy (phone / ID), not a bank: when the slip carries no bank, the name and digits checks below decide.
+  if (cfg.receiverBank && receiverBank && norm(receiverBank) !== norm(cfg.receiverBank)) {
     return { ok: false, code: 'WRONG_RECEIVER', receiverBank, receiverName, receiver }
   }
   const names = [d.receiver?.account?.name?.th, d.receiver?.account?.name?.en]
-  if (cfg.receiverNameContains && !names.some((n) => nameMatches(n, cfg.receiverNameContains!))) {
+  // RECEIVER_NAME_CONTAINS / RECEIVER_ACCOUNT_DIGITS may hold several values separated by commas (e.g. "0887,4479": the account and the PromptPay phone)
+  const list = (v?: string) => String(v ?? '').split(/[,;]+/).map((x) => x.trim()).filter(Boolean)
+  const wantNames = list(cfg.receiverNameContains)
+  if (wantNames.length && !wantNames.some((w) => names.some((n) => nameMatches(n, w)))) {
     return { ok: false, code: 'WRONG_RECEIVER', receiverBank, receiverName, receiver }
   }
-  const wantDigits = String(cfg.receiverAccountDigits ?? '').replace(/\D/g, '')
-  if (wantDigits && !accountMatches(d.receiver?.account, wantDigits)) {
+  const wantDigits = list(cfg.receiverAccountDigits).map((x) => x.replace(/\D/g, '')).filter(Boolean)
+  if (wantDigits.length && !wantDigits.some((w) => accountMatches(d.receiver?.account, w))) {
     return { ok: false, code: 'WRONG_RECEIVER', receiverBank, receiverName, receiver }
   }
   return { ok: true, transRef, amount: Math.round(amount * 100) / 100, receiverBank, receiverName, receiver }

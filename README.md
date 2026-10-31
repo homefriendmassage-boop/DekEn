@@ -563,3 +563,7 @@ Run `supabase/migration_059.sql` once, after migration_058. No Edge Function cha
 - Admin applications: tap a photo or "🔍 ขยายดูรูปจริง" to open every original (no mosaic) in the zoom viewer; the applicant's LINE profile picture shows on the card (`admin_user_pictures`); tags show in Thai.
 - Link sheet: besides the Flex button there is "ส่งเป็นข้อความ LINE" (LINE's own share URL, no popup) because the Flex picker can end on a blank `about:blank#blocked` page in some LINE builds; the Flex error code is shown if it fails.
 - Agency strip boost (`agency_boosts`): 3 places at a time, 100 THB/day (3 days 300, 7 days 500), bonus wallet first then Wallet, only for an agency with an active plan. Boosted agencies lead the strip with "⭐ แนะนำ" (rotated daily among themselves), the others follow in a daily rotation.
+
+## verify-slip: PromptPay slips and multiple receivers
+
+Redeploy the Edge Function `verify-slip`. `RECEIVER_NAME_CONTAINS` and `RECEIVER_ACCOUNT_DIGITS` accept several comma-separated values (e.g. `RECEIVER_ACCOUNT_DIGITS=0887,4479`: the bank account and the PromptPay phone); ณ / ญ count as the same letter in names; a slip that carries no bank (PromptPay shows the proxy) is no longer rejected by `RECEIVER_BANK`, the name and digits checks decide.
