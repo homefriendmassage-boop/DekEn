@@ -374,10 +374,10 @@ export default function App() {
     const canView = w.can_view ?? canViewWorker(w.category, w.rank, tier)
     const full = canView && w.original_path ? signedUrls[w.original_path] : null
     const agencyId = agDir.members[w.user_id] ?? null
-    const ag = agencyId ? agDir.agencies.find((a) => a.id === agencyId) : null
-    // the badge shows only when the agency allows it; on an agency's own page it is redundant (the header says it)
-    const badge = ag?.show_badge && !agencyFilter
-    return { ...w, canView, image: full ?? w.profile_image, agency_id: agencyId, agency_logo: badge ? w.agency_logo : null, agency_name: badge ? w.agency_name : null }
+    const hasPage = Boolean(agencyId) && agDir.agencies.some((a) => a.id === agencyId)      // only an agency with a paid plan has a page
+    // the badge stays on the photo while she belongs to the agency (paid or not) unless the agency hides it; on the agency's own page it is redundant
+    const badge = (agDir.badges?.[agencyId] ?? true) && !agencyFilter
+    return { ...w, canView, image: full ?? w.profile_image, agency_id: hasPage ? agencyId : null, agency_logo: badge ? w.agency_logo : null, agency_name: badge ? w.agency_name : null }
   }).filter((w) => !agencyFilter || w.agency_id === agencyFilter)
   const openedAgency = agencyFilter ? agDir.agencies.find((a) => a.id === agencyFilter) : null
 

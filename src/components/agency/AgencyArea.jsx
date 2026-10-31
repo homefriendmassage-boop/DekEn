@@ -87,7 +87,7 @@ function Apply({ ag, me, onDone, flash }) {
   return (
     <form onSubmit={submit} className="space-y-4 p-4">
       {ag?.status === 'rejected' && <p className="rounded-xl bg-red-500/10 p-2 text-sm text-red-300">ไม่ผ่านการอนุมัติ{ag.reject_reason ? ` — ${ag.reject_reason}` : ''} แก้ไขแล้วส่งใหม่ได้</p>}
-      <p className="text-sm text-neutral-400">ค่าใช้แพลตฟอร์ม 1,000 บาท / 30 วัน (ชำระจาก Wallet หลังอนุมัติ) ขึ้นรูปน้องได้ 10 คน เกินคนละ 200 บาท / 30 วัน น้องสมัครด้วย LINE ของตัวเองผ่านลิงก์ที่คุณส่งให้ ระบบรับเข้าสังกัดอัตโนมัติ</p>
+      <p className="text-sm text-neutral-400">หลังแอดมินอนุมัติ สร้างแบบร่างใบสมัครส่งให้น้องได้ทันที ชำระแพ็กเกจ 1,000 บาท / 30 วัน (จาก Wallet) เพื่อรับส่วนแบ่ง 40% ค่าจองของน้องในสังกัด และให้โลโก้ขึ้นแถบ/หน้าสังกัดของลูกค้า รวมน้อง 10 คน เกินคนละ 200 บาท / 30 วัน น้องสมัครด้วย LINE ของตัวเองผ่านลิงก์ที่คุณส่งให้ ระบบรับเข้าสังกัดอัตโนมัติ</p>
       <label className="block text-sm">ชื่อสังกัด
         <input required minLength={2} maxLength={60} value={name} onChange={(e) => setName(e.target.value)} className={input} />
       </label>
@@ -123,7 +123,7 @@ function Dashboard({ ag, me, reload, flash, onTopUp, onWallet, onChanged }) {
         ))}
       </nav>
       {!ag.active && (
-        <p className="mx-4 mb-3 rounded-xl bg-red-500/10 p-3 text-sm text-red-300">แพ็กเกจสังกัดยังไม่เปิด/หมดอายุ น้องของคุณจะไม่แสดงในหน้าลูกค้า ไปที่แท็บ "แพ็กเกจ" เพื่อชำระ</p>
+        <p className="mx-4 mb-3 rounded-xl bg-amber-400/10 p-3 text-xs text-amber-200">ยังไม่ได้ชำระแพ็กเกจสังกัด: สร้างแบบร่างและส่งลิงก์ให้น้องได้ตามปกติ น้องยังแสดงให้ลูกค้าเห็น และป้ายสังกัดยังอยู่บนรูปน้อง แต่ <b>ส่วนแบ่ง 40% ค่าจองของน้องในสังกัดตกเป็นของแพลตฟอร์ม</b> และโลโก้ยังไม่ขึ้นแถบ/หน้าสังกัดของลูกค้า (ส่วนแบ่ง 40% จากลูกค้าที่จองผ่านลิงก์ของคุณ ได้เหมือนเซลล์) ชำระที่แท็บ "แพ็กเกจ"</p>
       )}
       <div className="px-4">
         {tab === 'girls' && <Girls flash={flash} reload={reload} />}
@@ -246,6 +246,7 @@ function AgencyChats({ me, onTopUp }) {
 function Plan({ ag, me, reload, flash, onTopUp, onWallet, onChanged }) {
   const [busy, setBusy] = useState(false)
   const [share, setShare] = useState(false)
+  const [custShare, setCustShare] = useState(false)
   const guard = useRef(false)
   const wallet = Number(me?.wallet_balance ?? 0)
 
@@ -286,6 +287,12 @@ function Plan({ ag, me, reload, flash, onTopUp, onWallet, onChanged }) {
         <p className="text-xs text-neutral-400">ส่งลิงก์/QR/Flex ให้น้อง น้องกดสมัครด้วย LINE ของตัวเองแล้วเข้าสังกัดอัตโนมัติ (รอแอดมินอนุมัติโปรไฟล์) น้องที่เคยออกไปแล้วอยากกลับ ส่งลิงก์ให้อีกครั้งแล้วให้กด "ยอมรับเข้าสังกัด"</p>
         <button onClick={() => setShare(true)} className="w-full rounded-xl bg-line py-2 font-bold text-black active:scale-95">ส่งลิงก์เชิญน้อง</button>
       </section>
+      <section className="space-y-2 rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
+        <p className="text-sm font-semibold">ลิงก์ชวนลูกค้า (ได้ส่วนแบ่งเหมือนเซลล์)</p>
+        <p className="text-xs text-neutral-400">ลูกค้าที่เข้าผ่านลิงก์ของคุณแล้วจองน้อง คุณได้ 40% ของค่าจอง และ 20% ของค่าแพ็กเกจที่เขาซื้อ ไม่ต้องชำระแพ็กเกจสังกัดก็ได้</p>
+        <button onClick={() => setCustShare(true)} className="w-full rounded-xl bg-white/10 py-2 text-sm font-bold active:scale-95">🔗 แชร์ลิงก์ชวนลูกค้า</button>
+      </section>
+      {custShare && <ShareModal onClose={() => setCustShare(false)} />}
       {ag.active && <BoostCard flash={flash} onChanged={onChanged} />}
       {share && <ShareModal agencyCode={ag.code} onClose={() => setShare(false)} />}
     </div>

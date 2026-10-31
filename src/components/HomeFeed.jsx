@@ -117,7 +117,8 @@ function WorkerCard({ worker: w, onUnlock, onDetail, onAsk, onAgency, unread, is
         )}
 
         {w.agency_logo && (
-          <button onClick={(e) => { e.stopPropagation(); onAgency() }} className="absolute bottom-2 left-2 z-10 flex max-w-[80%] items-center gap-1 rounded-full bg-black/60 py-0.5 pl-0.5 pr-2 text-[10px] active:scale-95 sm:text-xs">
+          <button onClick={(e) => { e.stopPropagation(); if (w.agency_id) onAgency() }} disabled={!w.agency_id}
+            className="absolute bottom-2 left-2 z-10 flex max-w-[80%] items-center gap-1 rounded-full bg-black/60 py-0.5 pl-0.5 pr-2 text-[10px] enabled:active:scale-95 sm:text-xs">
             <img src={logoUrl(w.agency_logo)} alt="" className="h-5 w-5 shrink-0 rounded-full object-cover" />
             <span className="truncate">{w.agency_name}</span>
           </button>

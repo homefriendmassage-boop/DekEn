@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { supabase } from '../supabaseClient'
 import { useI18n } from '../i18n'
 import { logoUrl } from '../lib/logo'
 import { appLink, inviteBubble } from '../lib/flex'
@@ -33,7 +34,9 @@ export function AgencyStrip({ agencies, category, onOpen }) {
 export function AgencyHeader({ agency, category, onCategory, catName }) {
   const { t } = useI18n()
   const [sheet, setSheet] = useState(false)
-  const link = appLink({ agencypage: agency.id })
+  const [code, setCode] = useState(null)      // my own referral code: a customer who comes through my share counts as mine
+  useEffect(() => { if (sheet && !code) supabase.rpc('my_referral_stats').then(({ data }) => setCode(data?.[0]?.code ?? null)) }, [sheet, code])
+  const link = appLink(code ? { agencypage: agency.id, ref: code } : { agencypage: agency.id })
   return (
     <div className="space-y-3 border-b border-white/10 px-4 py-4">
       <div className="flex items-center gap-3">

@@ -599,3 +599,13 @@ Run `supabase/migration_062.sql` once, after migration_061. **Redeploy** the Edg
 ## migration_063 — withdrawals, final numbers
 
 Run `supabase/migration_063.sql` once, after migration_062. Minimum 100 THB requested (before the fee), fee 10 %, no tax: 150 → 135, 100 → 90. The net minimum of migration_062 is set to 0; the admin settings now show minimum / fee % / flat fee only.
+
+## migration_064 — agency works before it pays
+
+Run `supabase/migration_064.sql` once, after migration_063. No Edge Function change.
+
+- An APPROVED agency can create / edit / submit / delete drafts and send the 3-day links to its girls with or without a paid plan (no `PLAN_INACTIVE`).
+- Its girls stay listed (`worker_listed` no longer needs an active plan) and the agency badge stays on their photos while they belong to it (unless the agency hides the badge); the badge is not clickable when the agency has no page.
+- Unpaid plan: the agency's 40 % recruiter share of its girls' bookings goes to the platform (`booking_recruiter`); no strip tile / no agency page; slots and boosts still need an active plan.
+- An approved agency counts as a seller (`is_seller_at`): customers who came through its link (`?ref=<its code>`, also the agency page link a logged-in agency shares) give it the 40 % sales share and the 20 % package share, plan or not.
+- `agency_directory()` also returns `members` (every listed girl of every approved agency), `badges` and `paid`.
