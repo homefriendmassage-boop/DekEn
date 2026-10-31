@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
+import liff from '@line/liff'
 import { signIn } from '../lib/auth'
+import { getActiveLiffId } from '../lib/vendor'
+import { USE_MOCK_LIFF } from '../config'
 import Applications from './Applications'
 import Payments from './Payments'
 import Members from './Members'
@@ -123,6 +126,12 @@ export default function AdminApp() {
 
   return (
     <div className="mx-auto min-h-screen w-full max-w-5xl pb-10">
+      {!USE_MOCK_LIFF && !(() => { try { return liff.isInClient() } catch { return false } })() && (
+        <p className="m-3 rounded-xl bg-amber-400/10 p-3 text-xs text-amber-200">
+          ⚠️ คุณเปิดหน้านี้ผ่านเบราว์เซอร์ ไม่ใช่ผ่าน LINE (LIFF) ปุ่มส่ง Flex จะขึ้นหน้าขาว ให้เปิดผ่านลิงก์นี้แทน:
+          <span className="mt-1 block break-all font-mono text-[11px] text-amber-100">https://liff.line.me/{getActiveLiffId()}/admin.html</span>
+        </p>
+      )}
       <header className="sticky top-0 z-30 border-b border-white/10 bg-neutral-950/95 px-4 py-3 backdrop-blur">
         <div className="flex items-center justify-between">
           <h1 className="text-lg font-bold">🛠️ Admin</h1>

@@ -13,6 +13,8 @@ export default function LinkSheet({ title, intro, link, flex = null, onClose }) 
   const [qr, setQr] = useState(null)
   const [copied, setCopied] = useState(false)
   const [note, setNote] = useState(null)
+  // The Flex picker only works inside LINE's LIFF view; in a plain browser tab it ends on a blank about:blank#blocked page
+  const inClient = (() => { try { return liff.isInClient() } catch { return false } })()
 
   async function copy() {
     try { await navigator.clipboard.writeText(link); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch { setNote(link) }
@@ -23,7 +25,8 @@ export default function LinkSheet({ title, intro, link, flex = null, onClose }) 
   // Plain-text share through LINE's own share URL: needs no popup, so it still works where the Flex picker window is blocked
   function sendText() {
     const url = `https://line.me/R/share?text=${encodeURIComponent(`${title}\n${link}`)}`
-    try { liff.openWindow({ url, external: false }) } catch { window.location.href = url }
+    if (inClient) { try { liff.openWindow({ url, external: false }); return } catch { /* fall through */ } }
+    window.location.href = url
   }
   async function showQr() {
     if (qr) return setQr(null)
@@ -42,8 +45,9 @@ export default function LinkSheet({ title, intro, link, flex = null, onClose }) 
         <div className="grid grid-cols-2 gap-2">
           <button onClick={copy} className="rounded-xl bg-white/10 py-2 text-sm font-semibold active:scale-95">{copied ? t('copied') : t('shareCopy')}</button>
           <button onClick={showQr} className="rounded-xl bg-white/10 py-2 text-sm font-semibold active:scale-95">{t('shareQr')}</button>
-          {flex && canShareFlex() && <button onClick={sendFlex} className="col-span-2 rounded-xl bg-line py-2 text-sm font-bold text-black active:scale-95">{t('shareFlex')}</button>}
-          {!USE_MOCK_LIFF && <button onClick={sendText} className="col-span-2 rounded-xl bg-white/10 py-2 text-sm font-semibold active:scale-95">💬 ส่งเป็นข้อความ LINE (ถ้าปุ่ม Flex ขึ้นหน้าขาว)</button>}
+          {flex && canShareFlex() && inClient && <button onClick={sendFlex} className="col-span-2 rounded-xl bg-line py-2 text-sm font-bold text-black active:scale-95">{t('shareFlex')}</button>}
+          {flex && !USE_MOCK_LIFF && !inClient && <p className="col-span-2 rounded-lg bg-amber-400/10 p-2 text-[11px] text-amber-200">ปุ่ม Flex ใช้ได้เมื่อเปิดแอปผ่านลิงก์ LINE (liff.line.me) เท่านั้น ตอนนี้เปิดผ่านเบราว์เซอร์ ใช้ปุ่มส่งเป็นข้อความด้านล่างแทนได้</p>}
+          {!USE_MOCK_LIFF && <button onClick={sendText} className="col-span-2 rounded-xl bg-white/10 py-2 text-sm font-semibold active:scale-95">💬 ส่งเป็นข้อความ LINE </button>}
         </div>
         {qr && (
           <div className="space-y-2 text-center">
