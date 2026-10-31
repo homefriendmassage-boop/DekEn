@@ -567,3 +567,5 @@ Run `supabase/migration_059.sql` once, after migration_058. No Edge Function cha
 ## verify-slip: PromptPay slips and multiple receivers
 
 Redeploy the Edge Function `verify-slip`. `RECEIVER_NAME_CONTAINS` and `RECEIVER_ACCOUNT_DIGITS` accept several comma-separated values (e.g. `RECEIVER_ACCOUNT_DIGITS=0887,4479`: the bank account and the PromptPay phone); ณ / ญ count as the same letter in names; a slip that carries no bank (PromptPay shows the proxy) is no longer rejected by `RECEIVER_BANK`, the name and digits checks decide.
+
+`verify-slip` also handles banks that print too few digits of the receiving account (fewer than 3 visible): if the receiver NAME matches, the slip is not refused and not credited by itself — it goes to the admin "ตรวจสลิป" queue (`REVIEW_RECEIVER`, detail reason `RECEIVER_UNVERIFIED`). If 3 or more digits are visible they must match one of `RECEIVER_ACCOUNT_DIGITS`. Redeploy `verify-slip`; the app shows the new message (no SQL).

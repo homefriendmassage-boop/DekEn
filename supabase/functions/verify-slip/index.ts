@@ -31,7 +31,7 @@ const json = (body: unknown, status = 200) =>
 
 // ---- BEGIN pure rules (unit-tested without Deno) ----------------------------------------------
 export type SlipCheck =
-  | { ok: true; transRef: string; amount: number; receiverBank: string | null; receiverName: string | null; receiver: unknown }
+  | { ok: true; transRef: string; amount: number; receiverBank: string | null; receiverName: string | null; receiver: unknown; uncertain?: boolean }
   | { ok: false; code: string; receiverBank?: string | null; receiverName?: string | null; receiver?: unknown }
 
 const norm = (s: unknown) =>
@@ -122,10 +122,15 @@ export function evaluateSlip(
     return { ok: false, code: 'WRONG_RECEIVER', receiverBank, receiverName, receiver }
   }
   const wantDigits = list(cfg.receiverAccountDigits).map((x) => x.replace(/\D/g, '')).filter(Boolean)
-  if (wantDigits.length && !wantDigits.some((w) => accountMatches(d.receiver?.account, w))) {
-    return { ok: false, code: 'WRONG_RECEIVER', receiverBank, receiverName, receiver }
+  // Some banks print too few digits of the receiving account (fewer than 3 visible): the digits can neither confirm nor refuse it.
+  // The name matched above, so the slip is not refused and not credited by itself: it goes to an admin (uncertain = true).
+  const visible = Math.max(0, ...digitStrings(d.receiver?.account).map((x) => x.toLowerCase().replace(/[^0-9]/g, '').length))
+  let uncertain = false
+  if (wantDigits.length) {
+    if (visible < 3) uncertain = true
+    else if (!wantDigits.some((w) => accountMatches(d.receiver?.account, w))) return { ok: false, code: 'WRONG_RECEIVER', receiverBank, receiverName, receiver }
   }
-  return { ok: true, transRef, amount: Math.round(amount * 100) / 100, receiverBank, receiverName, receiver }
+  return { ok: true, transRef, amount: Math.round(amount * 100) / 100, receiverBank, receiverName, receiver, uncertain }
 }
 // ---- END pure rules ---------------------------------------------------------------------------
 
@@ -220,6 +225,21 @@ Deno.serve(async (req) => {
     if (!check.ok) {
       await log(check.code, null, { status, receiver: receiverInfo, response: snippet })
       return json({ ok: false, code: check.code })
+    }
+
+    // 5b) The bank hid too much of the receiving account to confirm it: a human decides (admin "ตรวจสลิป").
+    if (check.uncertain) {
+      const { error: uerr } = await admin.rpc('submit_payment_review', {
+        p_user: userId, p_trans_ref: check.transRef, p_amount: check.amount,
+        p_detail: { receiver: receiverInfo, reason: 'RECEIVER_UNVERIFIED' },
+      })
+      if (uerr) {
+        const code = uerr.message.includes('ALREADY_UNDER_REVIEW') ? 'ALREADY_UNDER_REVIEW' : uerr.message.includes('DUPLICATE_SLIP') ? 'DUPLICATE_SLIP' : 'SERVER_ERROR'
+        await log(code, check.transRef, { paid: check.amount, receiver: receiverInfo })
+        return json({ ok: false, code })
+      }
+      await log('REVIEW_RECEIVER', check.transRef, { paid: check.amount, receiver: receiverInfo })
+      return json({ ok: false, code: 'REVIEW_RECEIVER', paid: check.amount })
     }
 
     // 6) Atomic: amount must equal one of this user's pending requests; the transfer ref can be used once.
