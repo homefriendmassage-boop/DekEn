@@ -627,3 +627,10 @@ Run `supabase/migration_066.sql` once, after migration_065. Recruiter slot order
 ## migration_067 — the simple recruiter rule (paid agency first)
 
 Run `supabase/migration_067.sql` once, after migration_066. Recruiter slot (40 %): the girl's PAID agency (with another girl) first; else the seller / provider who brought her (90 days, renewing); else the platform. Sales slot as in 066.
+
+## migration_068 — "แนะนำตัว" per category, and "สปา VIP"
+
+Run `supabase/migration_068.sql` once, after migration_067. **Redeploy** the Edge Function `notify-chat` (the package Flex says "สปา VIP").
+
+- The choices are per category: bartender (banquet, ordination, wedding, auspicious events, no disreputable jobs, no illegal jobs), ENT (as before), masseuse (the massage list, back as it was), Spa VIP (the new list). A profile that picks both categories of its group (bartender + ENT, masseuse + Spa VIP) gets both lists together; a choice that does not belong to a chosen category is dropped when she saves. The database accepts the union for each group (`normalize_worker_profile`, written out in full).
+- "สปา" is renamed "สปา VIP" everywhere in the app (Thai, English "Spa VIP", Chinese "水疗 VIP") and in the Flex.

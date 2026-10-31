@@ -9,7 +9,7 @@ import { PROVINCES } from '../provinces'
 const input = 'mt-1 w-full rounded-xl bg-white/10 px-3 py-2.5 text-base outline-none ring-1 ring-white/10 focus:ring-line'
 const ERR = {
   PLAN_INACTIVE: 'แพ็กเกจสังกัดยังไม่เปิด/หมดอายุ', TOO_MANY_DRAFTS: 'มีแบบร่างค้างเกิน 40 รายการ', TOO_MANY_PHOTOS: 'รูปได้สูงสุด 5 ภาพ',
-  LOCKED: 'แบบร่างนี้แก้ไม่ได้ในสถานะปัจจุบัน', NO_PHOTO: 'ต้องมีรูปอย่างน้อย 1 ภาพ', MIXED_GROUPS: 'เลือกหมวดชงเหล้า/ENT ปนกับหมอนวด/สปาไม่ได้',
+  LOCKED: 'แบบร่างนี้แก้ไม่ได้ในสถานะปัจจุบัน', NO_PHOTO: 'ต้องมีรูปอย่างน้อย 1 ภาพ', MIXED_GROUPS: 'เลือกหมวดชงเหล้า/ENT ปนกับหมอนวด/สปา VIPไม่ได้',
   CONTACT_IN_PROFILE: 'ห้ามใส่เบอร์โทร ไอดี หรือลิงก์ในชื่อ/แนะนำตัว/ที่อยู่', BAD_PROVINCE: 'จังหวัดไม่ถูกต้อง', BAD_AGE_METHOD: 'เลือกวิธีตรวจอายุ', CONSENT_REQUIRED: 'ต้องระบุว่าได้รับความยินยอมแล้ว', BAD_AGE: 'อายุต้อง 20 ปีขึ้นไป',
 }
 // unknown errors show their technical text too, so a problem can be reported exactly
@@ -50,7 +50,7 @@ export default function DraftEditor({ draft, mode, onClose, onSaved }) {
     setBusy(true)
     try {
       const payload = {
-        display_name: form.display_name.trim(), categories: form.categories, ...profileToPayload(prof, grp),
+        display_name: form.display_name.trim(), categories: form.categories, ...profileToPayload(prof, grp, form.categories),
         province: form.province || null, district: form.district.trim() || null, nearby: form.nearby.trim() || null,
         phone: form.phone.trim() || null, line_id: form.line_id.trim() || null, note: form.note.trim() || null,
       }
@@ -70,7 +70,7 @@ export default function DraftEditor({ draft, mode, onClose, onSaved }) {
     return (
       <Shell onClose={onClose} title="สร้างแบบร่างใบสมัครให้น้อง">
         <p className="text-sm text-neutral-400">เลือกประเภทงานของน้อง (ฟอร์มต่างกัน)</p>
-        {[['night', '🍸', 'ชงเหล้า / ENT'], ['spa', '💆', 'หมอนวด / สปา']].map(([g, icon, label]) => (
+        {[['night', '🍸', 'ชงเหล้า / ENT'], ['spa', '💆', 'หมอนวด / สปา VIP']].map(([g, icon, label]) => (
           <button key={g} onClick={() => setGrp(g)} className="flex w-full items-center gap-4 rounded-3xl bg-white/5 p-4 text-left text-lg font-bold ring-1 ring-white/10 active:scale-[0.98]"><span className="text-3xl">{icon}</span>{label}</button>
         ))}
       </Shell>
@@ -123,7 +123,7 @@ export default function DraftEditor({ draft, mode, onClose, onSaved }) {
         </div>
       </fieldset>
 
-      <WorkerFields v={prof} set={(p) => setProf((x) => ({ ...x, ...p }))} grp={grp} hideLocation />
+      <WorkerFields v={prof} set={(p) => setProf((x) => ({ ...x, ...p }))} grp={grp} cats={form.categories} hideLocation />
       <label className="block text-sm">จังหวัดที่น้องรับงาน (ชั่วคราว)
         <select value={form.province} onChange={set('province')} className={input}>
           <option value="" className="text-black">เลือกจังหวัด</option>

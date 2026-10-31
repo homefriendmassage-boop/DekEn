@@ -10,7 +10,7 @@ import { inviteBubble } from '../lib/flex'
 import { applyLink } from '../lib/drafts'
 import WorkerFields, { GROUP_CATEGORIES, groupOf, profileFromRow, profileToPayload, validateProfile } from '../components/WorkerFields'
 
-const CAT = { bartender: 'ชงเหล้า', ent: 'ENT', masseuse: 'หมอนวด', spa: 'สปา' }
+const CAT = { bartender: 'ชงเหล้า', ent: 'ENT', masseuse: 'หมอนวด', spa: 'สปา VIP' }
 const FILTERS = [['pending', 'รอตรวจ'], ['approved', 'อนุมัติแล้ว'], ['rejected', 'ไม่ผ่าน']]
 
 export default function Applications({ onChanged, toast }) {
@@ -109,7 +109,7 @@ function Card({ a, linePic, onReview, onChanged, toast }) {
         {a.gender && <><dt className="text-neutral-400">ข้อมูล</dt><dd>{{ female: 'หญิง', male: 'ชาย', lgbt: 'LGBT' }[a.gender]} · อายุ {a.age ?? '—'} · สูง {a.height_cm ?? '—'} ซม. · หนัก {a.weight_kg ?? '—'} กก. · สัดส่วน {a.measurements ?? '—'}</dd></>}
         {a.tags?.length > 0 && <><dt className="text-neutral-400">บุคลิก</dt><dd>{a.tags.map((k) => (t(`tag_${k}`) === `tag_${k}` ? k : t(`tag_${k}`))).join(', ')}</dd></>}
         {a.about && <><dt className="text-neutral-400">แนะนำตัว</dt><dd className="whitespace-pre-wrap break-words">{a.about}</dd></>}
-        <dt className="text-neutral-400">กลุ่มงาน</dt><dd>{a.grp === 'spa' ? '💆 หมอนวด/สปา' : '🍸 ชงเหล้า/ENT'}{a.service_mode ? ` · ${{ shop: 'ที่ร้าน', outcall: 'ไปหาลูกค้า', both: 'ทั้งสองแบบ' }[a.service_mode]}` : ''}</dd>
+        <dt className="text-neutral-400">กลุ่มงาน</dt><dd>{a.grp === 'spa' ? '💆 หมอนวด/สปา VIP' : '🍸 ชงเหล้า/ENT'}{a.service_mode ? ` · ${{ shop: 'ที่ร้าน', outcall: 'ไปหาลูกค้า', both: 'ทั้งสองแบบ' }[a.service_mode]}` : ''}</dd>
         <dt className="text-neutral-400">ราคาเริ่มต้นครั้งแรก</dt><dd>{a.start_rate === '@60' ? '60 นาที' : a.start_rate === '@90' ? '90 นาที' : a.start_rate === '@120' ? '120 นาที' : a.start_rate === '1h' ? '1 ชม.' : a.start_rate === '@4h' ? '4 ชม.' : a.start_rate === '@6h' ? '6 ชม.' : a.start_rate}</dd>
         {a.price_options?.length > 0 && <><dt className="text-neutral-400">ราคาทั้งหมด</dt><dd>{a.price_options.map((o) => `${o.label === '@60' ? '60 นาที' : o.label === '@90' ? '90 นาที' : o.label === '@120' ? '120 นาที' : o.label === '1h' ? '1 ชม.' : o.label === '@4h' ? '4 ชม.' : o.label === '@6h' ? '6 ชม.' : o.label} ${baht(o.price)}`).join(' · ')}</dd></>}
         <dt className="text-neutral-400">พิกัด</dt><dd className={a.loc_verified ? 'text-green-300' : 'text-amber-300'}>{a.loc_verified ? 'ยืนยันพิกัดจากโทรศัพท์แล้ว' : 'ไม่ได้ยืนยันพิกัด (เลือกจังหวัดเอง)'}</dd>
@@ -250,7 +250,7 @@ function EditModal({ a, onClose, onSaved, toast }) {
     const bad = validateProfile(prof, grp, { needLocation: false })
     if (bad) return setError({ errGender: 'กรุณาเลือกเพศ', errAge: 'อายุต้อง 20 ปีขึ้นไป', errPrice: 'กรอกราคาอย่างน้อย 1 ช่อง', errServiceMode: 'เลือกรูปแบบการให้บริการ' }[bad] ?? 'ข้อมูลไม่ครบ')
     const payload = {
-      display_name: form.display_name.trim(), categories: form.categories, ...profileToPayload(prof, grp),
+      display_name: form.display_name.trim(), categories: form.categories, ...profileToPayload(prof, grp, form.categories),
       province: form.province || null, district: form.district.trim() || null, nearby: form.nearby.trim() || null,
       phone: form.phone.trim() || null, line_id: form.line_id.trim() || null, note: form.note.trim() || null,
     }
@@ -258,7 +258,7 @@ function EditModal({ a, onClose, onSaved, toast }) {
     setBusy(true)
     const { error: e } = await supabase.rpc('admin_edit_application', { p_app: a.id, p_data: payload })
     setBusy(false)
-    if (e) return setError(e.message.includes('CONTACT_IN_PROFILE') ? 'ห้ามใส่เบอร์ ไอดี หรือลิงก์ในชื่อ/แนะนำตัว/ที่อยู่' : e.message.includes('BAD_PROVINCE') ? 'จังหวัดไม่ถูกต้อง' : e.message.includes('MIXED_GROUPS') ? 'เลือกหมวดชงเหล้า/ENT ปนกับหมอนวด/สปาไม่ได้' : `บันทึกไม่สำเร็จ (${e.message.slice(0, 120)})`)
+    if (e) return setError(e.message.includes('CONTACT_IN_PROFILE') ? 'ห้ามใส่เบอร์ ไอดี หรือลิงก์ในชื่อ/แนะนำตัว/ที่อยู่' : e.message.includes('BAD_PROVINCE') ? 'จังหวัดไม่ถูกต้อง' : e.message.includes('MIXED_GROUPS') ? 'เลือกหมวดชงเหล้า/ENT ปนกับหมอนวด/สปา VIPไม่ได้' : `บันทึกไม่สำเร็จ (${e.message.slice(0, 120)})`)
     toast(a.status === 'approved' ? 'แก้ไขแล้ว อัปเดตโปรไฟล์จริงและแจ้งน้องแล้ว' : 'แก้ไขใบสมัครแล้ว')
     onSaved()
   }
@@ -278,7 +278,7 @@ function EditModal({ a, onClose, onSaved, toast }) {
             ))}
           </div>
         </fieldset>
-        <WorkerFields v={prof} set={(p) => setProf((x) => ({ ...x, ...p }))} grp={grp} hideLocation />
+        <WorkerFields v={prof} set={(p) => setProf((x) => ({ ...x, ...p }))} grp={grp} cats={form.categories} hideLocation />
         <label className="block text-sm">จังหวัด
           <select value={form.province} onChange={set('province')} className={field}>
             <option value="" className="text-black">ไม่เปลี่ยน / ไม่ระบุ</option>

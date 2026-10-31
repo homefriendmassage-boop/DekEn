@@ -60,7 +60,7 @@ export default function ProfileSection({ worker, userId, onChanged, onTopUp }) {
     setError(null)
     const bad = validateProfile(prof, grp, { needLocation: false })
     if (bad) return setError(t(bad))
-    const payload = { display_name: name.trim(), ...profileToPayload(prof, grp) }
+    const payload = { display_name: name.trim(), ...profileToPayload(prof, grp, worker.categories ?? []) }
     const changes = diffProfile(payload, worker)
     const fee = status && status.free_left <= 0 ? Number(status.fee) : 0
     if (!window.confirm(fee > 0 ? t('editConfirmFee', { fee: money(fee) }) : t('editConfirmFree'))) return
@@ -114,7 +114,7 @@ export default function ProfileSection({ worker, userId, onChanged, onTopUp }) {
         <label className="block text-sm">{t('fName')}
           <input value={name} maxLength={40} onChange={(e) => setName(e.target.value)} className={input} />
         </label>
-        <WorkerFields v={prof} set={(p) => setProf((x) => ({ ...x, ...p }))} grp={grp} hideLocation />
+        <WorkerFields v={prof} set={(p) => setProf((x) => ({ ...x, ...p }))} grp={grp} cats={worker.categories ?? []} hideLocation />
         <p className="rounded-xl bg-white/5 p-3 text-xs text-neutral-400">📍 {t('locChangeInfo')}</p>
         <PhotoManager userId={userId} state="pending_add" photos={photos} removeIds={removeIds} setRemoveIds={setRemoveIds} onChanged={load} />
         {error && <p className="rounded-lg bg-red-500/10 p-2 text-sm text-red-300">{error}</p>}

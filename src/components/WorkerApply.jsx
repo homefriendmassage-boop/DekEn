@@ -77,7 +77,7 @@ export default function WorkerApply({ userId, defaultName }) {
     const payload = {
       display_name: form.display_name.trim(),
       categories: form.categories,
-      ...profileToPayload(prof, grp),
+      ...profileToPayload(prof, grp, form.categories),
       district: form.district.trim() || null,
       nearby: form.nearby.trim() || null,
       phone: form.phone.trim() || null,
@@ -212,7 +212,7 @@ export default function WorkerApply({ userId, defaultName }) {
           </div>
         </fieldset>
 
-        <WorkerFields v={prof} set={(p) => setProf((x) => ({ ...x, ...p }))} grp={grp} />
+        <WorkerFields v={prof} set={(p) => setProf((x) => ({ ...x, ...p }))} grp={grp} cats={form.categories} />
         <label className="block text-sm">{t('fDistrict')}
           <input maxLength={60} value={form.district} onChange={set('district')} className={input} />
         </label>

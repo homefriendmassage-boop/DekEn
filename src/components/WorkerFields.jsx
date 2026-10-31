@@ -4,8 +4,19 @@ import { getPosition } from '../lib/geo'
 import { PROVINCES } from '../provinces'
 import { useI18n } from '../i18n'
 
-export const TAGS = ['playful', 'fun_talk', 'not_picky', 'sing', 'dance', 'drinks', 'friendly']
-export const SPA_TAGS = ['girlfriend_feel', 'fun_talk', 'playful', 'sweet', 'attentive', 'relax_massage', 'drinks', 'no_drink', 'not_picky', 'anything']
+// "แนะนำตัว" choices, one list per category. A profile that picks both categories of its group gets the two lists together.
+export const TAGS_BY_CAT = {
+  bartender: ['banquet', 'ordination', 'wedding', 'auspicious', 'no_shameful_jobs', 'no_illegal_jobs'],
+  ent: ['playful', 'fun_talk', 'not_picky', 'sing', 'dance', 'drinks', 'friendly'],
+  masseuse: ['thai_massage', 'oil', 'foot', 'aroma', 'sports', 'scrub', 'polite', 'punctual', 'experienced'],
+  spa: ['girlfriend_feel', 'fun_talk', 'playful', 'sweet', 'attentive', 'relax_massage', 'drinks', 'no_drink', 'not_picky', 'anything'],
+}
+// the choices to show: the lists of the chosen categories, together and without repeats (nothing chosen yet: every list of the group)
+export const tagOptions = (cats = [], grp = 'night') => {
+  const chosen = cats.filter((c) => TAGS_BY_CAT[c])
+  const use = chosen.length ? chosen : GROUP_CATEGORIES[grp]
+  return [...new Set(use.flatMap((c) => TAGS_BY_CAT[c]))]
+}
 // Two application forms: night = bartender + ENT, spa = masseuse + spa (one profile never mixes them)
 export const GROUP_CATEGORIES = { night: ['bartender', 'ent'], spa: ['masseuse', 'spa'] }
 export const groupOf = (cats = []) => (cats.some((c) => GROUP_CATEGORIES.spa.includes(c)) && !cats.some((c) => GROUP_CATEGORIES.night.includes(c)) ? 'spa' : 'night')
@@ -57,7 +68,7 @@ export function profileFromRow(r) {
 }
 
 // Form state -> columns. The server derives the province from the GPS point, so a typed province is only a fallback.
-export function profileToPayload(v, grp = 'night') {
+export function profileToPayload(v, grp = 'night', cats = []) {
   const rows = []
   for (const k of FIXED[grp]) if (v[FIELD[k]] !== '') rows.push({ label: k, price: Number(v[FIELD[k]]) })
   for (const c of v.custom) if (c.label.trim() && c.price !== '') rows.push({ label: c.label.trim(), price: Number(c.price) })
@@ -67,7 +78,7 @@ export function profileToPayload(v, grp = 'night') {
     price: Number(rows.find((r) => r.label === startLbl)?.price ?? 0),      // the DB keeps `price` equal to the starting rate
     gender: v.gender || null, age: v.age === '' ? null : Number(v.age),
     height_cm: v.height_cm === '' ? null : Number(v.height_cm), weight_kg: v.weight_kg === '' ? null : Number(v.weight_kg),
-    measurements: v.measurements.trim() || null, tags: v.tags, about: v.about.trim() || null, price_options: rows, start_rate: startLbl,
+    measurements: v.measurements.trim() || null, tags: v.tags.filter((k) => tagOptions(cats, grp).includes(k)), about: v.about.trim() || null, price_options: rows, start_rate: startLbl,
     service_mode: grp === 'spa' ? v.serviceMode || null : null,
   }
   if (v.locNew && v.loc) { out.loc_lat = v.loc.lat; out.loc_lng = v.loc.lng }
@@ -88,7 +99,7 @@ export function validateProfile(v, grp = 'night', { needLocation = true } = {}) 
 const input = 'mt-1 w-full rounded-xl bg-white/10 px-3 py-2.5 text-base outline-none ring-1 ring-white/10 focus:ring-line'
 
 // Profile details, prices and the GPS-confirmed location: shared by the application form and the provider's profile editor.
-export default function WorkerFields({ v, set, grp = 'night', hideLocation = false }) {
+export default function WorkerFields({ v, set, grp = 'night', cats = [], hideLocation = false }) {
   const { t } = useI18n()
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState(null)
@@ -170,7 +181,7 @@ export default function WorkerFields({ v, set, grp = 'night', hideLocation = fal
       <fieldset>
         <legend className="text-sm">{t('fTags')}</legend>
         <div className="mt-2 flex flex-wrap gap-2">
-          {(spa ? SPA_TAGS : TAGS).map((k) => (
+          {tagOptions(cats, grp).map((k) => (
             <button type="button" key={k} aria-pressed={v.tags.includes(k)} onClick={() => toggleTag(k)}
               className={`rounded-full px-3 py-1.5 text-sm font-semibold ring-1 active:scale-95 ${v.tags.includes(k) ? 'bg-line text-black ring-line' : 'bg-white/10 ring-white/15'}`}>
               {v.tags.includes(k) ? '✓ ' : ''}{t(`tag_${k}`)}
