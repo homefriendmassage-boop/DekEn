@@ -1,3 +1,4 @@
+import { HelpBar } from './HelpVideos'
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useI18n } from '../i18n'
@@ -92,6 +93,7 @@ export default function WithdrawModal({ onClose, onChanged }) {
     <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 sm:items-center sm:p-4" onClick={onClose} role="dialog" aria-modal="true">
       <div onClick={(e) => e.stopPropagation()} className="max-h-[92vh] w-full max-w-md space-y-3 overflow-y-auto rounded-t-3xl bg-neutral-900 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl sm:rounded-3xl">
         <div className="flex items-center justify-between"><h2 className="text-lg font-bold">💸 {t('withdraw')}</h2><button onClick={onClose} className="rounded-full bg-white/10 px-3 py-1 text-sm">✕</button></div>
+        <HelpBar spot="withdraw" />
         {!st ? <p className="py-6 text-center text-neutral-500">{t('loading')}</p> : (
           <>
             <div className="rounded-2xl bg-amber-400/10 p-3 text-center ring-1 ring-amber-400/30">

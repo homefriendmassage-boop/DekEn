@@ -1,3 +1,4 @@
+import { HelpBar } from './HelpVideos'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useI18n } from '../i18n'
@@ -114,6 +115,7 @@ export default function WorkerApply({ userId, defaultName }) {
         {app?.status === 'rejected' && (
           <p className="rounded-xl bg-red-500/10 p-2 text-sm text-red-300">{t('appRejected')}{app.reject_reason ? ` — ${app.reject_reason}` : ''}</p>
         )}
+        <HelpBar spot="apply" />
         <h2 className="text-base font-bold">{t('pickGroup')}</h2>
         {[['night', '🍸', t('groupNight'), t('groupNightSub')], ['spa', '💆', t('groupSpa'), t('groupSpaSub')]].map(([g, icon, title, sub]) => (
           <button key={g} onClick={() => { setGrp(g); setForm((f) => ({ ...f, categories: f.categories.filter((c) => GROUP_CATEGORIES[g].includes(c)) })); setProf(emptyProfile()) }}

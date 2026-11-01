@@ -653,3 +653,13 @@ Run `supabase/migration_070.sql` once, after migration_069. **Redeploy** `notify
 
 - Agency **paid**: the continuing 40 % on **all** its girls (seated or waiting, from its link or not).
 - Agency **not paid**: only girls it invited by its own link / draft, 90 fixed days (and, during the promotion, girls with a seat).
+
+## migration_071 — how-to videos (YouTube)
+
+Run `supabase/migration_071.sql` once, after migration_070. No Edge Function change.
+
+- The clips stay on **YouTube** (upload as "Unlisted"); the app keeps only the links (table `help_videos`). Only `youtube.com` / `youtu.be` links are accepted.
+- Admin → **📺 วิธีใช้งาน**: add / edit / hide / delete clips, choose the **spot** and the **group**.
+- Spots: `apply` (application page, before choosing a category — shows again whenever the page is shown, so after a profile is deleted too), `topup`, `book`, `withdraw`, `share`. A spot with one clip opens it at once; several clips open a pop-up list.
+- Every active clip is also in the **📺 วิธีใช้งาน** button in the top bar, grouped by customer / worker / seller / agency / general.
+- Clips open in YouTube (`liff.openWindow` external), not embedded. The first clip (application) is added by the migration.

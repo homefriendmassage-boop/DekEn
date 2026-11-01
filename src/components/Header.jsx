@@ -1,5 +1,6 @@
 import { PLAN_META } from '../config'
 import { LangSwitcher, useI18n } from '../i18n'
+import { HelpHub } from './HelpVideos'
 
 // Sticky top bar shared by every screen: back button, language switcher, tier + wallet chips.
 export default function Header({ title, onBack, displayName, tier, expiresAt, walletBalance, onTierClick, onChatClick, chatUnread, onBookingsClick, onWalletClick, onSupportClick, supportUnread }) {
@@ -16,6 +17,7 @@ export default function Header({ title, onBack, displayName, tier, expiresAt, wa
               {supportUnread > 0 && <span className="absolute -right-1 -top-1 rounded-full bg-red-500 px-1.5 text-[10px] font-bold">{supportUnread}</span>}
             </button>
           )}
+          <HelpHub />
           <LangSwitcher />
         </div>
       </div>

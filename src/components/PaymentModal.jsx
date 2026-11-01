@@ -1,3 +1,4 @@
+import { HelpBar } from './HelpVideos'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { BANK, LINE_OA_URL, MEMBERSHIP_DAYS, PLAN_META, PROMPTPAY_ID } from '../config'
@@ -151,6 +152,7 @@ export default function PaymentModal({ kind, tier, upgrade, onClose, onPaid, onO
         className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-neutral-900 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl sm:rounded-3xl">
         <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-white/20 sm:hidden" />
         <h2 className="text-xl font-bold">{kind === 'membership' ? PLAN_META[tier].icon : '💰'} {title}</h2>
+        {kind === 'wallet_topup' && <HelpBar spot="topup" className="mt-3" />}
 
         {!READY ? (
           <div className="mt-4 space-y-3">

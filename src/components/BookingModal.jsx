@@ -1,3 +1,4 @@
+import { HelpBar } from './HelpVideos'
 import { getVendor } from '../lib/vendor'
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabaseClient'
@@ -74,6 +75,7 @@ export default function BookingModal({ worker, walletBalance, onClose, onBooked,
       <div onClick={(e) => e.stopPropagation()}
         className="max-h-[92vh] w-full max-w-md space-y-4 overflow-y-auto rounded-t-3xl bg-neutral-900 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl sm:rounded-3xl">
         <div className="mx-auto h-1.5 w-10 rounded-full bg-white/20 sm:hidden" />
+        <HelpBar spot="book" />
 
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">

@@ -1,3 +1,4 @@
+import { HelpBar } from './HelpVideos'
 import { useEffect, useState } from 'react'
 import liff from '@line/liff'
 import { supabase } from '../supabaseClient'
@@ -62,6 +63,7 @@ export default function ShareModal({ onClose, agencyCode, recruit = false }) {
       <div onClick={(e) => e.stopPropagation()}
         className="max-h-[92vh] w-full max-w-md space-y-4 overflow-y-auto rounded-t-3xl bg-neutral-900 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl sm:rounded-3xl">
         <div className="mx-auto h-1.5 w-10 rounded-full bg-white/20 sm:hidden" />
+        <HelpBar spot="share" />
         <h2 className="text-xl font-bold">{agencyCode ? '🏢' : recruit ? '💃' : '🎁'} {t(agencyCode ? 'agencyInviteTitle' : recruit ? 'recruitTitle' : 'shareTitle')}</h2>
         <p className="text-sm text-neutral-400">{(recruit ? t(rw?.is_seller ? 'recruitBodySeller' : 'recruitBodyCustomer', { bonus: rw ? (rw.is_seller ? rw.seller_bonus : rw.customer_bonus) : '' }) : t(agencyCode ? 'agencyInviteBody' : 'shareBody'))}</p>
 
