@@ -20,7 +20,8 @@ export default function HomeFeed({ workers, category, tier, loading, onBook, onU
   const freeCategory = MIN_TIER[category] === 0
   const [province, setProvince] = useState('')
   const provinces = [...new Set(workers.map((w) => w.province).filter(Boolean))].sort()
-  const shown = province ? workers.filter((w) => w.province === province) : workers
+  const [gender, setGender] = useState('')
+  const shown = workers.filter((w) => (!province || w.province === province) && (!gender || w.gender === gender))
   const [detail, setDetail] = useState(null)
   const [viewer, setViewer] = useState(null)      // { url, name } : the clear photo in full size
 
@@ -50,6 +51,13 @@ export default function HomeFeed({ workers, category, tier, loading, onBook, onU
             {provinces.map((p) => <option key={p} value={p} className="text-black">{p}</option>)}
           </select>
         )}
+      </div>
+
+      <div className="flex gap-2 px-3 pt-2" role="group" aria-label={t('fGender')}>
+        {[['', t('allGenders')], ['female', t('gender_female')], ['male', t('gender_male')], ['lgbt', t('gender_lgbt')]].map(([g, label]) => (
+          <button key={g || 'all'} type="button" aria-pressed={gender === g} onClick={() => setGender(g)}
+            className={`flex-1 rounded-xl px-2 py-1.5 text-sm font-semibold ring-1 active:scale-95 ${gender === g ? 'bg-line text-black ring-line' : 'bg-white/10 ring-white/10'}`}>{label}</button>
+        ))}
       </div>
 
       {loading ? (
@@ -141,6 +149,7 @@ function WorkerCard({ worker: w, onUnlock, onDetail, onAsk, onAgency, unread, is
         <div>
           <h2 className="truncate text-sm font-bold sm:text-base">{w.display_name}</h2>
           <div className="mt-1 flex flex-wrap gap-1">
+            {w.gender && <span className="rounded-full bg-pink-500/20 px-2 py-0.5 text-[10px] font-semibold text-pink-200 sm:text-xs">{t(`gender_${w.gender}`)}</span>}
             {(w.categories ?? [w.category]).map((c) => (
               <span key={c} className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-neutral-300 sm:text-xs">{catName(c)}</span>
             ))}
