@@ -39,7 +39,17 @@ export default function WorkerDashboard({ userId, onTopUp, me, onWallet, openCha
     setJobs(data ?? [])
   }, [])
 
-  const loadAff = useCallback(() => supabase.rpc('my_worker_agency').then(({ data }) => setAff(data?.[0] ?? null)), [])
+  const [seatReqs, setSeatReqs] = useState([])
+  const loadAff = useCallback(() => {
+    supabase.rpc('my_worker_agency').then(({ data }) => setAff(data?.[0] ?? null))
+    supabase.rpc('my_seat_requests').then(({ data }) => setSeatReqs(data ?? []))
+  }, [])
+  async function answerSeat(r, accept) {
+    const { error } = await supabase.rpc('answer_seat_request', { p_id: r.id, p_accept: accept })
+    if (error) return setError(t('errGeneric'))
+    setNote(accept ? 'รับที่นั่งแล้ว' : 'ปฏิเสธแล้ว')
+    loadAff()
+  }
   useEffect(() => { loadWorker(); loadJobs(); loadAff() }, [loadWorker, loadJobs, loadAff])
   // approval puts her online by itself: if she has not added the OA yet, ask her to (she would miss the job pushes)
   useEffect(() => { if (worker?.is_online) isOaFriend().then((ok) => { if (!ok) setFriendGate(true) }) }, [worker?.is_online]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -144,6 +154,17 @@ export default function WorkerDashboard({ userId, onTopUp, me, onWallet, openCha
         </section>
       )}
 
+      {seatReqs.map((r) => (
+        <section key={r.id} className="space-y-2 rounded-2xl bg-amber-400/10 p-3 ring-1 ring-amber-400/30">
+          <p className="font-semibold">💺 {r.agency_name} ขอให้ที่นั่งสังกัดแก่คุณ</p>
+          <p className="text-xs text-neutral-300">ถ้ายินยอม คุณจะเป็นน้องที่นั่ง (มีป้ายสังกัด) และต้องอยู่ในสังกัดอย่างน้อย {'15'} วันก่อนออกได้ ถ้าไม่ยินยอม คุณยังอยู่ในสังกัดแบบรอที่นั่งและออกได้ทุกเมื่อ</p>
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={() => answerSeat(r, true)} className="rounded-xl bg-line py-2 text-sm font-bold text-black active:scale-95">ยินยอม</button>
+            <button onClick={() => answerSeat(r, false)} className="rounded-xl bg-white/10 py-2 text-sm active:scale-95">ไม่ยินยอม</button>
+          </div>
+        </section>
+      ))}
+
       {/* Agency affiliation: she can leave after the waiting period (or when the agency's plan is not active) */}
       {aff && (
         <section className="space-y-2 rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
@@ -156,6 +177,7 @@ export default function WorkerDashboard({ userId, onTopUp, me, onWallet, openCha
           </div>
           <button disabled={!aff.can_leave} onClick={leaveAgency}
             className="w-full rounded-xl bg-white/10 py-2 text-sm font-semibold active:scale-95 disabled:opacity-40">{t('leaveAgency')}</button>
+          {!aff.has_seat && <p className="text-[11px] text-neutral-500">คุณอยู่แบบรอที่นั่ง ออกจากสังกัดได้ทุกเมื่อ</p>}
           {!aff.can_leave && aff.can_leave_at && (
             <p className="text-[11px] text-neutral-500">{t('leaveAgencyFrom', { date: new Date(aff.can_leave_at).toLocaleDateString() })}</p>
           )}

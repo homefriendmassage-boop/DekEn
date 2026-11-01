@@ -16,6 +16,10 @@ const ERRORS = {
   BAD_INPUT: 'ข้อมูลไม่ถูกต้อง',
   NOT_FOUND: 'ไม่พบรายการ (อาจถูกจัดการไปแล้ว)',
   NO_CHANGE: 'ยังไม่ได้เปลี่ยนชื่อหรือโลโก้',
+  NO_FREE_SEAT: 'ที่นั่งฟรีเต็มแล้ว (10 ที่) เลือกน้องที่จะเปลี่ยนออก หรือซื้อที่นั่งเพิ่ม',
+  SEAT_TOO_NEW: 'ที่นั่งนี้ยังไม่ครบ 30 วัน เปลี่ยนไม่ได้',
+  ALREADY_SEATED: 'น้องคนนี้มีที่นั่งแล้ว',
+  REQUEST_PENDING: 'ส่งคำขอยินยอมไปแล้ว รอน้องตอบ',
   SLOTS_FULL: 'ที่ลำดับแรกเต็มแล้ว (3 ที่) รอให้มีที่ว่าง',
 }
 const errText = (m = '') => Object.entries(ERRORS).find(([k]) => m.includes(k))?.[1] ?? 'ทำรายการไม่สำเร็จ'
@@ -116,7 +120,7 @@ function Dashboard({ ag, me, reload, flash, onTopUp, onWallet, onChanged }) {
   const [tab, setTab] = useState('girls')
   const [missed, setMissed] = useState(null)      // what this agency missed this month while it is not eligible for the 40 %
   useEffect(() => { supabase.rpc('agency_missed').then(({ data }) => setMissed(data ?? null)) }, [ag.active])
-  const tabs = [['girls', '👯 น้อง'], ['reqs', '⏳ รออนุมัติ'], ['drafts', '📝 ร่างใบสมัคร'], ['chat', '💬 แชต'], ['plan', '🧾 แพ็กเกจ'], ['settings', '⚙️ ตั้งค่า']]
+  const tabs = [['girls', '👯 น้อง'], ['seats', '💺 ที่นั่ง'], ['reqs', '⏳ รออนุมัติ'], ['drafts', '📝 ร่างใบสมัคร'], ['chat', '💬 แชต'], ['plan', '🧾 แพ็กเกจ'], ['settings', '⚙️ ตั้งค่า']]
   return (
     <div>
       <nav className="flex gap-2 overflow-x-auto px-4 py-3">
@@ -136,6 +140,7 @@ function Dashboard({ ag, me, reload, flash, onTopUp, onWallet, onChanged }) {
       )}
       <div className="px-4">
         {tab === 'girls' && <Girls flash={flash} reload={reload} paid={ag.active} />}
+        {tab === 'seats' && <Seats ag={ag} me={me} flash={flash} reload={reload} onChanged={onChanged} />}
         {tab === 'reqs' && <Requests flash={flash} reload={reload} />}
         {tab === 'drafts' && <DraftsPanel mode="agency" toast={flash} />}
         {tab === 'chat' && (ag.active ? <AgencyChats me={me} onTopUp={onTopUp} /> : <p className="rounded-2xl bg-white/5 p-6 text-center text-sm text-neutral-300">🔒 ชำระแพ็กเกจสังกัดก่อน จึงจะอ่านและตอบแชตแทนน้องได้ (ค่าแชต 30 บาทเข้าบัญชีน้องผู้ลงทะเบียนเท่านั้น)</p>)}
@@ -269,25 +274,19 @@ function Plan({ ag, me, reload, flash, onTopUp, onWallet, onChanged }) {
     if (error) return flash(errText(error.message))
     flash('ชำระแล้ว เปิดสังกัด 30 วัน'); reload(); onChanged?.()
   }
-  async function slot() {
-    if (!window.confirm('ซื้อที่เพิ่ม 1 คน 200 บาท จาก Wallet (ใช้ได้ถึงสิ้นรอบ 30 วันนี้)?')) return
-    const { error } = await supabase.rpc('agency_buy_slot')
-    if (error) return flash(errText(error.message))
-    flash('เพิ่มที่แล้ว'); reload(); onChanged?.()
-  }
 
   return (
     <div className="space-y-3">
       <section className="space-y-1 rounded-2xl bg-white/5 p-3 ring-1 ring-white/10 text-sm">
         <p>สถานะ: <b className={ag.active ? 'text-green-300' : 'text-red-300'}>{ag.active ? 'เปิดใช้งาน' : 'ยังไม่เปิด / หมดอายุ'}</b></p>
         {ag.plan_expires_at && <p>หมดอายุ: {fmtDate(ag.plan_expires_at)}</p>}
-        <p>น้องในสังกัด: {ag.girls} / {ag.capacity} คน</p>
-        <p>ค่าต่ออายุรอบหน้า: <b>{baht(ag.renewal_price)}</b> <span className="text-xs text-neutral-400">(1,000 + 200 × น้องที่เกิน 10 คน)</span></p>
+        <p>น้องในสังกัด: {ag.girls} คน · ที่นั่งสิทธิพิเศษ {ag.capacity} ที่ (ฟรี 10 + ซื้อเพิ่ม {ag.extra_slots})</p>
+        <p>ค่าแพ็กเกจ 30 วัน: <b>{baht(ag.renewal_price)}</b> <span className="text-xs text-neutral-400">(ที่นั่งเพิ่มซื้อทีละคนที่แท็บ "ที่นั่ง")</span></p>
+        {ag.promo && !ag.active && <p className="rounded-lg bg-amber-400/10 p-2 text-xs text-amber-200">🎉 ช่วงโปรโมชัน: ยังไม่จ่ายแพ็กเกจก็ได้ 40% ต่อเนื่องจากน้องที่มีที่นั่ง (10 ที่ฟรี)</p>}
         <p>Wallet: {baht(wallet)}</p>
         <div className="grid grid-cols-2 gap-2 pt-2">
           <button disabled={busy} onClick={pay} className="rounded-xl bg-line py-2 font-bold text-black active:scale-95 disabled:opacity-50">{ag.active ? 'ต่ออายุ' : 'ชำระแพ็กเกจ'}</button>
           <button onClick={onTopUp} className="rounded-xl bg-white/10 py-2 font-semibold active:scale-95">เติมเงิน</button>
-          {ag.active && <button onClick={slot} className="rounded-xl bg-white/10 py-2 text-sm active:scale-95">+ ที่เพิ่ม 200 บาท</button>}
           <button onClick={onWallet} className="rounded-xl bg-white/10 py-2 text-sm active:scale-95">💰 รายได้ / กระเป๋า</button>
         </div>
       </section>
@@ -305,6 +304,88 @@ function Plan({ ag, me, reload, flash, onTopUp, onWallet, onChanged }) {
       {custShare && <ShareModal onClose={() => setCustShare(false)} />}
       {ag.active && <BoostCard flash={flash} onChanged={onChanged} />}
       {share && <ShareModal agencyCode={ag.code} onClose={() => setShare(false)} />}
+    </div>
+  )
+}
+
+// The seat board: 10 free seats + paid seats. A girl with a seat has the badge, the leave lock and (paid / promo) the continuing 40 %.
+function Seats({ ag, flash, reload, onChanged }) {
+  const [rows, setRows] = useState(null)
+  const [pick, setPick] = useState(null)      // a waiting girl the agency wants to seat for free by swapping
+  const load = useCallback(() => supabase.rpc('agency_seat_board').then(({ data }) => setRows(data ?? [])), [])
+  useEffect(() => { load() }, [load])
+  async function give(g, kind, release = null) {
+    const msg = kind === 'paid' ? `ซื้อที่นั่งให้ ${g.display_name} 200 บาท (30 วัน หรือถึงวันหมดแพ็กเกจ) จาก Wallet?` : `ให้ที่นั่งฟรีแก่ ${g.display_name}?`
+    if (!window.confirm(msg)) return
+    const { data, error } = await supabase.rpc('agency_give_seat', { p_worker: g.user_id, p_kind: kind, p_release: release })
+    if (error) return flash(errText(error.message))
+    flash(data === 'requested' ? 'ส่งคำขอความยินยอมให้น้องแล้ว (ค่าที่นั่งถูกกันไว้ คืนอัตโนมัติถ้าน้องไม่ตอบ/ปฏิเสธ)' : 'ให้ที่นั่งแล้ว')
+    setPick(null); load(); reload(); onChanged?.()
+  }
+  async function cancelReq(g) {
+    const { error } = await supabase.rpc('agency_cancel_seat_request', { p_worker: g.user_id })
+    if (error) return flash(errText(error.message))
+    flash('ยกเลิกคำขอแล้ว'); load(); reload(); onChanged?.()
+  }
+  if (rows === null) return <p className="py-8 text-center text-neutral-500">กำลังโหลด…</p>
+  const seated = rows.filter((r) => r.seat_kind)
+  const waiting = rows.filter((r) => !r.seat_kind)
+  const free = seated.filter((r) => r.seat_kind === 'free')
+  const fmt = (d) => (d ? new Date(d).toLocaleDateString('th-TH') : '')
+  const row = (g, isSeated) => (
+    <li key={g.user_id} className="rounded-2xl bg-white/5 p-3 ring-1 ring-white/10 text-sm">
+      <div className="flex items-center justify-between gap-2">
+        <p className="min-w-0 truncate font-semibold">#{g.pos} {g.display_name}</p>
+        <span className="shrink-0 text-[11px] text-neutral-400">เข้า {fmt(g.joined_at)}</span>
+      </div>
+      <p className="mt-1 text-xs text-neutral-400">
+        {isSeated ? (g.seat_kind === 'free' ? `ที่นั่งฟรี · เปลี่ยนคนได้ตั้งแต่ ${fmt(g.can_swap_at)}` : `ที่นั่งเสียเงิน · หมด ${fmt(g.seat_expires)}`) : 'รอที่นั่ง · น้องยกเลิกสังกัดเองได้ทุกเมื่อ'}
+        {g.via_link && g.invite_until && new Date(g.invite_until) > new Date() ? ` · สังกัดชวนมาเอง ได้ 40% ถึง ${fmt(g.invite_until)}` : ''}
+      </p>
+      {!isSeated && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {g.request_status ? (
+            <><span className="rounded-lg bg-amber-400/20 px-3 py-1 text-xs text-amber-200">⏳ รอน้องยินยอม</span>
+              <button onClick={() => cancelReq(g)} className="rounded-lg bg-white/10 px-3 py-1 text-xs active:scale-95">ยกเลิกคำขอ</button></>
+          ) : (
+            <>
+              {free.length < 10 && <button onClick={() => give(g, 'free')} className="rounded-lg bg-line px-3 py-1 text-xs font-bold text-black active:scale-95">ให้ที่นั่งฟรี</button>}
+              {free.length >= 10 && <button onClick={() => setPick(g)} className="rounded-lg bg-white/10 px-3 py-1 text-xs active:scale-95">สลับเข้าที่ฟรี</button>}
+              {ag.active && <button onClick={() => give(g, 'paid')} className="rounded-lg bg-pink-500 px-3 py-1 text-xs font-bold active:scale-95">ซื้อที่นั่ง 200 บาท</button>}
+            </>
+          )}
+        </div>
+      )}
+    </li>
+  )
+  return (
+    <div className="space-y-3">
+      <section className="rounded-2xl bg-white/5 p-3 text-xs text-neutral-300 ring-1 ring-white/10 space-y-1">
+        <p>💺 ที่นั่งฟรี <b>{free.length}/10</b> · ที่นั่งเสียเงิน <b>{seated.length - free.length}</b></p>
+        <p>น้องที่มีที่นั่ง: ป้ายสังกัด, ล็อกก่อนออก, และ {ag.active ? 'คุณได้ 40% ต่อเนื่อง (จ่ายแพ็กเกจแล้ว)' : ag.promo ? 'คุณได้ 40% ต่อเนื่อง (ช่วงโปรโมชัน)' : 'ได้ 40% ต่อเนื่องเมื่อจ่ายแพ็กเกจ'}</p>
+        <p>น้องรอที่นั่ง: ยังมีป้าย แต่น้องออกได้ทุกเมื่อ และคุณได้ 40% เฉพาะน้องที่คุณชวนมาเองภายใน 90 วัน</p>
+        <p>ที่นั่งฟรีเปลี่ยนคนได้ทุก 30 วัน นับจากวันที่เลือก · ที่นั่งเสียเงินหมดตามวันหมดแพ็กเกจ</p>
+      </section>
+      {rows.length === 0 && <p className="rounded-2xl bg-white/5 p-6 text-center text-neutral-500">ยังไม่มีน้องในสังกัด</p>}
+      {seated.length > 0 && <><p className="px-1 text-sm font-semibold">มีที่นั่ง ({seated.length})</p><ul className="space-y-2">{seated.map((g) => row(g, true))}</ul></>}
+      {waiting.length > 0 && <><p className="px-1 text-sm font-semibold">รอที่นั่ง ({waiting.length})</p><ul className="space-y-2">{waiting.map((g) => row(g, false))}</ul></>}
+      {pick && (
+        <div className="fixed inset-0 z-50 flex items-end bg-black/60" onClick={() => setPick(null)}>
+          <div className="max-h-[70vh] w-full space-y-2 overflow-y-auto rounded-t-3xl bg-neutral-900 p-4" onClick={(e) => e.stopPropagation()}>
+            <p className="font-semibold">สลับ {pick.display_name} เข้าที่นั่งฟรี แทนใคร?</p>
+            {free.map((f) => {
+              const ok = f.can_swap_at && new Date(f.can_swap_at) <= new Date()
+              return (
+                <button key={f.user_id} disabled={!ok} onClick={() => give(pick, 'free', f.user_id)}
+                  className="flex w-full items-center justify-between rounded-xl bg-white/10 px-3 py-2 text-left text-sm disabled:opacity-40">
+                  <span>{f.display_name}</span><span className="text-xs text-neutral-400">{ok ? 'เปลี่ยนได้' : `ได้ตั้งแต่ ${fmt(f.can_swap_at)}`}</span>
+                </button>
+              )
+            })}
+            <button onClick={() => setPick(null)} className="w-full rounded-xl bg-white/5 py-2 text-sm">ปิด</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

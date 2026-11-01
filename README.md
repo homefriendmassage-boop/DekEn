@@ -634,3 +634,15 @@ Run `supabase/migration_068.sql` once, after migration_067. **Redeploy** the Edg
 
 - The choices are per category: bartender (banquet, ordination, wedding, auspicious events, no disreputable jobs, no illegal jobs), ENT (as before), masseuse (the massage list, back as it was), Spa VIP (the new list). A profile that picks both categories of its group (bartender + ENT, masseuse + Spa VIP) gets both lists together; a choice that does not belong to a chosen category is dropped when she saves. The database accepts the union for each group (`normalize_worker_profile`, written out in full).
 - "สปา" is renamed "สปา VIP" everywhere in the app (Thai, English "Spa VIP", Chinese "水疗 VIP") and in the Flex.
+
+## migration_069 — agency seats ("ที่นั่ง")
+
+Run `supabase/migration_069.sql` once, after migration_068. **Redeploy** the Edge Function `notify-chat` (new `seat` push: an agency asks a girl for her consent).
+
+- An agency accepts an **unlimited** number of girls. **10 free seats** (the earliest girls first; the agency may swap one every 30 days) + **paid seats** (200 THB / girl / 30 days, plan must be active, lasts at most until the plan date).
+- A girl **with a seat**: agency badge, leave lock (`agency_leave_days`, now editable in the admin → สังกัด), and the continuing 40 % recruiter slot for the agency when the agency is **paid**, or **unpaid during the promotion** (`agency_promo_until`, admin → สังกัด → โปรโมชัน).
+- A girl **waiting for a seat** (11th+): badge too, leaves any time from day 1; the agency earns the recruiter slot only if she came by **its own link / draft**, for **90 fixed days** counted once per girl–agency pair.
+- A girl who came by the agency's own link has agreed already; a girl who registered before or moved from another agency must **agree** before a seat is given (request held 7 days, the seat price is held and refunded if she declines / does not answer).
+- An agency that is not paid never holds both the recruiter and the sales slot of the same booking (one slot only).
+- Existing agencies: the earliest 10 girls get free seats (days run on from when they joined); girls who had a paid slot keep a paid seat until the plan date.
+- Agency back office: new tab "💺 ที่นั่ง"; girl side: consent card on her dashboard.

@@ -329,8 +329,9 @@ Deno.serve(async (req) => {
   const isAdminPush = input.type === 'admin'
   const isApproval = input.type === 'approval'
   const isPayment = input.type === 'payment'
+  const isSeat = input.type === 'seat'
   const isSeller = input.type === 'seller' || input.type === 'agency'     // plan Flex (seller / agency): input.type tells which
-  if (!isBooking && !isSupport && !isSeller && !isAdminPush && !isApproval && !isPayment && (!thread_id || !recipient_id || !sender_id)) return json({ ok: false, code: 'BAD_INPUT' }, 400)
+  if (!isBooking && !isSupport && !isSeller && !isAdminPush && !isApproval && !isPayment && !isSeat && (!thread_id || !recipient_id || !sender_id)) return json({ ok: false, code: 'BAD_INPUT' }, 400)
   if (isSupport && !input.thread_id) return json({ ok: false, code: 'BAD_INPUT' }, 400)
   if (isSeller && !input.user_id) return json({ ok: false, code: 'BAD_INPUT' }, 400)
   if (isBooking && (!input.job_id || !input.event)) return json({ ok: false, code: 'BAD_INPUT' }, 400)
@@ -338,6 +339,18 @@ Deno.serve(async (req) => {
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
   const central = { token, liffId }
+  if (isSeat) {
+    // an agency asks a girl for her consent to give her a seat: a short text with the app link
+    const rs = await recipient(admin, input.user_id, central)
+    if (!rs || !/^U[0-9a-f]{32}$/.test(rs.lineId)) return json({ ok: true, status: 'NO_LINE_ID' })
+    const text = `💺 สังกัด ${String(input.detail ?? '').slice(0, 60)} ขอให้ที่นั่งสังกัดแก่คุณ\nเปิดแอปเพื่อกด "ยินยอม" หรือ "ไม่ยินยอม" (ภายใน 7 วัน)\nhttps://liff.line.me/${rs.liffId}`
+    const r = await fetch('https://api.line.me/v2/bot/message/push', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${rs.token}`, 'Content-Type': 'application/json', 'X-Line-Retry-Key': crypto.randomUUID() },
+      body: JSON.stringify({ to: rs.lineId, messages: [{ type: 'text', text }] }),
+    })
+    return json({ ok: r.ok, status: r.ok ? 'SENT' : 'FAILED' })
+  }
   if (isPayment) {
     const rp = await recipient(admin, input.user_id, central)
     if (!rp || !/^U[0-9a-f]{32}$/.test(rp.lineId)) return json({ ok: true, status: 'NO_LINE_ID' })

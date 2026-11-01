@@ -5,6 +5,45 @@ import { fmtDate, fmtDateTime } from './format'
 
 const FILTERS = [['pending', 'รอตรวจ'], ['edits', '✏️ ขอแก้ชื่อ/โลโก้'], ['approved', 'อนุมัติแล้ว'], ['rejected', 'ไม่ผ่าน']]
 
+// Agency rules the admin can change: the promotion (an agency that has NOT paid still earns the continuing 40 % on its seated girls until this date)
+// and the number of days a seated girl is locked before she may leave.
+function AgencyRules({ toast }) {
+  const [st, setSt] = useState(null)
+  const [promo, setPromo] = useState('')
+  const [days, setDays] = useState('15')
+  const load = useCallback(() => supabase.rpc('admin_agency_settings').then(({ data }) => {
+    const r = data?.[0]; setSt(r ?? null); setPromo(r?.promo_until ?? ''); setDays(String(r?.leave_days ?? 15))
+  }), [])
+  useEffect(() => { load() }, [load])
+  async function save(key, value) {
+    const { error } = await supabase.rpc('admin_set_setting', { p_key: key, p_value: value })
+    if (error) return toast('บันทึกไม่สำเร็จ')
+    toast('บันทึกแล้ว'); load()
+  }
+  if (!st) return null
+  return (
+    <section className="space-y-3 rounded-2xl bg-white/5 p-3 ring-1 ring-white/10 text-sm">
+      <p className="font-semibold">⚙️ กติกาสังกัด</p>
+      <div className="space-y-1">
+        <p>โปรโมชัน: สังกัดที่ยังไม่จ่ายแพ็กเกจ ได้ 40% ต่อเนื่องจากน้องที่มีที่นั่ง (10 ที่ฟรี) ถึงวันที่ <b>{st.promo_until || '— ไม่มี —'}</b> {st.promo_active ? <span className="text-green-300">(กำลังใช้งาน)</span> : <span className="text-neutral-400">(ปิดอยู่)</span>}</p>
+        <div className="flex gap-2">
+          <input type="date" value={promo} onChange={(e) => setPromo(e.target.value)} className="rounded-lg bg-white/10 px-3 py-2 text-base" />
+          <button onClick={() => save('agency_promo_until', promo)} className="rounded-lg bg-line px-3 py-2 font-bold text-black">บันทึก</button>
+          <button onClick={() => { setPromo(''); save('agency_promo_until', '') }} className="rounded-lg bg-white/10 px-3 py-2">ปิดโปรฯ</button>
+        </div>
+        <p className="text-xs text-neutral-400">หลังวันนี้ สังกัดที่ไม่จ่ายจะเหลือแค่ป้าย + ล็อก และ 40% เฉพาะน้องที่สังกัดชวนมาเองภายใน 90 วัน</p>
+      </div>
+      <div className="space-y-1">
+        <p>วันล็อกก่อนน้องที่มีที่นั่งจะออกจากสังกัด</p>
+        <div className="flex gap-2">
+          <input type="number" min="0" max="365" value={days} onChange={(e) => setDays(e.target.value)} className="w-24 rounded-lg bg-white/10 px-3 py-2 text-base" />
+          <button onClick={() => save('agency_leave_days', String(parseInt(days, 10) || 0))} className="rounded-lg bg-line px-3 py-2 font-bold text-black">บันทึก</button>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 // Modelling agencies: approve the name + logo before they can sell anything.
 // Suspend an agency (and so hide all its girls) from "สมาชิก" -> search -> ⚙️ จัดการ.
 export default function Agencies({ onChanged, toast }) {
@@ -40,6 +79,7 @@ export default function Agencies({ onChanged, toast }) {
 
   return (
     <div className="space-y-4">
+      <AgencyRules toast={toast} />
       <div className="flex flex-wrap gap-2">
         {FILTERS.map(([id, label]) => (
           <button key={id} onClick={() => setStatus(id)} className={`rounded-full px-3 py-1 text-sm ${status === id ? 'bg-white text-black' : 'bg-white/10'}`}>{label}</button>
