@@ -253,6 +253,30 @@ export function buildApprovalFlex(o: { kind: string; event: string; detail?: str
     },
   }
 }
+// To a girl: an agency asks her consent to give her a seat. The two buttons open the app with her answer (?open=seat&req=<id>&ans=yes|no).
+export function buildSeatFlex(o: { agency: string; requestId: string; liffId: string; logo?: string }) {
+  const base = `https://liff.line.me/${o.liffId}?open=seat&req=${encodeURIComponent(o.requestId)}`
+  return {
+    type: 'flex', altText: `💺 ${o.agency} ขอให้ที่นั่งสังกัดแก่คุณ`,
+    contents: {
+      type: 'bubble', size: 'kilo',
+      styles: { body: { backgroundColor: '#161616' }, footer: { backgroundColor: '#161616' } },
+      body: { type: 'box', layout: 'vertical', spacing: 'md', paddingAll: 'xl', contents: [
+        { type: 'box', layout: 'horizontal', spacing: 'md', alignItems: 'center', contents: [
+          ...(o.logo ? [{ type: 'image', url: o.logo, size: '40px', aspectMode: 'cover', aspectRatio: '1:1', flex: 0 }] : []),
+          { type: 'text', text: '💺 ขอความยินยอมเข้าสังกัด', weight: 'bold', size: 'md', color: '#F5B301', gravity: 'center', wrap: true },
+        ] },
+        { type: 'text', text: o.agency, weight: 'bold', size: 'lg', color: '#FFFFFF', wrap: true },
+        { type: 'text', text: 'สังกัดนี้ขอให้ที่นั่งแก่คุณ ถ้ายินยอม คุณจะมีป้ายสังกัดและต้องอยู่ในสังกัดตามระยะล็อกก่อนออกได้ ถ้าไม่ยินยอม คุณยังเป็นน้องรอที่นั่งและออกจากสังกัดได้ทุกเมื่อ', size: 'sm', color: '#DDDDDD', wrap: true },
+        { type: 'text', text: 'คำขอหมดอายุใน 7 วัน', size: 'xs', color: '#9CA3AF', wrap: true },
+      ] },
+      footer: { type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: 'lg', contents: [
+        { type: 'button', style: 'primary', color: '#06C755', height: 'md', action: { type: 'uri', label: 'ยินยอมเข้าสังกัด', uri: `${base}&ans=yes` } },
+        { type: 'button', style: 'secondary', height: 'md', action: { type: 'uri', label: 'ไม่ยินยอม', uri: `${base}&ans=no` } },
+      ] },
+    },
+  }
+}
 // To the customer after a payment: the package he got (with a button for every group it opens) or the Wallet top-up
 const PLANS: Record<number, { name: string; icon: string; color: string; groups: [string, string][] }> = {
   1: { name: 'Gold', icon: '🥇', color: '#F5B301', groups: [['bartender', 'ดูน้องชงเหล้า'], ['ent', 'ดูน้อง ENT']] },
@@ -340,14 +364,16 @@ Deno.serve(async (req) => {
 
   const central = { token, liffId }
   if (isSeat) {
-    // an agency asks a girl for her consent to give her a seat: a short text with the app link
+    // an agency asks a girl for her consent to give her a seat: Flex with the two answer buttons
     const rs = await recipient(admin, input.user_id, central)
     if (!rs || !/^U[0-9a-f]{32}$/.test(rs.lineId)) return json({ ok: true, status: 'NO_LINE_ID' })
-    const text = `💺 สังกัด ${String(input.detail ?? '').slice(0, 60)} ขอให้ที่นั่งสังกัดแก่คุณ\nเปิดแอปเพื่อกด "ยินยอม" หรือ "ไม่ยินยอม" (ภายใน 7 วัน)\nhttps://liff.line.me/${rs.liffId}`
+    const appUrl = Deno.env.get('APP_URL')?.replace(/\/$/, '')
+    if (!/^[0-9a-f-]{36}$/i.test(String(input.request_id ?? ''))) return json({ ok: true, status: 'NO_REQUEST' })
+    const message = buildSeatFlex({ agency: String(input.detail ?? '').slice(0, 60), requestId: String(input.request_id), liffId: rs.liffId, logo: appUrl ? `${appUrl}/dekn-logo.jpg?v=2` : undefined })
     const r = await fetch('https://api.line.me/v2/bot/message/push', {
       method: 'POST',
       headers: { Authorization: `Bearer ${rs.token}`, 'Content-Type': 'application/json', 'X-Line-Retry-Key': crypto.randomUUID() },
-      body: JSON.stringify({ to: rs.lineId, messages: [{ type: 'text', text }] }),
+      body: JSON.stringify({ to: rs.lineId, messages: [message] }),
     })
     return json({ ok: r.ok, status: r.ok ? 'SENT' : 'FAILED' })
   }

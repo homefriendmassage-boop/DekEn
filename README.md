@@ -646,3 +646,10 @@ Run `supabase/migration_069.sql` once, after migration_068. **Redeploy** the Edg
 - An agency that is not paid never holds both the recruiter and the sales slot of the same booking (one slot only).
 - Existing agencies: the earliest 10 girls get free seats (days run on from when they joined); girls who had a paid slot keep a paid seat until the plan date.
 - Agency back office: new tab "💺 ที่นั่ง"; girl side: consent card on her dashboard.
+
+## migration_070 — paid agency earns on every girl, consent Flex with buttons
+
+Run `supabase/migration_070.sql` once, after migration_069. **Redeploy** `notify-chat` again (the seat consent is now a Flex with "ยินยอมเข้าสังกัด" / "ไม่ยินยอม" buttons; the tapped button answers the request when the app opens).
+
+- Agency **paid**: the continuing 40 % on **all** its girls (seated or waiting, from its link or not).
+- Agency **not paid**: only girls it invited by its own link / draft, 90 fixed days (and, during the promotion, girls with a seat).

@@ -10,7 +10,7 @@ import RankBoost from './RankBoost'
 import ProfileSection from './ProfileSection'
 import WorkerJobs from './WorkerJobs'
 import { logoUrl } from '../lib/logo'
-import { clearAgencyCode, getAgencyCode, isOaFriend } from '../lib/auth'
+import { clearAgencyCode, getAgencyCode, isOaFriend, takeSeatAnswer } from '../lib/auth'
 import { LINE_OA_URL } from '../config'
 
 // Provider home: online switch, profile edit, photo upload, live job inbox.
@@ -51,6 +51,14 @@ export default function WorkerDashboard({ userId, onTopUp, me, onWallet, openCha
     loadAff()
   }
   useEffect(() => { loadWorker(); loadJobs(); loadAff() }, [loadWorker, loadJobs, loadAff])
+  // the tapped button of the seat Flex is her answer
+  useEffect(() => {
+    const a = takeSeatAnswer()
+    if (a) supabase.rpc('answer_seat_request', { p_id: a.id, p_accept: a.accept }).then(({ error }) => {
+      if (error) return setError('คำขอที่นั่งนี้ไม่มีแล้ว (ตอบไปแล้วหรือหมดอายุ)')
+      setNote(a.accept ? 'ยินยอมเข้าสังกัดแล้ว ได้ที่นั่งเรียบร้อย' : 'ไม่ยินยอมแล้ว'); loadAff()
+    })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
   // approval puts her online by itself: if she has not added the OA yet, ask her to (she would miss the job pushes)
   useEffect(() => { if (worker?.is_online) isOaFriend().then((ok) => { if (!ok) setFriendGate(true) }) }, [worker?.is_online]) // eslint-disable-line react-hooks/exhaustive-deps
 

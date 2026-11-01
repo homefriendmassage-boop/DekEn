@@ -21,6 +21,18 @@ export function captureOpenParam() {
   }
   try { if (open === 'plans' || open === 'share' || open === 'seller' || open === 'agency' || open === 'worker' || open === 'wallet' || open === 'alive' || open === 'home' || ['bartender', 'ent', 'masseuse', 'spa'].includes(open)) sessionStorage.setItem('open_intent', open) } catch { /* storage blocked */ }
 }
+// Seat consent Flex: ?open=seat&req=<request id>&ans=yes|no  (the tapped button is the answer)
+export function captureSeatParam() {
+  const params = new URLSearchParams(window.location.search)
+  let src = params
+  const state = params.get('liff.state')
+  if (!params.get('open') && state) { const q = state.indexOf('?'); src = new URLSearchParams(q >= 0 ? state.slice(q) : state) }
+  const req = src.get('req'), ans = src.get('ans')
+  try { if (src.get('open') === 'seat' && req && /^[0-9a-f-]{36}$/i.test(req) && (ans === 'yes' || ans === 'no')) { sessionStorage.setItem('open_intent', 'worker'); sessionStorage.setItem('seat_answer', `${req}:${ans}`) } } catch { /* storage blocked */ }
+}
+export function takeSeatAnswer() {
+  try { const v = sessionStorage.getItem('seat_answer'); sessionStorage.removeItem('seat_answer'); if (!v) return null; const [id, a] = v.split(':'); return { id, accept: a === 'yes' } } catch { return null }
+}
 export function takeOpenIntent() {
   try {
     const v = sessionStorage.getItem('open_intent')
@@ -237,6 +249,7 @@ export function captureRefCode() {
 export async function signIn() {
   captureRefCode()
   captureOpenParam()
+  captureSeatParam()
   captureWorkerParam()
   captureAgencyPageParam()
   captureChatParam()
@@ -290,6 +303,7 @@ export async function signIn() {
   try { await supabase.rpc('touch_profile', { p_name: profile.displayName, p_picture: profile.pictureUrl ?? null }) } catch { /* ignore */ }
 
   captureOpenParam()
+  captureSeatParam()
   captureWorkerParam()
   captureAgencyPageParam()
   captureChatParam()
