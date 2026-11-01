@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import liff from '@line/liff'
 import { supabase } from '../supabaseClient'
 
@@ -25,7 +26,8 @@ const GROUPS = [['customer', '🛍️ ลูกค้า'], ['worker', '👯 น
 
 // The pop-up: choose a topic, the clip opens in YouTube.
 function Popup({ title, videos, grouped, onClose }) {
-  return (
+  // rendered on <body>: inside the sticky top bar (backdrop-filter) a "fixed" box would be clipped to the bar
+  return createPortal(
     <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/70 sm:items-center sm:p-4" onClick={onClose} role="dialog" aria-modal="true">
       <div onClick={(e) => e.stopPropagation()} className="max-h-[85vh] w-full max-w-md space-y-3 overflow-y-auto rounded-t-3xl bg-neutral-900 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl sm:rounded-3xl">
         <div className="flex items-center justify-between"><h2 className="text-lg font-bold">📺 {title}</h2><button onClick={onClose} className="rounded-full bg-white/10 px-3 py-1 text-sm">✕</button></div>
@@ -45,7 +47,8 @@ function Popup({ title, videos, grouped, onClose }) {
           )
         })}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
