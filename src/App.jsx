@@ -633,6 +633,7 @@ export default function App() {
 
       {pay && (
         <PaymentModal kind={pay.kind} tier={pay.tier} upgrade={pay.upgrade} onClose={() => setPay(null)} onOpenSupport={openSupport}
+          onSwitchTopup={() => setPay({ kind: 'wallet_topup' })}
           onPaid={() => { loadMe(); if (view === 'feed') loadFeed(category) }} />
       )}
 

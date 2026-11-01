@@ -49,7 +49,7 @@ const mmss = (ms) => {
  * 1) server creates a request with a unique amount (e.g. 100.37)  2) QR with that amount  3) slip upload -> verified server-side.
  * kind: 'membership' (+ tier) | 'wallet_topup'
  */
-export default function PaymentModal({ kind, tier, upgrade, onClose, onPaid, onOpenSupport }) {
+export default function PaymentModal({ kind, tier, upgrade, onClose, onPaid, onOpenSupport, onSwitchTopup }) {
   const { t, money } = useI18n()
   const [step, setStep] = useState(kind === 'membership' ? 'creating' : 'choose') // choose | creating | pay | verifying | done
   const [topup, setTopup] = useState(500)
@@ -185,6 +185,10 @@ export default function PaymentModal({ kind, tier, upgrade, onClose, onPaid, onO
           </div>
         ) : (
           <div className="mt-4 space-y-4">
+            <p className={`rounded-lg p-2 text-xs ${kind === 'membership' ? 'bg-sky-500/15 text-sky-100' : 'bg-green-500/10 text-green-200'}`}>
+              {kind === 'membership' ? t('payIsMembership', { plan: PLAN_META[tier]?.name ?? '' }) : t('payIsTopup')}
+              {kind === 'membership' && onSwitchTopup && <button type="button" onClick={onSwitchTopup} className="ml-2 rounded-full bg-line px-3 py-0.5 font-bold text-black active:scale-95">{t('payWantTopup')}</button>}
+            </p>
             <div className="rounded-2xl bg-amber-400/10 p-3 text-center ring-1 ring-amber-400/40">
               <p className="text-xs text-amber-200">{t('payExact')}</p>
               <p className="mt-1 text-3xl font-extrabold text-amber-300">{money(intent.amount)}</p>
