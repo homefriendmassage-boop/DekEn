@@ -1,4 +1,4 @@
--- ตรวจว่ารัน migration ถึงไหนแล้ว (056 → 070)
+-- ตรวจว่ารัน migration ถึงไหนแล้ว (056 → 071)
 -- Supabase → SQL Editor → New query → วาง → Run  (อ่านอย่างเดียว ไม่แก้ข้อมูล)
 -- ผลลัพธ์: คอลัมน์ ok = true แปลว่ารันแล้ว, false = ยังไม่ได้รัน (ให้รันตัวที่ false ตามลำดับเลขจากน้อยไปมาก)
 with c(mig, what, ok) as (values
@@ -31,7 +31,9 @@ with c(mig, what, ok) as (values
   ('069', 'ตาราง agency_seats (ที่นั่งสังกัด)',
     to_regclass('public.agency_seats') is not null),
   ('070', 'agency_earns_on ให้สังกัดที่จ่ายแล้วได้ทุกน้อง',
-    coalesce((select bool_or(pg_get_functiondef(oid) like '%PAID agency (and a girl besides its owner): every girl%') from pg_proc where proname = 'agency_earns_on' and pronamespace = 'public'::regnamespace), false))
+    coalesce((select bool_or(pg_get_functiondef(oid) like '%PAID agency (and a girl besides its owner): every girl%') from pg_proc where proname = 'agency_earns_on' and pronamespace = 'public'::regnamespace), false)),
+  ('071', 'ตาราง help_videos (คลิปวิธีใช้งาน)',
+    to_regclass('public.help_videos') is not null)
 )
 select mig as migration, what as ตรวจอะไร, ok
   from c
