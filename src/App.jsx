@@ -92,9 +92,12 @@ export default function App() {
   const [showBookings, setShowBookings] = useState(false)
   const [showSeller, setShowSeller] = useState(false)
   const [showShare, setShowShare] = useState(false)
+  const [showAgencyInvite, setShowAgencyInvite] = useState(false)
+  const [agencyInfo, setAgencyInfo] = useState(null)       // my agency row (approved agencies see the agency buttons)
   const [showRecruit, setShowRecruit] = useState(false)     // my own link that brings a friend to the application form
   const [newIds, setNewIds] = useState([])                   // profiles approved in the last days (badge "new")
   const [sellerSt, setSellerSt] = useState(null)       // my_seller_status: used for the "plan lapsed" notice
+  useEffect(() => { if (session) supabase.rpc('my_agency').then(({ data }) => setAgencyInfo(data?.[0] ?? null), () => {}) }, [session])
   const loadSellerSt = useCallback(() => supabase.rpc('my_seller_status').then(({ data }) => setSellerSt(data ?? null), () => {}), [])
   const [highlightJob, setHighlightJob] = useState(null)   // a booking opened from its push
   const [applyOnly, setApplyOnly] = useState(false)    // opened from a registration-only link: nothing but the application form
@@ -498,13 +501,30 @@ export default function App() {
                 ⚠️ แพ็กเกจเซลล์หมดอายุ: ตอนนี้ลูกค้าที่จองผ่านลิงก์ของคุณยังจองได้ปกติ แต่คุณไม่ได้ส่วนแบ่ง (ตกเป็นของแพลตฟอร์ม) กดเพื่อต่ออายุ
               </button>
             )}
-            <button onClick={() => setShowSeller(true)} className="w-full rounded-xl bg-white/10 py-2.5 text-sm font-semibold text-neutral-100 ring-1 ring-white/15 active:scale-95">🤝 ส่วนแบ่งของฉัน</button>
-            <button onClick={() => setShowRecruit(true)} className="w-full rounded-xl bg-pink-500/90 py-2.5 text-sm font-bold active:scale-95">💃 {t('recruitButton')}</button>
-            {!session.vendor && (
-              <button onClick={() => setView('worker')} className="w-full rounded-xl bg-white/10 py-2.5 text-sm font-semibold text-neutral-100 ring-1 ring-white/15 active:scale-95">
-                {me?.role === 'worker' ? `💼 ${t('workerArea')}` : `📝 ${t('applyPartnerHere')}`}
-              </button>
-            )}
+            {(() => {
+              // the buttons follow who the user is: nobody yet / seller / provider / agency
+              const isWorker = me?.role === 'worker'
+              const isAgency = agencyInfo?.status === 'approved'
+              const isSeller = !!sellerSt?.is_seller && sellerSt?.via !== 'provider'
+              const btn = 'w-full rounded-xl bg-white/10 py-2.5 text-sm font-semibold text-neutral-100 ring-1 ring-white/15 active:scale-95'
+              const pink = 'w-full rounded-xl bg-pink-500/90 py-2.5 text-sm font-bold active:scale-95'
+              return (
+                <>
+                  {isAgency && <button onClick={() => { setView('worker'); setWorkerTab('agency') }} className={btn}>💼 หลังบ้านสังกัด</button>}
+                  {isWorker && !isAgency && !session.vendor && <button onClick={() => { setView('worker'); setWorkerTab('self') }} className={btn}>💼 {t('workerArea')}</button>}
+                  {isSeller && <button onClick={() => setShowSeller(true)} className={btn}>🤝 ส่วนแบ่งของฉัน</button>}
+                  {!isSeller && !isWorker && !isAgency && <button onClick={() => setShowSeller(true)} className={btn}>🤝 สมัครเป็นเซลล์ (รับส่วนแบ่ง)</button>}
+                  {(isSeller || isWorker) && !isAgency && <button onClick={() => setShowRecruit(true)} className={pink}>💃 {t('recruitButton')}</button>}
+                  {isAgency && agencyInfo?.code && <button onClick={() => setShowAgencyInvite(true)} className={pink}>💃 ชวนน้องเข้าสังกัด</button>}
+                  {(isWorker || isAgency || isSeller) ? (
+                    !isSeller && <button onClick={() => setShowShare(true)} className={btn}>🎁 แชร์แอปรับรายได้</button>
+                  ) : (
+                    <button onClick={() => setShowShare(true)} className={btn}>🎁 แชร์แอป / แนะนำเพื่อน</button>
+                  )}
+                  {!isWorker && !isAgency && !session.vendor && <button onClick={() => setView('worker')} className={btn}>📝 {t('applyPartnerHere')}</button>}
+                </>
+              )
+            })()}
           </div>
           <CategoryPicker tier={viewTier} onPick={openCategory} />
         </>
@@ -572,6 +592,7 @@ export default function App() {
       {showSeller && <SellerPanel walletBalance={me?.wallet_balance ?? 0} onTopUp={() => { setShowSeller(false); setPay({ kind: 'wallet_topup' }) }} onChanged={() => { loadMe(); loadSellerSt() }} onClose={() => setShowSeller(false)} />}
       {showShare && <ShareModal onClose={() => setShowShare(false)} />}
       {showRecruit && <ShareModal recruit onClose={() => setShowRecruit(false)} />}
+      {showAgencyInvite && agencyInfo?.code && <ShareModal agencyCode={agencyInfo.code} onClose={() => setShowAgencyInvite(false)} />}
 
       {claim && <ClaimDraft token={claim} onClose={() => setClaim(null)} onDone={async () => { setClaim(null); setView('worker'); setWorkerTab('self'); await loadMe() }} />}
 

@@ -38,10 +38,15 @@ export default function SellerPanel({ onClose, walletBalance = 0, onTopUp, onCha
       <div onClick={(e) => e.stopPropagation()}
         className="max-h-[92vh] w-full max-w-md space-y-3 overflow-y-auto rounded-t-3xl bg-neutral-900 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl sm:rounded-3xl">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold">🤝 ส่วนแบ่งของฉัน</h2>
+          <h2 className="text-lg font-bold">🤝 {st && !st.is_seller ? 'สมัครเป็นเซลล์' : 'ส่วนแบ่งของฉัน'}</h2>
           <button onClick={onClose} className="rounded-full bg-white/10 px-3 py-1 text-sm">✕</button>
         </div>
 
+        {st && !st.is_seller && (
+          <p className="rounded-2xl bg-amber-400/10 p-3 text-sm text-amber-100 ring-1 ring-amber-400/30">
+            เป็นเซลล์ รับ <b>40% ของค่าจอง</b> จากลูกค้าที่คุณพามาจองน้อง สมัครได้ทันทีจาก Wallet ด้านล่าง ไม่ต้องรออนุมัติ
+          </p>
+        )}
         <button onClick={() => setShare(true)} className="w-full rounded-xl bg-line py-3 font-bold text-black active:scale-95">🔗 แชร์ลิงก์ชวนเพื่อน</button>
         {st?.is_seller && <button onClick={() => setRecruit(true)} className="w-full rounded-xl bg-pink-500 py-3 font-bold active:scale-95">💃 ชวนเพื่อนมาสมัครงาน (ได้ 40% ค่าจองของเพื่อน 90 วัน)</button>}
 
