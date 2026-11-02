@@ -17,6 +17,27 @@ export function useHelpVideos() {
   return rows
 }
 
+// Who the user is (decides which clips the "วิธีใช้งาน" list shows): loaded once, from the same data the app already reads.
+let rolesCache = null
+let rolesPending = null
+function loadRoles() {
+  if (rolesCache) return Promise.resolve(rolesCache)
+  if (!rolesPending) {
+    rolesPending = Promise.all([
+      supabase.auth.getUser().then(({ data }) => (data?.user?.id ? supabase.from('users').select('role').eq('id', data.user.id).maybeSingle() : { data: null })).then((r) => r.data?.role === 'worker', () => false),
+      supabase.rpc('my_agency').then((r) => r.data?.[0]?.status === 'approved', () => false),
+      supabase.rpc('my_seller_status').then((r) => !!r.data?.is_seller && r.data?.via !== 'provider', () => false),
+    ]).then(([worker, agency, seller]) => { rolesCache = { worker, agency, seller }; rolesPending = null; return rolesCache })
+  }
+  return rolesPending
+}
+// customer: customer clips · seller: customer + seller · provider: provider · agency: agency  (+ the clips for everyone; the application clip is always there)
+function audiencesFor(r) {
+  const a = ['all']
+  if (r.agency) a.push('agency'); else if (r.worker) a.push('worker'); else { a.push('customer'); if (r.seller) a.push('seller') }
+  return a
+}
+
 function openVideo(url) {
   try { if (liff.isInClient()) { liff.openWindow({ url, external: true }); return } } catch { /* fall through */ }
   window.open(url, '_blank', 'noopener')
@@ -70,8 +91,12 @@ export function HelpBar({ spot, className = '' }) {
 
 // The button in the top bar: every clip, grouped by who it is for.
 export function HelpHub() {
-  const videos = useHelpVideos()
+  const all = useHelpVideos()
+  const [roles, setRoles] = useState(rolesCache)
   const [open, setOpen] = useState(false)
+  useEffect(() => { let on = true; loadRoles().then((r) => on && setRoles(r)); return () => { on = false } }, [])
+  const mine = audiencesFor(roles ?? {})
+  const videos = all.filter((v) => v.spot === 'apply' || mine.includes(v.audience))
   if (videos.length === 0) return null
   return (
     <>
