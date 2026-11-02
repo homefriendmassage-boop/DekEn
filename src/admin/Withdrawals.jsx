@@ -4,7 +4,7 @@ import { promptPayPayload } from '../lib/promptpay'
 import Certificate from '../components/Certificate'
 
 const baht = (n) => `${Number(n ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท`
-const SUBS = [['identity', '🪪 ยืนยันตัวตน'], ['pending', '💸 รอโอน'], ['paid', '✅ โอนแล้ว'], ['other', 'ปฏิเสธ/ยกเลิก'], ['settings', '⚙️ ตั้งค่า']]
+const SUBS = [['identity', '🪪 ยืนยันตัวตน'], ['idDone', '🪪 ตรวจแล้ว'], ['pending', '💸 รอโอน'], ['paid', '✅ โอนแล้ว'], ['other', 'ปฏิเสธ/ยกเลิก'], ['settings', '⚙️ ตั้งค่า']]
 const field = 'mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-sm outline-none ring-1 ring-white/10 focus:ring-line'
 const ERR = { PAYER_NOT_SET: 'ยังไม่ได้ตั้งชื่อผู้จ่ายเงิน (ไปที่แท็บตั้งค่า)', REF_REQUIRED: 'ใส่เลขอ้างอิงสลิปก่อน', REASON_REQUIRED: 'ใส่เหตุผลก่อน', NOT_FOUND: 'รายการนี้ถูกจัดการไปแล้ว' }
 const errText = (m = '') => Object.entries(ERR).find(([k]) => m.includes(k))?.[1] ?? `ไม่สำเร็จ (${m.slice(0, 100)})`
@@ -14,16 +14,28 @@ export default function Withdrawals({ toast, onChanged }) {
   const [sub, setSub] = useState('identity')
   const [rows, setRows] = useState(null)
   const [cert, setCert] = useState(null)
+  const [err, setErr] = useState(null)
 
   const load = useCallback(async () => {
-    setRows(null)
+    setRows(null); setErr(null)
     if (sub === 'settings') return setRows([])
-    if (sub === 'identity') { const { data } = await supabase.rpc('admin_payout_profiles', { p_status: 'pending' }); return setRows(data ?? []) }
+    if (sub === 'identity') {
+      const { data, error } = await supabase.rpc('admin_payout_profiles', { p_status: 'pending' })
+      if (error) setErr(error.message)
+      return setRows(data ?? [])
+    }
+    if (sub === 'idDone') {
+      const [a, b] = await Promise.all([supabase.rpc('admin_payout_profiles', { p_status: 'verified' }), supabase.rpc('admin_payout_profiles', { p_status: 'rejected' })])
+      if (a.error || b.error) setErr((a.error || b.error).message)
+      return setRows([...(a.data ?? []), ...(b.data ?? [])])
+    }
     if (sub === 'other') {
       const [a, b] = await Promise.all([supabase.rpc('admin_withdrawals', { p_status: 'rejected' }), supabase.rpc('admin_withdrawals', { p_status: 'cancelled' })])
       return setRows([...(a.data ?? []), ...(b.data ?? [])])
     }
-    const { data } = await supabase.rpc('admin_withdrawals', { p_status: sub }); setRows(data ?? [])
+    const { data, error } = await supabase.rpc('admin_withdrawals', { p_status: sub })
+    if (error) setErr(error.message)
+    setRows(data ?? [])
   }, [sub])
   useEffect(() => { load() }, [load])
   const done = (msg) => { toast(msg); load(); onChanged?.() }
@@ -33,10 +45,11 @@ export default function Withdrawals({ toast, onChanged }) {
       <div className="flex flex-wrap gap-2">
         {SUBS.map(([id, label]) => <button key={id} onClick={() => setSub(id)} className={`rounded-full px-3 py-1.5 text-sm font-semibold ${sub === id ? 'bg-white text-black' : 'bg-white/10'}`}>{label}</button>)}
       </div>
+      {err && <p className="rounded-xl bg-red-500/10 p-3 text-sm text-red-300">โหลดรายการไม่สำเร็จ: {err}</p>}
       {sub === 'settings' ? <Settings toast={toast} /> : rows === null ? <p className="py-10 text-center text-neutral-500">กำลังโหลด…</p> : rows.length === 0 ? <p className="rounded-2xl bg-white/5 p-6 text-center text-neutral-500">ไม่มีรายการ</p> : (
         <ul className="grid gap-3 md:grid-cols-2">
-          {sub === 'identity' && rows.map((p) => <IdentityCard key={p.user_id} p={p} toast={toast} onDone={done} />)}
-          {sub !== 'identity' && rows.map((w) => <WithdrawCard key={w.id} w={w} sub={sub} toast={toast} onDone={done} onCert={setCert} />)}
+          {(sub === 'identity' || sub === 'idDone') && rows.map((p) => <IdentityCard key={p.user_id} p={p} toast={toast} onDone={done} />)}
+          {sub !== 'identity' && sub !== 'idDone' && rows.map((w) => <WithdrawCard key={w.id} w={w} sub={sub} toast={toast} onDone={done} onCert={setCert} />)}
         </ul>
       )}
       {cert && <Certificate cert={cert} adminView onClose={() => setCert(null)} />}
@@ -56,7 +69,9 @@ function IdentityCard({ p, toast, onDone }) {
   }
   return (
     <li className="space-y-2 rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
-      <p className="font-bold">{p.full_name} <span className="text-xs font-normal text-neutral-400">· บัญชี LINE: {p.user_name ?? '—'}</span></p>
+      <p className="font-bold">{p.full_name} <span className="text-xs font-normal text-neutral-400">· บัญชี LINE: {p.user_name ?? '—'}</span>
+        {p.status === 'verified' && <span className="ml-2 rounded-full bg-green-500/20 px-2 py-0.5 text-[11px] text-green-300">ยืนยันแล้ว</span>}
+        {p.status === 'rejected' && <span className="ml-2 rounded-full bg-red-500/20 px-2 py-0.5 text-[11px] text-red-300">ปฏิเสธ{p.reject_reason ? `: ${p.reject_reason}` : ''}</span>}</p>
       <p className="text-xs text-neutral-400">บัตรลงท้าย {p.id_last4} · ส่งเมื่อ {new Date(p.created_at).toLocaleString('th-TH')}</p>
       {detail ? (
         <dl className="space-y-0.5 rounded-xl bg-black/30 p-3 text-sm">
@@ -66,7 +81,7 @@ function IdentityCard({ p, toast, onDone }) {
         </dl>
       ) : <button onClick={show} className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold active:scale-95">👁 ดูข้อมูลเต็ม (บันทึกว่าเปิดดู)</button>}
       <p className="text-[11px] text-amber-200">ยืนยันกับเจ้าตัวทาง LINE ก่อนกดอนุมัติ (ชื่อตรงกับบัตร/พร้อมเพย์)</p>
-      {rejecting ? (
+      {p.status !== 'pending' ? null : rejecting ? (
         <div className="space-y-2">
           <input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} placeholder="เหตุผล (ผู้สมัครเห็น)" className={field} />
           <div className="grid grid-cols-2 gap-2"><button onClick={() => setRejecting(false)} className="rounded-xl bg-white/10 py-2 text-sm">ยกเลิก</button><button onClick={() => decide(false)} className="rounded-xl bg-red-500 py-2 text-sm font-bold">ยืนยันปฏิเสธ</button></div>
