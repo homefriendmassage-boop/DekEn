@@ -685,3 +685,19 @@ Run `supabase/migration_074.sql` once, after migration_073. **Redeploy** the Edg
 - **📢 แจ้งแก้**: a Flex to the girl, her agency, or both (with the admin's note); the girl sees a notice on her page and the agency a badge on that girl until the flag is closed.
 - **🎨 วางโมเสกเอง**: the admin opens the private original, places the mosaic circles, previews the public version and replaces the old public file (storage policy `worker-public_admin_insert/delete`). The flag closes by itself.
 - **✓ ปิดเรื่อง** closes a flag without changing the photo.
+
+## migration_075 — booking rules, round 1 (database + money)  — run it TOGETHER with the round-2 screens
+
+New bookings (`jobs.rules_v2 = true`) follow the new rules; bookings already open keep the old ones (shares were paid at "accepted").
+
+- Shares (40/40/20) and the recruit bonus are paid only when the fee is **earned**: completed (the provider's button, the customer's optional button, or automatically at the date + `job_autocomplete_hours`), the customer cancels late / does not come, or an agreed reschedule. A refunded fee is never shared.
+- Pending: no answer in `job_response_minutes` (admin setting, default 30) / declined → full refund; the customer cancels → refund minus `job_cancel_fee` (100), free in the first `job_free_cancel_minutes` (2).
+- Matched: the customer cancels ≥ `job_early_cancel_hours` (24) before → refund minus 100; later → no refund. The provider cancels / does not come / someone else comes / photos do not match → full refund + a strike.
+- Strikes: 1st warning, 2nd block + fine 200, 3rd 300, 4th 400 … (`penalty_step` × strikes) until an admin sets the counter back (`admin_strike_set`). Fine from the bonus balance first, then the Wallet (`worker_pay_fine`). "Someone else came" blocks until an admin unblocks.
+- Disputes wait for an admin only (`admin_disputes`, `admin_dispute_resolve`: customer / worker / none). Customer "provider did not come" settles at once if she never pressed "arrived"; otherwise it is a dispute.
+- Customer "did not come": the provider presses it `job_noshow_wait_minutes` after "arrived"; the customer may object for `job_objection_hours`, otherwise the fee is earned.
+- Reschedule (one per job, asked ≥ `job_resched_notice_hours` before): the other side answers; accepting completes the job (fee earned, shares paid now).
+- A customer with 3 no-shows/late cancels in 30 days cannot book for 3 days (`customer_holds`).
+- Stats on the provider's page: `worker_reliability()` — provider faults, customer no-shows, customer cancels (90 days, shown only when she accepted a booking in that time). Admin can void single events (`admin_event_void`, reason required).
+- Customer's optional compensation goes to the platform (`job_compensation`); the admin credits the provider's Wallet (`admin_compensation_credit`).
+- `job_tick()` (pg_cron, every minute) replaces `expire_pending_jobs()`.
