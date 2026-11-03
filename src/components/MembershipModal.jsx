@@ -3,7 +3,7 @@ import { useI18n } from '../i18n'
 
 // Plan comparison. Payment is handled manually by an admin for now
 // (select public.set_membership(user_id, tier, 30) in the SQL editor).
-export default function MembershipModal({ tier, walletBalance = 0, onClose, onPay, onPayWallet, onSupport }) {
+export default function MembershipModal({ tier, minTier = 0, walletBalance = 0, onClose, onPay, onPayWallet, onSupport }) {
   const { t, money } = useI18n()
   const curPrice = PLANS.find((p) => p.tier === tier)?.price ?? 0
 
@@ -17,12 +17,17 @@ export default function MembershipModal({ tier, walletBalance = 0, onClose, onPa
         <h2 className="text-xl font-bold">✨ {t('membershipTitle')}</h2>
         <p className="mt-1 text-sm text-neutral-400">{t('membershipSub', { days: MEMBERSHIP_DAYS })}</p>
 
+        {minTier > 0 && (
+          <p className="mt-3 rounded-xl bg-amber-400/10 p-3 text-sm font-semibold text-amber-200 ring-1 ring-amber-400/30">
+            🔒 {t('needTierNote', { plan: PLAN_META[minTier].name })}{tier > 0 && tier < minTier ? ` · ${t('needTierUpgrade', { cur: PLAN_META[tier].name })}` : ''}
+          </p>
+        )}
         <ul className="mt-4 space-y-2 text-sm">
-          <li className={`rounded-2xl p-3 ${tier === 0 ? 'bg-white/15 ring-1 ring-white/30' : 'bg-white/5'}`}>
+          {minTier === 0 && <li className={`rounded-2xl p-3 ${tier === 0 ? 'bg-white/15 ring-1 ring-white/30' : 'bg-white/5'}`}>
             <p className="font-bold">{t('freePlan')} {tier === 0 && <span className="ml-1 text-xs text-green-300">· {t('yourPlan')}</span>}</p>
             <p className="text-neutral-400">{t('planFree', { n: FREE_RANK_LIMIT })}</p>
-          </li>
-          {PLANS.map((p) => {
+          </li>}
+          {PLANS.filter((p) => p.tier >= minTier).map((p) => {
             const m = PLAN_META[p.tier]
             return (
               <li key={p.tier} className={`rounded-2xl p-3 ring-1 ${m.soft} ${tier === p.tier ? `${m.ring} ring-2` : 'ring-white/10'}`}>

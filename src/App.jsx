@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from './supabaseClient'
 import { signIn, takeOpenIntent, takeWorkerIntent, takeChatIntent, takeDraftIntent, takeJobIntent, takeSupportIntent, getAgencyCode, isApplyOnly, clearApplyOnly, takeAgencyPageIntent } from './lib/auth'
 import { getPosition } from './lib/geo'
-import { CATEGORIES, PLAN_META, canViewWorker, suspensionOf, tierOf } from './config'
+import { CATEGORIES, MIN_TIER, PLAN_META, canViewWorker, suspensionOf, tierOf } from './config'
 import { LangSwitcher, useI18n } from './i18n'
 import SellerPanel from './components/SellerPanel'
 import ShareModal from './components/ShareModal'
@@ -72,6 +72,7 @@ export default function App() {
   const [nearBusy, setNearBusy] = useState(false)
   const [selected, setSelected] = useState(null)       // worker being booked
   const [showMembership, setShowMembership] = useState(false)
+  const [membershipMin, setMembershipMin] = useState(0)     // opened from a locked category: only the plans that open it (or higher)
   const [toast, setToast] = useState(null)
   const [previewTier, setPreviewTier] = useState(null) // mock-mode UI override (null = real)
   const [chat, setChat] = useState(null)              // { id, other_name } of the open chat
@@ -141,7 +142,7 @@ export default function App() {
         }
         const openIntent = takeOpenIntent()
         if (openIntent === 'home') setView('categories')          // customer link: straight to the customer side, even for providers
-        if (openIntent === 'plans') { setView('categories'); setShowMembership(true) } // opened from a renewal reminder
+        if (openIntent === 'plans') { setView('categories'); setMembershipMin(0); setShowMembership(true) } // opened from a renewal reminder
         if (openIntent === 'share') { setView('categories'); setShowShare(true) }       // opened from the new seller's Flex
         if (openIntent === 'seller') { setView('categories'); setShowSeller(true) }     // seller plan reminder
         if (['bartender', 'ent', 'masseuse', 'spa'].includes(openIntent)) openCategory(openIntent)     // payment Flex: straight to that group
@@ -464,7 +465,7 @@ export default function App() {
     tier,
     expiresAt: me?.vip_expires_at,
     walletBalance: me?.wallet_balance ?? 0,
-    onTierClick: () => setShowMembership(true),
+    onTierClick: () => { setMembershipMin(0); setShowMembership(true) },
     onWalletClick: () => setShowWallet(true),
     onSupportClick: openSupport,
     onBookingsClick: () => setShowBookings(true),
@@ -545,7 +546,7 @@ export default function App() {
             tier={tier}
             loading={feedLoading}
             onBook={setSelected}
-            onUnlock={() => setShowMembership(true)}
+            onUnlock={() => { setMembershipMin(MIN_TIER[category] ?? 0); setShowMembership(true) }}
             nearOn={nearOn} nearBusy={nearBusy} onToggleNear={toggleNear}
             onAsk={askWorker}
             unreadByWorker={unreadByWorker}
@@ -609,7 +610,7 @@ export default function App() {
 
       {shared?.worker && (
         <WorkerDetail worker={shared.worker} isMe={shared.worker.user_id === me?.id} onClose={() => setShared(null)}
-          onUnlock={() => { setShared(null); setShowMembership(true) }}
+          onUnlock={() => { setMembershipMin(MIN_TIER[shared.worker.category] ?? 0); setShared(null); setShowMembership(true) }}
           onBook={() => { const w = shared.worker; setShared(null); setSelected(w) }}
           onAsk={() => { const w = shared.worker; setShared(null); askWorker(w) }} />
       )}
@@ -647,7 +648,7 @@ export default function App() {
           onTopUp={() => { setChat(null); setPay({ kind: 'wallet_topup' }) }} />}
 
       {showMembership && (
-        <MembershipModal tier={tier} walletBalance={Number(me?.wallet_balance ?? 0)} onPayWallet={payWithWallet} onClose={() => setShowMembership(false)}
+        <MembershipModal tier={tier} minTier={membershipMin} walletBalance={Number(me?.wallet_balance ?? 0)} onPayWallet={payWithWallet} onClose={() => { setShowMembership(false); setMembershipMin(0) }}
           onPay={(planTier) => { setShowMembership(false); setPay({ kind: 'membership', tier: planTier, upgrade: tier > 0 && planTier > tier }) }}
           onSupport={() => { setShowMembership(false); openSupport() }} />
       )}
