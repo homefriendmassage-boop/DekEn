@@ -14,6 +14,8 @@ import ProfileEdits from './ProfileEdits'
 import Chats from './Chats'
 import Vendors from './Vendors'
 import Inactive from './Inactive'
+import Disputes from './Disputes'
+import JobAdmin from './JobAdmin'
 import TeaserCheck from './TeaserCheck'
 import HelpVideos from './HelpVideos'
 import Growth from './Growth'
@@ -24,7 +26,7 @@ import { baht } from './format'
 
 // Separate back office (admin.html). Access is decided by the DATABASE: every admin_* function
 // A push button opens e.g. admin.html?tab=apps (LINE may tuck the query into liff.state on the first open)
-const TABS = ['apps', 'reviews', 'support', 'pay', 'drafts', 'chats', 'edits', 'agencies', 'vendors', 'members', 'withdrawals', 'inactive', 'growth', 'help', 'teaser']
+const TABS = ['apps', 'reviews', 'support', 'pay', 'drafts', 'chats', 'edits', 'agencies', 'vendors', 'members', 'withdrawals', 'inactive', 'growth', 'help', 'teaser', 'disputes', 'jobadmin']
 function tabFromUrl() {
   try {
     const params = new URLSearchParams(window.location.search)
@@ -46,6 +48,7 @@ export default function AdminApp() {
   const [supportVendor, setSupportVendor] = useState(null)   // null = central customers
   const [supportVendorName, setSupportVendorName] = useState(null)
   const [agCount, setAgCount] = useState(0)       // agency name / logo change requests waiting
+  const [disputeCount, setDisputeCount] = useState(0)     // booking disputes waiting for a decision
   const [wdCount, setWdCount] = useState(0)       // identity checks + withdrawals waiting
   const [chatCount, setChatCount] = useState(0)    // flagged / reported / suspended chats waiting for a decision
   const [prefill, setPrefill] = useState(null)   // { user, tier } from "renew" on the Members tab
@@ -64,6 +67,8 @@ export default function AdminApp() {
     setChatCount(typeof c.data === 'number' ? c.data : 0)
     const wd = await supabase.rpc('admin_withdraw_pending_count')
     setWdCount(typeof wd.data === 'number' ? wd.data : 0)
+    const dp = await supabase.rpc('admin_disputes', { p_open: true })
+    setDisputeCount(Array.isArray(dp.data) ? dp.data.length : 0)
     const ag = await supabase.rpc('admin_agency_edit_count')
     setAgCount(typeof ag.data === 'number' ? ag.data : 0)
   }, [])
@@ -127,6 +132,8 @@ export default function AdminApp() {
     ['growth', '🚀 ชวนสมาชิก'],
     ['help', '📺 วิธีใช้งาน'],
     ['teaser', '🖼️ ตรวจรูปตัวอย่าง'],
+    ['disputes', `⚖️ ข้อพิพาท${disputeCount ? ` (${disputeCount})` : ''}`],
+    ['jobadmin', '🚫 ค่าปรับ/กติกาจอง'],
     ['withdrawals', `💸 ถอนเงิน${wdCount ? ` (${wdCount})` : ''}`],
   ]
 
@@ -182,6 +189,8 @@ export default function AdminApp() {
         {tab === 'growth' && <Growth toast={showToast} />}
         {tab === 'help' && <HelpVideos toast={showToast} />}
         {tab === 'teaser' && <TeaserCheck toast={showToast} />}
+        {tab === 'disputes' && <Disputes toast={showToast} onChanged={loadStats} />}
+        {tab === 'jobadmin' && <JobAdmin toast={showToast} />}
         {tab === 'withdrawals' && <Withdrawals toast={showToast} onChanged={loadStats} />}
         {tab === 'members' && <Members toast={showToast} onRenew={(user) => { setPrefill({ user, tier: user.vip_tier }); setTab('pay') }} />}
       </main>

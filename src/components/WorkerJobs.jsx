@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useI18n } from '../i18n'
 import { fmtWhen, mapsLink, minutesLeft } from '../lib/booking'
+import { cancelText, jobErr, useJobRules } from '../lib/jobRules'
+import { ReschedSheet, answerResched } from './JobSheets'
 
 const BADGE = { pending: 'bg-amber-400/20 text-amber-200', matched: 'bg-green-500/20 text-green-300', completed: 'bg-sky-500/20 text-sky-200', cancelled: 'bg-neutral-600/40 text-neutral-300' }
 
@@ -10,6 +12,9 @@ const BADGE = { pending: 'bg-amber-400/20 text-amber-200', matched: 'bg-green-50
 export default function WorkerJobs({ jobs, reload, highlightId, onError }) {
   const { t, money, lang } = useI18n()
   const [, tick] = useState(0)
+  const rules = useJobRules()
+  const [sheet, setSheet] = useState(null)
+  const flash = (m) => onError?.(m)
   useEffect(() => { const id = setInterval(() => tick((n) => n + 1), 30000); return () => clearInterval(id) }, [])
 
   async function setStatus(id, status) {
@@ -31,8 +36,22 @@ export default function WorkerJobs({ jobs, reload, highlightId, onError }) {
     reload()
   }
 
+  async function noshow(j) {
+    if (!window.confirm('รายงานว่าลูกค้าไม่มาตามนัด? ค่าจองจะไม่คืนลูกค้า (ลูกค้าคัดค้านได้ภายในเวลาที่กำหนด แล้วแอดมินจะตรวจสอบ)')) return
+    const { error } = await supabase.rpc('worker_report_customer_noshow', { p_job: j.id })
+    if (error) onError?.(jobErr(error.message))
+    reload()
+  }
+  function cancelAfterAccept(j) {
+    const msg = j.rules_v2
+      ? 'ยกเลิกงานหลังรับแล้ว? ค่าจองจะคืนลูกค้าเต็มจำนวน และนับเป็น "ผิดนัด" 1 ครั้ง ครั้งที่ 2 ขึ้นไปจะถูกบล็อกและมีค่าปรับ ยืนยันยกเลิก?'
+      : t('jobCancelConfirm')
+    if (window.confirm(msg)) setStatus(j.id, 'cancelled')
+  }
+
   if (jobs.length === 0) return <p className="rounded-2xl bg-white/5 p-4 text-center text-sm text-neutral-500">{t('noJobs')}</p>
   return (
+    <>
     <ul className="space-y-2">
       {jobs.map((j) => {
         const map = mapsLink(j)
@@ -75,17 +94,40 @@ export default function WorkerJobs({ jobs, reload, highlightId, onError }) {
                 {j.arrived_at && <p className="text-xs font-semibold text-green-300">📍 {t('jobArrivedAt', { time: fmtWhen(j.arrived_at, lang) })}</p>}
               </div>
             )}
-            {j.status === 'matched' && (
-              <div className="mt-2 grid grid-cols-3 gap-2">
-                <button disabled={!!j.arrived_at} onClick={() => arrived(j.id)} className="rounded-lg bg-sky-500 py-2 text-xs font-bold text-black active:scale-95 disabled:opacity-40">📍 {t('jobArrived')}</button>
-                <button onClick={() => setStatus(j.id, 'completed')} className="rounded-lg bg-line py-2 text-xs font-bold text-black active:scale-95">{t('complete')}</button>
-                <button onClick={() => window.confirm(t('jobCancelConfirm')) && setStatus(j.id, 'cancelled')} className="rounded-lg bg-white/10 py-2 text-xs font-semibold active:scale-95">{t('cancelJob')}</button>
+            {j.status === 'matched' && j.rules_v2 && j.dispute_open && <p className="mt-2 rounded-lg bg-amber-400/10 p-2 text-xs font-semibold text-amber-200">⚖️ งานนี้รอแอดมินตรวจสอบ (ทำรายการอื่นไม่ได้ในตอนนี้)</p>}
+            {j.status === 'matched' && j.rules_v2 && j.customer_noshow_at && !j.dispute_open && <p className="mt-2 rounded-lg bg-sky-500/10 p-2 text-xs text-sky-100">คุณรายงานว่าลูกค้าไม่มา รอลูกค้าคัดค้านถึง {fmtWhen(j.objection_until, lang)} ถ้าไม่มีการคัดค้าน ระบบบันทึกให้อัตโนมัติ</p>}
+            {j.status === 'matched' && j.rules_v2 && j.resched_status === 'pending' && j.resched_by === 'customer' && (
+              <div className="mt-2 space-y-1 rounded-lg bg-sky-500/10 p-2 text-xs text-sky-100">
+                <p>🔁 ลูกค้าขอเลื่อนนัดเป็น <b>{fmtWhen(j.resched_to, lang)}</b></p>
+                <p className="text-amber-200">ถ้ารับ งานนี้ถือว่าเสร็จสิ้น และนัดใหม่อยู่นอกการคุ้มครองของแพลตฟอร์ม</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={async () => { if (await answerResched(j, true, 'worker', flash)) reload() }} className="rounded-lg bg-line py-1.5 font-bold text-black active:scale-95">รับเลื่อนนัด</button>
+                  <button onClick={async () => { if (await answerResched(j, false, 'worker', flash)) reload() }} className="rounded-lg bg-white/10 py-1.5 active:scale-95">ไม่รับ</button>
+                </div>
               </div>
             )}
-            {j.status === 'cancelled' && <p className="mt-2 rounded-lg bg-white/5 p-2 text-xs text-neutral-300">{t(`jobCancel_${j.cancel_reason ?? 'admin'}`)}</p>}
+            {j.status === 'matched' && j.rules_v2 && j.resched_status === 'pending' && j.resched_by === 'worker' && <p className="mt-2 rounded-lg bg-sky-500/10 p-2 text-xs text-sky-100">🔁 คุณขอเลื่อนเป็น {fmtWhen(j.resched_to, lang)} รอลูกค้าตอบ</p>}
+            {j.status === 'matched' && (
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                <button disabled={!!j.arrived_at || j.dispute_open} onClick={() => arrived(j.id)} className="rounded-lg bg-sky-500 py-2 text-xs font-bold text-black active:scale-95 disabled:opacity-40">📍 {t('jobArrived')}</button>
+                <button disabled={j.dispute_open} onClick={() => setStatus(j.id, 'completed')} className="rounded-lg bg-line py-2 text-xs font-bold text-black active:scale-95 disabled:opacity-40">{t('complete')}</button>
+                <button disabled={j.dispute_open} onClick={() => cancelAfterAccept(j)} className="rounded-lg bg-white/10 py-2 text-xs font-semibold active:scale-95 disabled:opacity-40">{t('cancelJob')}</button>
+              </div>
+            )}
+            {j.status === 'matched' && j.rules_v2 && !j.dispute_open && (
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {!j.resched_status && j.scheduled_at && Date.now() <= new Date(j.scheduled_at).getTime() - Number(rules.resched_notice_hours) * 3600e3 &&
+                  <button onClick={() => setSheet({ type: 'resched', job: j })} className="rounded-lg bg-white/10 py-2 text-xs font-semibold active:scale-95">🔁 ขอเลื่อนนัด</button>}
+                {j.arrived_at && !j.customer_noshow_at && Date.now() >= new Date(j.arrived_at).getTime() + Number(rules.noshow_wait_minutes) * 60000 &&
+                  <button onClick={() => noshow(j)} className="rounded-lg bg-red-500/20 py-2 text-xs font-semibold text-red-200 active:scale-95">🚫 ลูกค้าไม่มา</button>}
+              </div>
+            )}
+            {j.status === 'cancelled' && <p className="mt-2 rounded-lg bg-white/5 p-2 text-xs text-neutral-300">{j.rules_v2 ? cancelText(j, 'worker') : t(`jobCancel_${j.cancel_reason ?? 'admin'}`)}</p>}
           </li>
         )
       })}
     </ul>
+    {sheet?.type === 'resched' && <ReschedSheet job={sheet.job} role="worker" flash={flash} onClose={() => setSheet(null)} onDone={() => { setSheet(null); reload() }} />}
+    </>
   )
 }

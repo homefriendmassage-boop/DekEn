@@ -701,3 +701,13 @@ New bookings (`jobs.rules_v2 = true`) follow the new rules; bookings already ope
 - Stats on the provider's page: `worker_reliability()` — provider faults, customer no-shows, customer cancels (90 days, shown only when she accepted a booking in that time). Admin can void single events (`admin_event_void`, reason required).
 - Customer's optional compensation goes to the platform (`job_compensation`); the admin credits the provider's Wallet (`admin_compensation_credit`).
 - `job_tick()` (pg_cron, every minute) replaces `expire_pending_jobs()`.
+
+## Booking rules, round 2 (screens + Flex) — deploy together with migration_075
+
+Run `supabase/migration_075.sql` and **redeploy `notify-chat`** at the same time as the new app version.
+
+- Customer ("📅 การจองของฉัน"): cancel sheet (reason + what happens to the fee + optional compensation), "แจ้งปัญหา", "เจอน้องแล้ว/งานเสร็จ", "ขอเลื่อนนัด", answer a reschedule, object to "customer did not come".
+- Provider: "ลูกค้าไม่มา", "ขอเลื่อนนัด", answer a reschedule; warning / block / fine panel on her page (pay the fine, write the reason); the reliability bar (3 numbers, 90 days) on the provider's detail page.
+- Flex: cancel reasons, refunds, strikes / blocks, disputes (to the admins), reschedule request with accept / decline buttons (`?job=<id>&act=rs_yes|rs_no`), "did not come" with an objection button (`act=obj`).
+- Admin: **⚖️ ข้อพิพาท** (decide: for the reporter / against / nobody at fault) and **🚫 ค่าปรับ/กติกาจอง** (strike counters, unblock, "do not count this event" with a reason, compensation → credit the provider's Wallet, all the numbers of the rules).
+- `supabase/migration_check_056_075.sql` checks which migrations have been run.

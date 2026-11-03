@@ -84,6 +84,10 @@ export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlo
     } catch { setShareNote(t('shareFailed')) }
   }
 
+  // her reliability in the last 90 days, like a review (shown only when she has taken a booking in that time)
+  const [rel, setRel] = useState(null)
+  useEffect(() => { supabase.rpc('worker_reliability', { p_worker: w.user_id }).then(({ data }) => setRel(data?.[0] ?? null), () => {}) }, [w.user_id])
+
   const facts = [
     w.gender && [t('fGender'), t(`gender_${w.gender}`)],
     w.age && [t('fAge'), `${w.age}`],
@@ -128,6 +132,21 @@ export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlo
           )}
           <div>
             <h2 className="text-xl font-bold">{w.display_name}</h2>
+            {rel?.shown && (
+              <div className="mt-2 rounded-xl bg-white/5 p-2.5 text-xs ring-1 ring-white/10">
+                <p className="mb-1 font-semibold text-neutral-300">ประวัติการนัดหมาย ภายใน 90 วัน</p>
+                {rel.worker_faults + rel.customer_noshows + rel.customer_cancels === 0 ? (
+                  <p className="text-green-300">✓ ไม่มีประวัติผิดนัดหรือยกเลิก</p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="rounded-lg bg-black/30 p-1.5"><p className={`text-base font-bold ${rel.worker_faults ? 'text-red-300' : 'text-neutral-200'}`}>{rel.worker_faults}</p><p className="text-[10px] text-neutral-400">น้องผิดนัด</p></div>
+                    <div className="rounded-lg bg-black/30 p-1.5"><p className="text-base font-bold text-neutral-200">{rel.customer_noshows}</p><p className="text-[10px] text-neutral-400">ลูกค้าผิดนัดน้อง</p></div>
+                    <div className="rounded-lg bg-black/30 p-1.5"><p className="text-base font-bold text-neutral-200">{rel.customer_cancels}</p><p className="text-[10px] text-neutral-400">ลูกค้ายกเลิกนัด</p></div>
+                  </div>
+                )}
+                <p className="mt-1 text-[10px] text-neutral-500">นับเฉพาะงานที่น้องกดรับแล้ว</p>
+              </div>
+            )}
             <div className="mt-1 flex flex-wrap items-center gap-1">
               {(w.categories ?? [w.category]).map((c) => <span key={c} className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-neutral-300">{catName(c)}</span>)}
               <span className={`text-xs ${w.is_online && w.is_busy ? 'text-amber-300' : w.is_online ? 'text-green-400' : 'text-neutral-400'}`}>● {w.is_online && w.is_busy ? t('busyNow') : w.is_online ? t('online') : t('offline')}</span>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from './supabaseClient'
-import { signIn, takeOpenIntent, takeWorkerIntent, takeChatIntent, takeDraftIntent, takeJobIntent, takeSupportIntent, getAgencyCode, isApplyOnly, clearApplyOnly, takeAgencyPageIntent } from './lib/auth'
+import { takeJobAction, signIn, takeOpenIntent, takeWorkerIntent, takeChatIntent, takeDraftIntent, takeJobIntent, takeSupportIntent, getAgencyCode, isApplyOnly, clearApplyOnly, takeAgencyPageIntent } from './lib/auth'
 import { getPosition } from './lib/geo'
 import { CATEGORIES, MIN_TIER, PLAN_META, canViewWorker, suspensionOf, tierOf } from './config'
 import { LangSwitcher, useI18n } from './i18n'
@@ -24,6 +24,7 @@ import ThreadList from './components/ThreadList'
 import WorkerDetail from './components/WorkerDetail'
 import ClaimDraft from './components/ClaimDraft'
 import MyBookings from './components/MyBookings'
+import { answerResched } from './components/JobSheets'
 import VendorInbox from './components/VendorInbox'
 
 // Mock mode only, when the workers table is empty: lets you click through the UI
@@ -169,12 +170,22 @@ export default function App() {
           if (staffOf) setInbox({ thread: supportIntent === 'open' ? null : supportIntent })
           else { const { data: th } = await supabase.rpc('support_open'); if (th) setSupport({ threadId: th }) }
         }
+        const jobAct = takeJobAction()         // a Flex button on a booking (answer a reschedule / object to "you did not come")
         const jobId = takeJobIntent()          // a booking push: provider -> her inbox, customer -> my bookings
         if (jobId && meRow) {
           const { data: jb } = await supabase.from('jobs').select('id, customer_id, worker_id').eq('id', jobId).maybeSingle()
           if (jb) {
             setHighlightJob(jb.id)
             if (jb.worker_id === meRow.id) { setView('worker'); setWorkerTab('self') } else { setView('categories'); setShowBookings(true) }
+            if (jobAct && jobAct.id === jb.id) {
+              const mine = jb.worker_id === meRow.id ? 'worker' : 'customer'
+              if (jobAct.act === 'obj') {
+                const note = window.prompt('คุณไม่ได้ผิดนัด? ใส่รายละเอียดสั้น ๆ (ห้ามใส่เบอร์/LINE) แอดมินจะตรวจสอบ', '')
+                if (note !== null) { const { error } = await supabase.rpc('customer_object_noshow', { p_job: jb.id, p_note: note }); showToast(error ? 'ทำรายการไม่สำเร็จ (อาจหมดเวลาคัดค้านแล้ว)' : 'ส่งให้แอดมินตรวจสอบแล้ว') }
+              } else {
+                await answerResched({ id: jb.id }, jobAct.act === 'rs_yes', mine, showToast)
+              }
+            }
           }
         }
         const draftTok = takeDraftIntent()     // a link an admin / modelling agency issued for her

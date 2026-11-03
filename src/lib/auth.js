@@ -146,6 +146,18 @@ export function captureJobParam() {
   }
   try { if (id && UUID.test(id)) sessionStorage.setItem('open_job', id) } catch { /* storage blocked */ }
 }
+// Flex buttons on a booking: ?job=<id>&act=rs_yes | rs_no (answer a reschedule) | obj (object to "you did not come")
+export function captureJobAction() {
+  const params = new URLSearchParams(window.location.search)
+  let src = params
+  const state = params.get('liff.state')
+  if (!params.get('act') && state) { const q = state.indexOf('?'); src = new URLSearchParams(q >= 0 ? state.slice(q) : state) }
+  const id = src.get('job'), act = src.get('act')
+  try { if (id && UUID.test(id) && ['rs_yes', 'rs_no', 'obj'].includes(act)) sessionStorage.setItem('job_action', `${id}:${act}`) } catch { /* storage blocked */ }
+}
+export function takeJobAction() {
+  try { const v = sessionStorage.getItem('job_action'); sessionStorage.removeItem('job_action'); if (!v) return null; const [id, act] = v.split(':'); return { id, act } } catch { return null }
+}
 export function takeJobIntent() {
   try {
     const v = sessionStorage.getItem('open_job')
@@ -250,6 +262,7 @@ export async function signIn() {
   captureRefCode()
   captureOpenParam()
   captureSeatParam()
+  captureJobAction()
   captureWorkerParam()
   captureAgencyPageParam()
   captureChatParam()
@@ -304,6 +317,7 @@ export async function signIn() {
 
   captureOpenParam()
   captureSeatParam()
+  captureJobAction()
   captureWorkerParam()
   captureAgencyPageParam()
   captureChatParam()

@@ -56,11 +56,13 @@ const baht = (n: number) => `${Number(n).toLocaleString('en-US')} บาท`
 const when = (v: string) => new Date(v).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', dateStyle: 'medium', timeStyle: 'short' })
 
 // One booking event -> { to: 'worker' | 'customer', flex } (null when nobody needs to hear about it)
-export function buildBookingFlex(o: { event: string; jobId: string; liffId: { worker: string; customer: string }; customer: string; worker: string; rate: string; price: number; at: string; place?: string; source?: string; logo?: string; fee?: number; travel?: string; workerPlace?: string }) {
+type BookingX = { reason?: string; newAt?: string; by?: string; until?: string; v2?: boolean; kind?: string; minutes?: number }
+export function buildBookingFlex(o: { event: string; jobId: string; liffId: { worker: string; customer: string }; customer: string; worker: string; rate: string; price: number; at: string; place?: string; source?: string; logo?: string; fee?: number; travel?: string; workerPlace?: string; x?: BookingX }) {
   const fee = o.fee ?? 500
+  const x = o.x ?? {}
   const rate = RATE[o.rate] ?? o.rate
   const line = (text: string, extra: Record<string, unknown> = {}) => ({ type: 'text', text, wrap: true, size: 'sm', color: '#DDDDDD', ...extra })
-  const card = (to: 'worker' | 'customer', head: string, title: string, lines: string[], button: string, color = '#EC4899') => ({
+  const card = (to: 'worker' | 'customer', head: string, title: string, lines: string[], button: string, color = '#EC4899', buttons?: { label: string; act: string; secondary?: boolean }[]) => ({
     to, url: `https://liff.line.me/${o.liffId[to]}?job=${o.jobId}`,
     flex: {
       type: 'flex', altText: `${head} ${title}`,
@@ -75,7 +77,9 @@ export function buildBookingFlex(o: { event: string; jobId: string; liffId: { wo
           { type: 'text', text: title, weight: 'bold', size: 'lg', color: '#FFFFFF', wrap: true },
           ...lines.map((l) => line(l)),
         ] },
-        footer: { type: 'box', layout: 'vertical', paddingAll: 'lg', contents: [{ type: 'button', style: 'primary', color, height: 'md', action: { type: 'uri', label: button, uri: `https://liff.line.me/${o.liffId[to]}?job=${o.jobId}` } }] },
+        footer: { type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: 'lg', contents: buttons
+          ? buttons.map((b) => ({ type: 'button', style: b.secondary ? 'secondary' : 'primary', color: b.secondary ? undefined : color, height: 'md', action: { type: 'uri', label: b.label, uri: `https://liff.line.me/${o.liffId[to]}?job=${o.jobId}&act=${b.act}` } }))
+          : [{ type: 'button', style: 'primary', color, height: 'md', action: { type: 'uri', label: button, uri: `https://liff.line.me/${o.liffId[to]}?job=${o.jobId}` } }] },
       },
     },
   })
@@ -84,12 +88,36 @@ export function buildBookingFlex(o: { event: string; jobId: string; liffId: { wo
     case 'new': return card('worker', '🔔 มีการจองใหม่', `${o.customer} จอง ${rate}`, [...(o.source ? [`ลูกค้าจาก: ${o.source}`] : []), when1, `ค่าบริการที่คุณได้รับ (เงินสด): ${baht(o.price)}`, ...(o.travel === 'customer_goes' ? ['ลูกค้าจะเดินทางไปหาคุณ: กรุณากรอกชื่อสถานที่/เลขห้องตอนกดรับงาน'] : o.place ? [`สถานที่: ${o.place}`] : []), 'ตอบรับภายใน 30 นาที ไม่เช่นนั้นงานจะถูกยกเลิก', 'เบอร์และตำแหน่งลูกค้าจะแสดงหลังคุณกดรับงาน'], 'เปิดดูและตอบรับ')
     case 'accepted': return card('customer', '✅ น้องรับงานแล้ว', `${o.worker} รับงานของคุณแล้ว`, [when1, `เรท: ${rate}`, `จ่ายตรงให้น้องเมื่อพบกัน: ${baht(o.price)}`, ...(o.workerPlace ? [`สถานที่ที่น้องแจ้ง: ${o.workerPlace}`] : []), 'ดูเบอร์ติดต่อและสถานะได้ที่หน้าการจอง'], 'ดูรายละเอียดการจอง', '#06C755')
     case 'declined': return card('customer', '❌ น้องปฏิเสธงาน', `${o.worker} ไม่สะดวกรับงานนี้`, [`ค่าธรรมเนียมแพลตฟอร์ม ${fee} บาท คืนเข้า Wallet ของคุณแล้ว`], 'ดูการจอง', '#F59E0B')
-    case 'expired': return card('customer', '⏰ งานถูกยกเลิก', `${o.worker} ไม่ได้ตอบภายใน 30 นาที`, [`ค่าธรรมเนียมแพลตฟอร์ม ${fee} บาท คืนเข้า Wallet ของคุณแล้ว`, 'เลือกคนใหม่ได้เลย'], 'ดูการจอง', '#F59E0B')
-    case 'missed': return card('worker', '⏰ งานถูกยกเลิก', `คุณไม่ได้ตอบรับงานของ ${o.customer} ภายใน 30 นาที`, ['ครั้งต่อไปกรุณาตอบรับหรือปฏิเสธให้เร็วขึ้น'], 'เปิดแอป', '#F59E0B')
+    case 'expired': return card('customer', '⏰ งานถูกยกเลิก', `${o.worker} ไม่ได้ตอบภายใน ${x.minutes ?? 30} นาที`, [`ค่าธรรมเนียมแพลตฟอร์ม ${fee} บาท คืนเข้า Wallet ของคุณแล้ว`, 'เลือกคนใหม่ได้เลย'], 'ดูการจอง', '#F59E0B')
+    case 'missed': return card('worker', '⏰ งานถูกยกเลิก', `คุณไม่ได้ตอบรับงานของ ${o.customer} ภายใน ${x.minutes ?? 30} นาที`, ['ครั้งต่อไปกรุณาตอบรับหรือปฏิเสธให้เร็วขึ้น'], 'เปิดแอป', '#F59E0B')
     case 'customer': return card('worker', '↩️ ลูกค้ายกเลิกคำขอ', `${o.customer} ยกเลิกการจอง`, [when1], 'เปิดแอป', '#F59E0B')
     case 'arrived': return card('customer', '📍 น้องถึงแล้ว', `${o.worker} ถึงจุดนัดหมายแล้ว`, [when1], 'ดูรายละเอียดการจอง', '#06C755')
     case 'completed': return card('customer', '🎉 งานเสร็จสิ้น', 'ขอบคุณที่ใช้บริการ', [`งานกับ ${o.worker} เสร็จสิ้นแล้ว`], 'ดูการจอง', '#06C755')
-    case 'worker_cancelled': return card('customer', '⚠️ น้องยกเลิกงาน', `${o.worker} ยกเลิกงานหลังรับแล้ว`, ['กรุณาติดต่อแอดมินเพื่อขอคืนค่าธรรมเนียม'], 'ดูการจอง', '#EF4444')
+    case 'worker_cancelled': return card('customer', '⚠️ น้องยกเลิกงาน', `${o.worker} ยกเลิกงานหลังรับแล้ว`, x.v2 ? [`คืนค่าจอง ${fee} บาท เข้า Wallet ของคุณเต็มจำนวนแล้ว`, 'ขออภัยในความไม่สะดวก เลือกน้องคนอื่นได้เลย'] : ['กรุณาติดต่อแอดมินเพื่อขอคืนค่าธรรมเนียม'], 'ดูการจอง', '#F59E0B')
+    // ---- new rules: customer cancels after she accepted (the provider hears the reason) ----
+    case 'customer_early': return card('worker', '↩️ ลูกค้ายกเลิกนัดล่วงหน้า', `${o.customer} ยกเลิกนัด`, [when1, ...(x.reason ? [`เหตุผล: ${x.reason}`] : [])], 'เปิดแอป', '#F59E0B')
+    case 'customer_late': return card('worker', '↩️ ลูกค้ายกเลิกนัดใกล้เวลา', `${o.customer} ยกเลิกนัด`, [when1, ...(x.reason ? [`เหตุผล: ${x.reason}`] : []), 'บันทึกในประวัติลูกค้าแล้ว'], 'เปิดแอป', '#F59E0B')
+    case 'customer_noshow': return card('customer', '🚫 บันทึกว่าไม่มาตามนัด', 'น้องรายงานว่าคุณไม่มาตามนัด', [when1, `ค่าจอง ${fee} บาท ไม่คืน`], 'ดูการจอง', '#EF4444')
+    // ---- the provider failed / an admin decided in the customer's favour: the customer is refunded, the provider is told ----
+    case 'worker_noshow': return card('customer', '✅ คืนค่าจองแล้ว', `${o.worker} ไม่ไปตามนัด`, [`คืนค่าจอง ${fee} บาท เข้า Wallet ของคุณเต็มจำนวนแล้ว`, 'ขออภัยในความไม่สะดวก'], 'ดูการจอง', '#06C755')
+    case 'worker_noshow_w': return card('worker', '⚠️ นับเป็นผิดนัด', 'ลูกค้ารายงานว่าคุณไม่ไปตามนัด', [when1, 'ค่าจองคืนลูกค้าแล้ว นับเป็นผิดนัด 1 ครั้ง ครั้งที่ 2 ขึ้นไปบัญชีจะถูกบล็อกและมีค่าปรับ'], 'เปิดแอป', '#F59E0B')
+    case 'imposter': return card('customer', '✅ แอดมินตรวจสอบแล้ว', 'คืนค่าจองเต็มจำนวน', [`แอดมินยืนยันว่ามีคนอื่นไปแทน คืนค่าจอง ${fee} บาท เข้า Wallet แล้ว`], 'ดูการจอง', '#06C755')
+    case 'imposter_w': return card('worker', '🚫 บัญชีถูกบล็อก', 'แอดมินยืนยันว่ามีคนอื่นไปแทนตัวจริง', ['ติดต่อแอดมินและส่งเซลฟีสดยืนยันตัวตน เพื่อปลดบล็อก'], 'เปิดแอป', '#EF4444')
+    case 'mismatch': return card('customer', '✅ แอดมินตรวจสอบแล้ว', 'คืนค่าจองเต็มจำนวน', [`แอดมินยืนยันว่าไม่ตรงปก คืนค่าจอง ${fee} บาท เข้า Wallet แล้ว`], 'ดูการจอง', '#06C755')
+    case 'mismatch_w': return card('worker', '⚠️ นับเป็นผิดนัด', 'แอดมินยืนยันว่ารูปไม่ตรงปก', ['นับเป็นผิดนัด 1 ครั้ง กรุณาแก้รูปโปรไฟล์ให้ตรงกับตัวจริง'], 'เปิดแอป', '#F59E0B')
+    case 'worker_fault_other': return card('customer', '✅ แอดมินตรวจสอบแล้ว', 'คืนค่าจองเต็มจำนวน', [`คืนค่าจอง ${fee} บาท เข้า Wallet ของคุณแล้ว`], 'ดูการจอง', '#06C755')
+    case 'worker_fault_other_w': return card('worker', '⚠️ นับเป็นผิดนัด', 'แอดมินตรวจสอบเรื่องงานนี้แล้ว', ['นับเป็นผิดนัด 1 ครั้ง'], 'เปิดแอป', '#F59E0B')
+    case 'admin_refund': return card('customer', '✅ แอดมินตรวจสอบแล้ว', 'คืนค่าจองเต็มจำนวน', [`ไม่ถือเป็นความผิดของฝ่ายใด คืนค่าจอง ${fee} บาท เข้า Wallet แล้ว`], 'ดูการจอง', '#06C755')
+    case 'admin_refund_w': return card('worker', 'ℹ️ แอดมินตรวจสอบแล้ว', 'งานนี้ไม่ถือเป็นความผิดของฝ่ายใด', ['ค่าจองคืนลูกค้า ไม่นับสถิติของคุณ'], 'เปิดแอป', '#06C755')
+    case 'dispute': return card('worker', '⚖️ งานนี้รอแอดมินตรวจสอบ', 'ลูกค้าแจ้งปัญหาเกี่ยวกับงานนี้', [when1, 'ระบบพักเงินไว้ แอดมินจะตัดสินและแจ้งผลทาง LINE'], 'ดูรายละเอียด', '#F59E0B')
+    case 'noshow_claim': return card('customer', '🚫 น้องแจ้งว่าคุณไม่มาตามนัด', `${o.worker} รายงานว่าไม่พบคุณตามนัด`, [when1, 'ถ้าไม่จริง กดคัดค้านภายในเวลาที่กำหนด แอดมินจะตรวจสอบ ถ้าไม่คัดค้าน ค่าจองไม่คืน'], 'ดูการจอง', '#EF4444', [{ label: 'ไม่จริง ขอให้แอดมินตรวจ', act: 'obj' }])
+    case 'resched_request': {
+      const toCustomer = x.by === 'worker'
+      const warn = toCustomer ? 'ถ้ารับ งานนี้ถือว่าเสร็จสิ้น ค่าจองไม่คืน และนัดใหม่อยู่นอกการคุ้มครองของแพลตฟอร์ม (ไม่มีการรายงานไม่มา/ขอคืนเงิน)' : 'ถ้ารับ งานนี้ถือว่าเสร็จสิ้น และนัดใหม่อยู่นอกการคุ้มครองของแพลตฟอร์ม'
+      return card(toCustomer ? 'customer' : 'worker', '🔁 ขอเลื่อนนัด', toCustomer ? `${o.worker} ขอเลื่อนนัด` : `${o.customer} ขอเลื่อนนัด`, [`นัดเดิม: ${when(o.at)}`, `นัดใหม่: ${x.newAt ? when(x.newAt) : '-'}`, warn], 'ดูรายละเอียด', '#38BDF8', [{ label: 'รับเลื่อนนัด', act: 'rs_yes' }, { label: 'ไม่รับ (นัดเดิมยังอยู่)', act: 'rs_no', secondary: true }])
+    }
+    case 'resched_accepted': return card(x.by === 'worker' ? 'worker' : 'customer', '✅ รับเลื่อนนัดแล้ว', 'อีกฝ่ายรับเลื่อนนัดแล้ว', ['งานนี้ถือว่าเสร็จสิ้น นัดใหม่ตกลงกันเองได้เลย'], 'ดูรายละเอียด', '#06C755')
+    case 'resched_declined': return card(x.by === 'worker' ? 'worker' : 'customer', '❌ ไม่รับเลื่อนนัด', 'อีกฝ่ายไม่รับเลื่อนนัด', [`นัดเดิมยังอยู่: ${when(o.at)}`], 'ดูรายละเอียด', '#F59E0B')
     default: return null
   }
 }
@@ -167,6 +195,7 @@ const ADMIN_EVENTS: Record<string, { head: string; text: string; tab: string; co
   report: { head: '🚩 มีรายงานจากผู้ใช้', text: 'ตรวจรายงานแล้วดำเนินการ', tab: 'chats', color: '#EF4444', button: 'เปิดหน้าธง/รายงาน' },
   identity: { head: '🪪 ขอยืนยันตัวตนเพื่อถอนเงิน', text: 'ตรวจข้อมูลและยืนยันตัวตนทาง LINE แล้วกดอนุมัติ', tab: 'withdrawals', color: '#F59E0B', button: 'เปิดหน้าถอนเงิน' },
   withdraw: { head: '💸 มีคำขอถอนเงิน', text: 'โอนเงินตามยอดสุทธิ แล้วบันทึกเลขอ้างอิงสลิป', tab: 'withdrawals', color: '#F59E0B', button: 'เปิดหน้าถอนเงิน' },
+  dispute: { head: '⚖️ มีข้อพิพาทการจอง', text: 'มีคนแจ้งปัญหาเรื่องงาน รอแอดมินตัดสิน (ระบบพักเงินไว้ ไม่คืนอัตโนมัติ)', tab: 'disputes', color: '#F59E0B', button: 'เปิดหน้าข้อพิพาท' },
   slip: { head: '🔎 มีสลิปรอตรวจ', text: 'ระบบตรวจสลิปอัตโนมัติไม่ผ่าน ต้องให้แอดมินตัดสิน', tab: 'reviews', color: '#F59E0B', button: 'เปิดหน้าตรวจสลิป' },
 }
 export function buildAdminFlex(o: { event: string; detail?: string; liffId: string; logo?: string }) {
@@ -276,6 +305,31 @@ export function buildApprovalFlex(o: { kind: string; event: string; detail?: str
     },
   }
 }
+// To a provider: a warning, or the account is blocked (fine / someone else came)
+export function buildStrikeFlex(o: { event: string; detail?: string; kind?: string; liffId: string; logo?: string }) {
+  const blocked = o.event === 'blocked'
+  const imposter = o.kind === 'imposter'
+  const head = !blocked ? '⚠️ แจ้งเตือนผิดนัด' : imposter ? '🚫 บัญชีถูกบล็อก' : '🚫 บัญชีถูกบล็อกชั่วคราว'
+  const color = blocked ? '#EF4444' : '#F59E0B'
+  const text = !blocked ? 'คุณผิดนัดลูกค้า 1 ครั้ง ครั้งถัดไปบัญชีจะถูกบล็อกและมีค่าปรับ (ครั้งที่ 2 = 200 บาท เพิ่มครั้งละ 100) กดปุ่มเพื่อใส่เหตุผล'
+    : imposter ? 'แอดมินยืนยันว่ามีคนอื่นไปแทนตัวจริง กรุณาติดต่อแอดมินและส่งเซลฟีสดยืนยันตัวตนเพื่อปลดบล็อก'
+    : `ผิดนัดซ้ำ บัญชีถูกบล็อกและมีค่าปรับ ${o.detail ?? ''} บาท ชำระที่หน้าผู้ให้บริการ (หักจากกระเป๋าโบนัสก่อน ส่วนที่เหลือหักจาก Wallet) แล้วกลับมาแสดงและรับงานได้ทันที`
+  return {
+    type: 'flex', altText: head,
+    contents: {
+      type: 'bubble', size: 'kilo',
+      styles: { body: { backgroundColor: '#161616' }, footer: { backgroundColor: '#161616' } },
+      body: { type: 'box', layout: 'vertical', spacing: 'md', paddingAll: 'xl', contents: [
+        { type: 'box', layout: 'horizontal', spacing: 'md', alignItems: 'center', contents: [
+          ...(o.logo ? [{ type: 'image', url: o.logo, size: '40px', aspectMode: 'cover', aspectRatio: '1:1', flex: 0 }] : []),
+          { type: 'text', text: head, weight: 'bold', size: 'md', color, gravity: 'center', wrap: true },
+        ] },
+        { type: 'text', text: text, size: 'sm', color: '#DDDDDD', wrap: true },
+      ] },
+      footer: { type: 'box', layout: 'vertical', paddingAll: 'lg', contents: [{ type: 'button', style: 'primary', color, height: 'md', action: { type: 'uri', label: blocked && !imposter ? 'ชำระค่าปรับ' : 'เปิดหน้าผู้ให้บริการ', uri: `https://liff.line.me/${o.liffId}?open=worker` } }] },
+    },
+  }
+}
 // To a girl: an agency asks her consent to give her a seat. The two buttons open the app with her answer (?open=seat&req=<id>&ans=yes|no).
 export function buildSeatFlex(o: { agency: string; requestId: string; liffId: string; logo?: string }) {
   const base = `https://liff.line.me/${o.liffId}?open=seat&req=${encodeURIComponent(o.requestId)}`
@@ -377,8 +431,9 @@ Deno.serve(async (req) => {
   const isApproval = input.type === 'approval'
   const isPayment = input.type === 'payment'
   const isSeat = input.type === 'seat'
+  const isStrike = input.type === 'strike'
   const isSeller = input.type === 'seller' || input.type === 'agency'     // plan Flex (seller / agency): input.type tells which
-  if (!isBooking && !isSupport && !isSeller && !isAdminPush && !isApproval && !isPayment && !isSeat && (!thread_id || !recipient_id || !sender_id)) return json({ ok: false, code: 'BAD_INPUT' }, 400)
+  if (!isBooking && !isSupport && !isSeller && !isAdminPush && !isApproval && !isPayment && !isSeat && !isStrike && (!thread_id || !recipient_id || !sender_id)) return json({ ok: false, code: 'BAD_INPUT' }, 400)
   if (isSupport && !input.thread_id) return json({ ok: false, code: 'BAD_INPUT' }, 400)
   if (isSeller && !input.user_id) return json({ ok: false, code: 'BAD_INPUT' }, 400)
   if (isBooking && (!input.job_id || !input.event)) return json({ ok: false, code: 'BAD_INPUT' }, 400)
@@ -386,6 +441,18 @@ Deno.serve(async (req) => {
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
   const central = { token, liffId }
+  if (isStrike) {
+    const rs = await recipient(admin, input.user_id, central)
+    if (!rs || !/^U[0-9a-f]{32}$/.test(rs.lineId)) return json({ ok: true, status: 'NO_LINE_ID' })
+    const appUrl = Deno.env.get('APP_URL')?.replace(/\/$/, '')
+    const message = buildStrikeFlex({ event: String(input.event ?? ''), detail: input.detail ? String(input.detail) : undefined, kind: input.kind ? String(input.kind) : undefined, liffId: rs.liffId, logo: appUrl ? `${appUrl}/dekn-logo.jpg?v=2` : undefined })
+    const r = await fetch('https://api.line.me/v2/bot/message/push', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${rs.token}`, 'Content-Type': 'application/json', 'X-Line-Retry-Key': crypto.randomUUID() },
+      body: JSON.stringify({ to: rs.lineId, messages: [message] }),
+    })
+    return json({ ok: r.ok, status: r.ok ? 'SENT' : 'FAILED' })
+  }
   if (isSeat) {
     // an agency asks a girl for her consent to give her a seat: Flex with the two answer buttons
     const rs = await recipient(admin, input.user_id, central)
@@ -492,7 +559,7 @@ Deno.serve(async (req) => {
     return json({ ok: true, results })
   }
   if (isBooking) {
-    const { data: job } = await admin.from('jobs').select('id, customer_id, worker_id, rate_label, service_price, scheduled_at, place_note, source_label, booking_fee, travel_mode').eq('id', input.job_id).maybeSingle()
+    const { data: job } = await admin.from('jobs').select('id, customer_id, worker_id, rate_label, service_price, scheduled_at, place_note, source_label, booking_fee, travel_mode, cancel_note, rules_v2, resched_to, resched_by').eq('id', input.job_id).maybeSingle()
     if (!job) return json({ ok: false, code: 'NOT_FOUND' }, 404)
     const { data: cu } = await admin.from('users').select('display_name').eq('id', job.customer_id).maybeSingle()
     const { data: ww } = await admin.from('workers').select('display_name').eq('user_id', job.worker_id).maybeSingle()
@@ -502,9 +569,13 @@ Deno.serve(async (req) => {
     const appUrl = Deno.env.get('APP_URL')?.replace(/\/$/, '')
     const results: unknown[] = []
     // a missed / expired booking tells both sides
-    const events = input.event === 'expired' ? ['expired', 'missed'] : [input.event]
+    const BOTH = ['worker_noshow', 'imposter', 'mismatch', 'worker_fault_other', 'admin_refund']     // the customer and the provider are both told
+    const { data: setr } = await admin.from('app_settings').select('value').eq('key', 'job_response_minutes').maybeSingle()
+    const x = { reason: job.cancel_note ?? undefined, newAt: job.resched_to ?? undefined, by: job.resched_by ?? undefined, v2: !!job.rules_v2, minutes: Number(setr?.value ?? 30) || 30 }
+    const events = input.event === 'expired' ? ['expired', 'missed'] : BOTH.includes(String(input.event)) ? [input.event, `${input.event}_w`]
+      : input.event === 'resched_accepted' || input.event === 'resched_declined' ? [input.event] : [input.event]
     for (const ev of events) {
-      const card = buildBookingFlex({ event: ev, jobId: job.id, liffId: { worker: rw?.liffId ?? liffId, customer: rc?.liffId ?? liffId }, customer: cu?.display_name ?? 'ลูกค้า', worker: ww?.display_name ?? 'น้อง', rate: job.rate_label ?? '', price: Number(job.service_price), at: job.scheduled_at, place: job.place_note ?? undefined, source: job.source_label ?? undefined, fee: Number(job.booking_fee), travel: job.travel_mode, workerPlace: jp?.worker_place ?? undefined, logo: appUrl ? `${appUrl}/dekn-logo.jpg?v=2` : undefined })
+      const card = buildBookingFlex({ event: ev, jobId: job.id, liffId: { worker: rw?.liffId ?? liffId, customer: rc?.liffId ?? liffId }, customer: cu?.display_name ?? 'ลูกค้า', worker: ww?.display_name ?? 'น้อง', rate: job.rate_label ?? '', price: Number(job.service_price), at: job.scheduled_at, place: job.place_note ?? undefined, source: job.source_label ?? undefined, fee: Number(job.booking_fee), travel: job.travel_mode, workerPlace: jp?.worker_place ?? undefined, x, logo: appUrl ? `${appUrl}/dekn-logo.jpg?v=2` : undefined })
       if (!card) { results.push({ event: ev, status: 'SKIPPED' }); continue }
       const rcp = card.to === 'worker' ? rw : rc
       if (!rcp || !/^U[0-9a-f]{32}$/.test(rcp.lineId)) { results.push({ event: ev, status: 'NO_LINE_ID' }); continue }

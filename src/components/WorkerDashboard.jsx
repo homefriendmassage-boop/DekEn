@@ -40,6 +40,21 @@ export default function WorkerDashboard({ userId, onTopUp, me, onWallet, openCha
   }, [])
 
   const [seatReqs, setSeatReqs] = useState([])
+  const [strike, setStrike] = useState(null)         // my_strike_status(): warnings, block, fine
+  const [strikeReason, setStrikeReason] = useState('')
+  const loadStrike = useCallback(() => supabase.rpc('my_strike_status').then(({ data }) => setStrike(data?.[0] ?? null), () => {}), [])
+  useEffect(() => { loadStrike() }, [loadStrike])
+  async function payFine() {
+    if (!window.confirm(`ชำระค่าปรับ ${strike.fine_due} บาท? ระบบหักจากกระเป๋าโบนัสก่อน ส่วนที่เหลือหักจาก Wallet`)) return
+    const { error } = await supabase.rpc('worker_pay_fine')
+    if (error) return setError(error.message.includes('INSUFFICIENT') ? 'ยอดไม่พอ กรุณาเติม Wallet ก่อน' : t('errGeneric'))
+    setNote('ชำระค่าปรับแล้ว กลับมารับงานได้'); loadStrike()
+  }
+  async function saveReason() {
+    const { error } = await supabase.rpc('worker_strike_reason', { p_event: strike.last_event, p_text: strikeReason })
+    if (error) return setError(error.message.includes('CONTACT') ? 'ห้ามใส่เบอร์/LINE ในข้อความ' : t('errGeneric'))
+    setNote('บันทึกเหตุผลแล้ว'); setStrikeReason(''); loadStrike()
+  }
   const [teaserFlag, setTeaserFlag] = useState(null)     // the admin asked her to redo the mosaic of her public photo
   useEffect(() => { supabase.rpc('my_teaser_flag').then(({ data }) => setTeaserFlag(data?.[0] ?? null), () => {}) }, [])
   const loadAff = useCallback(() => {
@@ -164,6 +179,38 @@ export default function WorkerDashboard({ userId, onTopUp, me, onWallet, openCha
         </section>
       )}
 
+      {strike && (strike.blocked || strike.strikes > 0) && (
+        <section className={`space-y-2 rounded-2xl p-3 ring-1 ${strike.blocked ? 'bg-red-500/10 ring-red-400/40' : 'bg-amber-400/10 ring-amber-400/30'}`}>
+          {strike.blocked && strike.block_kind === 'fine' && (
+            <>
+              <p className="font-semibold text-red-200">🚫 บัญชีถูกบล็อกชั่วคราว (ผิดนัด {strike.strikes} ครั้ง)</p>
+              <p className="text-sm text-neutral-200">ค่าปรับ <b>{strike.fine_due} บาท</b> หักจากกระเป๋าโบนัสก่อน (มี {Number(strike.bonus_balance).toFixed(0)}) ส่วนที่เหลือหักจาก Wallet (มี {Number(strike.wallet_balance).toFixed(0)}) เมื่อชำระแล้วโปรไฟล์กลับมาแสดงและรับงานได้ทันที</p>
+              {Number(strike.bonus_balance) + Number(strike.wallet_balance) >= Number(strike.fine_due)
+                ? <button onClick={payFine} className="w-full rounded-xl bg-line py-2.5 text-sm font-bold text-black active:scale-95">ชำระค่าปรับ {strike.fine_due} บาท</button>
+                : <button onClick={onTopUp} className="w-full rounded-xl bg-amber-400 py-2.5 text-sm font-bold text-black active:scale-95">เติม Wallet ก่อน (ยอดไม่พอ)</button>}
+            </>
+          )}
+          {strike.blocked && strike.block_kind === 'imposter' && (
+            <>
+              <p className="font-semibold text-red-200">🚫 บัญชีถูกบล็อก (แอดมินยืนยันว่ามีคนอื่นไปแทนตัวจริง)</p>
+              <p className="text-sm text-neutral-200">กรุณาติดต่อแอดมินผ่านปุ่ม "แชทกับแอดมิน" ด้านบน และส่งเซลฟีสดยืนยันตัวตน แอดมินจะปลดบล็อกให้เมื่อยืนยันแล้ว</p>
+            </>
+          )}
+          {!strike.blocked && (
+            <>
+              <p className="font-semibold text-amber-200">⚠️ คุณผิดนัดแล้ว {strike.strikes} ครั้ง</p>
+              <p className="text-xs text-neutral-300">ครั้งถัดไปบัญชีจะถูกบล็อกและมีค่าปรับ (ครั้งที่ 2 = 200 บาท เพิ่มครั้งละ 100) การยกเลิกหลังรับงาน ลูกค้าจะได้รับเงินค่าจองคืนเต็มจำนวน</p>
+              {strike.last_event && !strike.last_reason && (
+                <div className="space-y-1">
+                  <input value={strikeReason} maxLength={300} onChange={(e) => setStrikeReason(e.target.value)} placeholder="เหตุผลที่ผิดนัด (แอดมินเห็น)" className="w-full rounded-xl bg-white/10 px-3 py-2 text-base outline-none ring-1 ring-white/10 focus:ring-line" />
+                  <button disabled={!strikeReason.trim()} onClick={saveReason} className="w-full rounded-xl bg-white/10 py-2 text-sm font-semibold active:scale-95 disabled:opacity-40">บันทึกเหตุผล</button>
+                </div>
+              )}
+              {strike.last_reason && <p className="text-[11px] text-neutral-400">เหตุผลที่บันทึกไว้: {strike.last_reason}</p>}
+            </>
+          )}
+        </section>
+      )}
       {teaserFlag && (
         <section className="space-y-1 rounded-2xl bg-amber-400/10 p-3 ring-1 ring-amber-400/30">
           <p className="font-semibold">🖼️ แอดมินขอให้แก้โมเสกรูปตัวอย่าง</p>
