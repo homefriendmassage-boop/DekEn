@@ -77,6 +77,7 @@ export default function App() {
   const [chat, setChat] = useState(null)              // { id, other_name } of the open chat
   const [showThreads, setShowThreads] = useState(false)
   const [chatUnread, setChatUnread] = useState(0)
+  const [agOrder, setAgOrder] = useState({})     // worker id -> the place her (paid) agency gave her on its own page; none = random order
   const [agDir, setAgDir] = useState({ agencies: [], members: {} })   // agencies a customer may see (active plan) and which girl belongs to which
   const [agencyFilter, setAgencyFilter] = useState(null)             // id of the agency whose page is open
   const [custThreads, setCustThreads] = useState([])    // my chats with providers: who replied and I haven't read
@@ -179,6 +180,7 @@ export default function App() {
         if (draftTok) setClaim(draftTok)
         const { data: dir } = await supabase.rpc('agency_directory')
         if (dir?.agencies) setAgDir(dir)
+        supabase.rpc('agency_girl_order').then(({ data: o }) => setAgOrder(Object.fromEntries((o ?? []).map((r) => [r.worker_id, r.pos]))), () => {})
         const agencyPage = takeAgencyPageIntent()      // a link to an agency's page
         if (agencyPage) {
           const ag = dir?.agencies?.find((a) => a.id === agencyPage)
@@ -251,6 +253,7 @@ export default function App() {
   useEffect(() => {
     if (!me?.id || (view !== 'feed' && view !== 'categories')) return
     supabase.rpc('agency_directory').then(({ data }) => { if (data?.agencies) setAgDir(data) })
+    supabase.rpc('agency_girl_order').then(({ data: o }) => setAgOrder(Object.fromEntries((o ?? []).map((r) => [r.worker_id, r.pos]))), () => {})
     supabase.rpc('new_worker_ids').then(({ data }) => setNewIds(Array.isArray(data) ? data : []))
   }, [me?.id, view])
   const unreadByWorker = Object.fromEntries(custThreads.filter((x) => x.unread > 0).map((x) => [x.worker_id, x.unread]))
@@ -385,6 +388,8 @@ export default function App() {
     const badge = (agDir.badges?.[agencyId] ?? true) && !agencyFilter
     return { ...w, canView, is_new: newIds.includes(w.user_id), image: full ?? w.profile_image, agency_id: hasPage ? agencyId : null, agency_logo: badge ? w.agency_logo : null, agency_name: badge ? w.agency_name : null }
   }).filter((w) => !agencyFilter || w.agency_id === agencyFilter)
+    // on the agency's own page the girls it placed come first, in its order; the rest keep the daily random order
+    .sort((a, b) => (agencyFilter ? (agOrder[a.user_id] ?? 1e9) - (agOrder[b.user_id] ?? 1e9) : 0))
   const openedAgency = agencyFilter ? agDir.agencies.find((a) => a.id === agencyFilter) : null
 
   if (phase === 'loading') {

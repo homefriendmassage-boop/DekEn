@@ -667,3 +667,12 @@ Run `supabase/migration_071.sql` once, after migration_070. No Edge Function cha
 ## migration_072 — fewer free clear faces
 
 Run `supabase/migration_072.sql` once, after migration_071. For visitors without a membership the clear (un-blurred) faces per category and per day are now **bartender 4, ENT 4, massage 2**, Spa VIP 0 (unchanged); the set rotates every midnight and bought places still come first. Only `ranked_workers()` changes; the texts in the app are updated.
+
+## migration_073 — agency orders its own page ("จัดอันดับน้อง")
+
+Run `supabase/migration_073.sql` once, after migration_072. No Edge Function change.
+
+- A **paid** agency can order all of its girls (button "↕️ จัดอันดับน้อง" in the girls tab). The order is used **only on the agency's own page**; the shared feed and the clear / blurred faces are untouched.
+- Girls not placed (new girls) follow the placed ones in the normal daily random order. "ล้างลำดับ" gives the order back to the system (random).
+- If the plan lapses the saved order stops being used (visitors get the random order again) and comes back when the plan is paid.
+- Leaving the agency clears the girl's place.

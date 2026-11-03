@@ -169,11 +169,14 @@ function Girls({ flash, reload, paid }) {
     if (error) return flash(errText(error.message))
     flash('นำออกจากสังกัดแล้ว'); load(); reload()
   }
+  const [ordering, setOrdering] = useState(false)
   if (rows === null) return <p className="py-8 text-center text-neutral-500">กำลังโหลด…</p>
   if (rows.length === 0) return <p className="rounded-2xl bg-white/5 p-6 text-center text-neutral-500">ยังไม่มีน้องในสังกัด ส่งลิงก์ให้น้องที่แท็บ "แพ็กเกจ"</p>
   return (
     <>
     {detail && <WorkerDetail worker={detail} agencyView onClose={() => setDetail(null)} />}
+    {ordering && <OrderSheet flash={flash} onClose={() => setOrdering(false)} />}
+    <button onClick={() => (paid ? setOrdering(true) : flash('ชำระแพ็กเกจสังกัดก่อน จึงจะจัดอันดับน้องได้'))} className={`mb-2 w-full rounded-xl py-2.5 text-sm font-bold active:scale-95 ${paid ? 'bg-pink-500' : 'bg-white/10 text-neutral-400'}`}>{paid ? '↕️ จัดอันดับน้อง (เรียงโชว์ในหน้าสังกัด)' : '🔒 จัดอันดับน้อง (ต้องชำระแพ็กเกจ)'}</button>
     <ul className="space-y-2">
       {rows.map((g) => (
         <li key={g.user_id} className="rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
@@ -193,6 +196,49 @@ function Girls({ flash, reload, paid }) {
       ))}
     </ul>
     </>
+  )
+}
+
+// Put the girls in the order the agency wants on its own page; "reset" gives the order back to the system (random every day).
+function OrderSheet({ flash, onClose }) {
+  const [list, setList] = useState(null)
+  const [hasOrder, setHasOrder] = useState(false)
+  useEffect(() => { supabase.rpc('agency_order_list').then(({ data }) => { setList(data ?? []); setHasOrder((data ?? []).some((r) => r.pos != null)) }) }, [])
+  const move = (i, d) => setList((l) => { const j = i + d; if (j < 0 || j >= l.length) return l; const n = [...l]; [n[i], n[j]] = [n[j], n[i]]; return n })
+  async function save() {
+    const { error } = await supabase.rpc('agency_set_order', { p_order: list.map((r) => r.user_id) })
+    if (error) return flash(errText(error.message))
+    flash('บันทึกลำดับแล้ว หน้าสังกัดจะเรียงตามนี้'); onClose()
+  }
+  async function reset() {
+    if (!window.confirm('ล้างลำดับ ให้ระบบสุ่มเรียงให้เองทุกวัน?')) return
+    const { error } = await supabase.rpc('agency_reset_order')
+    if (error) return flash(errText(error.message))
+    flash('กลับเป็นการสุ่มอัตโนมัติแล้ว'); onClose()
+  }
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center sm:p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="max-h-[88vh] w-full max-w-md space-y-3 overflow-y-auto rounded-t-3xl bg-neutral-900 p-5 sm:rounded-3xl">
+        <div className="flex items-center justify-between"><h3 className="text-lg font-bold">↕️ จัดอันดับน้อง</h3><button onClick={onClose} className="rounded-full bg-white/10 px-3 py-1 text-sm">✕</button></div>
+        <p className="text-xs text-neutral-400">เรียงน้องที่ต้องการให้ขึ้นก่อนในหน้าสังกัดของคุณ (กดลูกศรขึ้น-ลง) ใช้กับหน้าสังกัดของคุณเท่านั้น ไม่กระทบฟีดรวม ถ้าไม่จัด หรือกดล้างลำดับ ระบบจะสุ่มให้เองทุกวัน น้องใหม่ที่ยังไม่ได้จัดจะอยู่ต่อท้าย</p>
+        {list === null ? <p className="py-6 text-center text-neutral-500">กำลังโหลด…</p> : (
+          <ul className="space-y-1.5">
+            {list.map((r, i) => (
+              <li key={r.user_id} className="flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-sm">
+                <span className="w-6 shrink-0 text-center text-xs text-neutral-400">{i + 1}</span>
+                <span className="min-w-0 flex-1 truncate font-semibold">{r.display_name}</span>
+                <button disabled={i === 0} onClick={() => move(i, -1)} className="rounded-lg bg-white/10 px-2.5 py-1 disabled:opacity-30">▲</button>
+                <button disabled={i === list.length - 1} onClick={() => move(i, 1)} className="rounded-lg bg-white/10 px-2.5 py-1 disabled:opacity-30">▼</button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="grid grid-cols-2 gap-2 pt-1">
+          <button onClick={save} disabled={!list?.length} className="rounded-xl bg-line py-2.5 font-bold text-black disabled:opacity-40">บันทึกลำดับ</button>
+          <button onClick={reset} disabled={!hasOrder} className="rounded-xl bg-white/10 py-2.5 text-sm disabled:opacity-40">ล้างลำดับ (สุ่มเอง)</button>
+        </div>
+      </div>
+    </div>
   )
 }
 
