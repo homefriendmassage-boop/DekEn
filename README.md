@@ -676,3 +676,12 @@ Run `supabase/migration_073.sql` once, after migration_072. No Edge Function cha
 - Girls not placed (new girls) follow the placed ones in the normal daily random order. "ล้างลำดับ" gives the order back to the system (random).
 - If the plan lapses the saved order stops being used (visitors get the random order again) and comes back when the plan is paid.
 - Leaving the agency clears the girl's place.
+
+## migration_074 — admin checks the public (teaser) photos
+
+Run `supabase/migration_074.sql` once, after migration_073. **Redeploy** the Edge Function `notify-chat` (new Flex "ขอให้แก้โมเสกรูปตัวอย่าง").
+
+- Admin → **🖼️ ตรวจรูปตัวอย่าง**: every provider's public (mosaicked) photos, search by name, "🚩 รอแก้" filter, tap to zoom.
+- **📢 แจ้งแก้**: a Flex to the girl, her agency, or both (with the admin's note); the girl sees a notice on her page and the agency a badge on that girl until the flag is closed.
+- **🎨 วางโมเสกเอง**: the admin opens the private original, places the mosaic circles, previews the public version and replaces the old public file (storage policy `worker-public_admin_insert/delete`). The flag closes by itself.
+- **✓ ปิดเรื่อง** closes a flag without changing the photo.

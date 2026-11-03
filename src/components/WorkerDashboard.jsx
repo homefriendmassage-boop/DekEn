@@ -40,6 +40,8 @@ export default function WorkerDashboard({ userId, onTopUp, me, onWallet, openCha
   }, [])
 
   const [seatReqs, setSeatReqs] = useState([])
+  const [teaserFlag, setTeaserFlag] = useState(null)     // the admin asked her to redo the mosaic of her public photo
+  useEffect(() => { supabase.rpc('my_teaser_flag').then(({ data }) => setTeaserFlag(data?.[0] ?? null), () => {}) }, [])
   const loadAff = useCallback(() => {
     supabase.rpc('my_worker_agency').then(({ data }) => setAff(data?.[0] ?? null))
     supabase.rpc('my_seat_requests').then(({ data }) => setSeatReqs(data ?? []))
@@ -162,6 +164,13 @@ export default function WorkerDashboard({ userId, onTopUp, me, onWallet, openCha
         </section>
       )}
 
+      {teaserFlag && (
+        <section className="space-y-1 rounded-2xl bg-amber-400/10 p-3 ring-1 ring-amber-400/30">
+          <p className="font-semibold">🖼️ แอดมินขอให้แก้โมเสกรูปตัวอย่าง</p>
+          <p className="text-sm text-neutral-200">{teaserFlag.note || 'รูปตัวอย่างยังเห็นหน้า กรุณาวางโมเสกให้ครอบใบหน้าทุกคนในรูป'}</p>
+          <p className="text-xs text-neutral-400">ไปที่โปรไฟล์ของฉัน → แก้ไขรูป แล้วอัปโหลดรูปใหม่พร้อมวางโมเสก (หรือแจ้งแอดมินให้วางให้ได้)</p>
+        </section>
+      )}
       {seatReqs.map((r) => (
         <section key={r.id} className="space-y-2 rounded-2xl bg-amber-400/10 p-3 ring-1 ring-amber-400/30">
           <p className="font-semibold">💺 {r.agency_name} ขอให้ที่นั่งสังกัดแก่คุณ</p>

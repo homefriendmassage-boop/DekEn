@@ -170,6 +170,8 @@ function Girls({ flash, reload, paid }) {
     flash('นำออกจากสังกัดแล้ว'); load(); reload()
   }
   const [ordering, setOrdering] = useState(false)
+  const [flagged, setFlagged] = useState({})
+  useEffect(() => { supabase.rpc('agency_flagged_girls').then(({ data }) => setFlagged(Object.fromEntries((data ?? []).map((r) => [r.worker_id, r.note || true]))), () => {}) }, [])
   if (rows === null) return <p className="py-8 text-center text-neutral-500">กำลังโหลด…</p>
   if (rows.length === 0) return <p className="rounded-2xl bg-white/5 p-6 text-center text-neutral-500">ยังไม่มีน้องในสังกัด ส่งลิงก์ให้น้องที่แท็บ "แพ็กเกจ"</p>
   return (
@@ -187,6 +189,7 @@ function Girls({ flash, reload, paid }) {
             </div>
             <span className={`rounded-full px-2 py-0.5 text-[11px] ${g.listed ? 'bg-green-500/20 text-green-300' : 'bg-neutral-600/40 text-neutral-300'}`}>{g.listed ? 'แสดงอยู่' : 'ไม่แสดง'}</span>
           </div>
+          {flagged[g.user_id] && <p className="mt-1 rounded-lg bg-amber-400/15 px-2 py-1 text-xs text-amber-200">🖼️ แอดมินขอให้แก้โมเสกรูปตัวอย่าง{typeof flagged[g.user_id] === 'string' ? `: ${flagged[g.user_id]}` : ''}</p>}
           <p className="mt-1 text-xs text-neutral-400">จองเดือนนี้ {g.jobs_month} ครั้ง · ส่วนแบ่งสะสม {baht(g.earned)}</p>
           <div className="mt-2 flex gap-2">
             <button onClick={() => openDetail(g)} className={`rounded-lg px-3 py-1 text-xs font-semibold active:scale-95 ${paid ? 'bg-pink-500' : 'bg-white/10 text-neutral-400'}`}>{paid ? 'ดูรูปและรายละเอียด' : '🔒 ดูรูปและรายละเอียด'}</button>

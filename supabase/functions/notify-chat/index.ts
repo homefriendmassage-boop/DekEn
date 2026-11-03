@@ -221,7 +221,30 @@ export function buildAliveFlex(o: { event: string; detail?: string; liffId: stri
 }
 
 // To the person who applied: approved / rejected
+// Admin asks for a new mosaic on a public (teaser) photo: to the girl, or to her agency (event 'flagged_agency', detail = her name + the reason)
+export function buildMosaicFlex(o: { event: string; detail?: string; liffId: string; logo?: string }) {
+  const agency = o.event === 'flagged_agency'
+  const uri = `https://liff.line.me/${o.liffId}?open=${agency ? 'agency' : 'worker'}`
+  return {
+    type: 'flex', altText: '🖼️ แอดมินขอให้วางโมเสกรูปตัวอย่างใหม่',
+    contents: {
+      type: 'bubble', size: 'kilo',
+      styles: { body: { backgroundColor: '#161616' }, footer: { backgroundColor: '#161616' } },
+      body: { type: 'box', layout: 'vertical', spacing: 'md', paddingAll: 'xl', contents: [
+        { type: 'box', layout: 'horizontal', spacing: 'md', alignItems: 'center', contents: [
+          ...(o.logo ? [{ type: 'image', url: o.logo, size: '40px', aspectMode: 'cover', aspectRatio: '1:1', flex: 0 }] : []),
+          { type: 'text', text: '🖼️ ขอให้แก้โมเสกรูปตัวอย่าง', weight: 'bold', size: 'md', color: '#F59E0B', gravity: 'center', wrap: true },
+        ] },
+        { type: 'text', text: agency ? 'รูปตัวอย่างของน้องในสังกัดยังเห็นหน้า' : 'รูปตัวอย่างของคุณยังเห็นหน้า', weight: 'bold', size: 'lg', color: '#FFFFFF', wrap: true },
+        ...(o.detail ? [{ type: 'text', text: o.detail, size: 'sm', color: '#F59E0B', wrap: true }] : []),
+        { type: 'text', text: 'กรุณาแก้ไขรูปและวางโมเสกให้ครอบใบหน้าทุกคนในรูป ภายใน 24 ชม. ถ้าทำเองไม่ได้ แจ้งแอดมินให้วางโมเสกให้ได้', size: 'sm', color: '#DDDDDD', wrap: true },
+      ] },
+      footer: { type: 'box', layout: 'vertical', paddingAll: 'lg', contents: [{ type: 'button', style: 'primary', color: '#F59E0B', height: 'md', action: { type: 'uri', label: agency ? 'เปิดหลังบ้านสังกัด' : 'เปิดหน้าผู้ให้บริการ', uri } }] },
+    },
+  }
+}
 export function buildApprovalFlex(o: { kind: string; event: string; detail?: string; liffId: string; logo?: string }) {
+  if (o.kind === 'mosaic') return buildMosaicFlex(o)
   if (o.kind === 'alive') return buildAliveFlex(o)
   const ok = o.event === 'approved' || o.event === 'paid'
   const what: Record<string, { name: string; open: string; yes: string; no: string; button: string }> = {
