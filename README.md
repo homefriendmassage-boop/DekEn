@@ -663,3 +663,7 @@ Run `supabase/migration_071.sql` once, after migration_070. No Edge Function cha
 - Spots: `apply` (application page, before choosing a category — shows again whenever the page is shown, so after a profile is deleted too), `topup`, `book`, `withdraw`, `share`. A spot with one clip opens it at once; several clips open a pop-up list.
 - Every active clip is also in the **📺 วิธีใช้งาน** button in the top bar, grouped by customer / worker / seller / agency / general.
 - Clips open in YouTube (`liff.openWindow` external), not embedded. The first clip (application) is added by the migration.
+
+## migration_072 — fewer free clear faces
+
+Run `supabase/migration_072.sql` once, after migration_071. For visitors without a membership the clear (un-blurred) faces per category and per day are now **bartender 4, ENT 4, massage 2**, Spa VIP 0 (unchanged); the set rotates every midnight and bought places still come first. Only `ranked_workers()` changes; the texts in the app are updated.

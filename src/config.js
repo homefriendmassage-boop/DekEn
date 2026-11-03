@@ -21,7 +21,7 @@ export const CATEGORIES = ['bartender', 'ent', 'masseuse', 'spa']
 // ---- Membership (mirrors public.can_view_category in migration_002.sql) ----
 // The database is the authority; this copy only drives UI locks and demo data.
 export const MEMBERSHIP_DAYS = 30
-export const FREE_RANK_LIMIT = 10
+export const FREE_RANK_LIMIT = 4
 // Display names/looks for the three paid tiers (the DB only knows tier 1/2/3).
 export const PLAN_META = {
   1: { name: 'Gold', icon: '🥇', badge: 'bg-gradient-to-r from-yellow-200 via-amber-300 to-amber-500 text-black', ring: 'ring-amber-400', soft: 'bg-amber-400/10' },
