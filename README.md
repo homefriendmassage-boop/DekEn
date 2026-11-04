@@ -721,3 +721,12 @@ Run `supabase/migration_076.sql` once, after migration_075. **Redeploy `notify-c
 - One pending request per girl (shared with her own edit requests); she cannot cancel the agency's request; the agency can cancel its own. A rejected request removes the staged pictures.
 - The mosaic editor is shared: `src/components/MosaicEditor.jsx` (also used by the admin "🖼️ ตรวจรูปตัวอย่าง").
 - `supabase/migration_check_056_076.sql` checks which migrations have been run.
+
+## migration_077 — agency pictures: free mosaic on the public picture, fee for admin work
+
+Run `supabase/migration_077.sql` once, after migration_076 (no Edge Function change since 076; `notify-chat` already has the agency Flex).
+
+- **Any approved agency (paid or not)** can add mosaic spots on top of the PUBLIC picture of its own girls ("🎨 เพิ่มโมเสกทับ"): free, no admin, at once. It can only hide more. Each edit keeps the old picture (`agency_mosaic_edits`); the admin tab "🖼️ ตรวจรูปตัวอย่าง" shows "🏢 สังกัดแก้โมเสกเอง" with "↩ ย้อนกลับ". Limit 30 edits per girl per day.
+- **Add / delete / re-place the mosaic from the private original**: paid agencies only, as a request an admin approves (migration_076). The **first** request per girl is free (shared with the girl's own requests), later ones cost `profile_edit_fee` (20 THB) from the **agency Wallet**, refunded to the agency when the request is rejected / cancelled. Mosaics on the public picture are not counted.
+- Unpaid agencies see the public pictures of their girls (never the private originals) and cannot add / delete pictures.
+- `supabase/migration_check_056_077.sql` checks which migrations have been run.

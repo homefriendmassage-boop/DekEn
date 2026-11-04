@@ -49,6 +49,11 @@ export default function TeaserCheck({ toast }) {
     if (error) return toast('ส่งไม่สำเร็จ')
     toast('แจ้งแล้ว'); setFlagging(null); load(0)
   }
+  async function revert(p) {
+    if (!window.confirm('ย้อนกลับเป็นรูปก่อนที่สังกัดแก้โมเสก?')) return
+    const { error } = await supabase.rpc('admin_mosaic_revert', { p_edit: p.agency_edit_id })
+    toast(error ? (error.message.includes('NOT_LATEST') ? 'ย้อนไม่ได้ มีการแก้ใหม่กว่านี้แล้ว' : 'ทำรายการไม่สำเร็จ') : 'ย้อนกลับแล้ว'); load(0)
+  }
   async function resolve(g) {
     await supabase.rpc('admin_teaser_resolve', { p_worker: g.worker_id }); toast('ปิดเรื่องแล้ว'); load(0)
   }
@@ -74,6 +79,12 @@ export default function TeaserCheck({ toast }) {
                   <div key={p.photo_id} className="space-y-1">
                     <button onClick={() => setZoom(p.public_url)} className="block w-full overflow-hidden rounded-xl bg-black active:scale-95"><img src={p.public_url} alt="" loading="lazy" className="aspect-[3/4] w-full object-cover" /></button>
                     <button onClick={() => setEditing(p)} className="w-full rounded-lg bg-pink-500/80 py-1 text-[11px] font-semibold active:scale-95">🎨 วางโมเสกเอง{p.is_cover ? ' (ปก)' : ''}</button>
+                    {p.agency_edit_id && (
+                      <div className="space-y-1 rounded-lg bg-sky-500/10 p-1">
+                        <p className="text-[10px] text-sky-200">🏢 สังกัดแก้โมเสกเอง {new Date(p.agency_edit_at).toLocaleDateString('th-TH')}</p>
+                        <button onClick={() => revert(p)} className="w-full rounded-md bg-white/10 py-1 text-[10px] active:scale-95">↩ ย้อนกลับเป็นรูปก่อนแก้</button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

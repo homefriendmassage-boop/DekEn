@@ -18,7 +18,7 @@ function mosaicCircle(src, cx, cy, r) {
 
 // Place the mosaic again from a private original (admin, or the agency for its own girls).
 // onSave(blob) receives the new PUBLIC picture (a JPEG blob) and uploads / stores it; the original is never changed.
-export default function MosaicEditor({ title, originalPath, onClose, onSave, saveLabel = 'ยืนยัน แทนที่รูปเดิม', toast }) {
+export default function MosaicEditor({ title, originalPath, sourceUrl, onClose, onSave, saveLabel = 'ยืนยัน แทนที่รูปเดิม', toast }) {
   const boxRef = useRef(null)
   const dragging = useRef(-1)
   const [src, setSrc] = useState(null)
@@ -27,6 +27,7 @@ export default function MosaicEditor({ title, originalPath, onClose, onSave, sav
   const [preview, setPreview] = useState(null)
   const [busy, setBusy] = useState(false)
   useEffect(() => {
+    if (sourceUrl) { setSrc(sourceUrl); return }            // add spots on top of the PUBLIC picture (can only hide more)
     supabase.storage.from('worker-originals').createSignedUrl(originalPath, 600).then(({ data, error }) => {
       if (error || !data?.signedUrl) { toast?.('เปิดรูปต้นฉบับไม่ได้'); onClose(); return }
       setSrc(data.signedUrl)

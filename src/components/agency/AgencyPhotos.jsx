@@ -10,22 +10,27 @@ const ERR = {
   NOTHING_TO_CHANGE: 'ยังไม่ได้แก้อะไร',
   PLAN_INACTIVE: 'ชำระแพ็กเกจสังกัดก่อน จึงจะแก้รูปน้องได้',
   ALREADY_STAGED: 'รูปนี้มีรูปใหม่รอส่งอยู่แล้ว',
+  INSUFFICIENT_BALANCE: 'ยอด Wallet ไม่พอสำหรับค่าบริการ กรุณาเติมเงินก่อน',
+  TOO_MANY: 'แก้โมเสกบ่อยเกินไปวันนี้ ลองใหม่พรุ่งนี้',
 }
 const errText = (m = '') => Object.entries(ERR).find(([k]) => m.includes(k))?.[1] ?? 'ทำรายการไม่สำเร็จ'
 const MAX = 5
 
 // The agency edits the pictures of one of its girls: add, delete, place the mosaic again. Nothing goes live until an admin approves the request.
-export default function AgencyPhotos({ girl, onClose, flash, onChanged }) {
+export default function AgencyPhotos({ girl, paid, onClose, flash, onChanged }) {
   const [rows, setRows] = useState(null)
   const [req, setReq] = useState(null)          // her latest request from this agency { status, reject_reason }
   const [marks, setMarks] = useState(new Set()) // live pictures marked for removal
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [fee, setFee] = useState(null)          // { fee, wallet, is_free } of the next add / delete request
+  const [direct, setDirect] = useState(null)    // a picture getting extra mosaic spots (on the public picture, at once)
 
   const load = useCallback(async () => {
-    const [p, r] = await Promise.all([supabase.rpc('agency_girl_photos', { p_worker: girl.user_id }), supabase.rpc('agency_photo_requests')])
+    const [p, r, f] = await Promise.all([supabase.rpc('agency_girl_photos', { p_worker: girl.user_id }), supabase.rpc('agency_photo_requests'), supabase.rpc('agency_photo_fee', { p_worker: girl.user_id })])
     setRows(p.data ?? [])
+    setFee(f.data?.[0] ?? null)
     setReq((r.data ?? []).find((x) => x.worker_id === girl.user_id) ?? null)
   }, [girl.user_id])
   useEffect(() => { load() }, [load])
@@ -74,6 +79,13 @@ export default function AgencyPhotos({ girl, onClose, flash, onChanged }) {
     }
     setBusy(false); load()
   }
+  // extra mosaic spots on the public picture: free, no admin, at once (the old picture is kept so an admin can put it back)
+  async function saveDirect(p, blob) {
+    const up = await uploadPair(girl.user_id, null, blob)
+    const { error } = await supabase.rpc('agency_mosaic_direct', { p_photo: p.id, p_public_url: up.url })
+    if (error) { supabase.storage.from('worker-public').remove([up.pubPath]).catch(() => {}); flash(errText(error.message)); return }
+    flash('บันทึกโมเสกแล้ว มีผลทันที'); setDirect(null); load(); onChanged?.()
+  }
   async function submit() {
     if (!window.confirm('ส่งคำขอแก้ไขรูปให้แอดมินอนุมัติ? รูปใหม่จะแสดงเมื่อแอดมินอนุมัติเท่านั้น')) return
     setBusy(true)
@@ -93,7 +105,7 @@ export default function AgencyPhotos({ girl, onClose, flash, onChanged }) {
     <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 sm:items-center sm:p-4" onClick={onClose} role="dialog" aria-modal="true">
       <div onClick={(e) => e.stopPropagation()} className="max-h-[92vh] w-full max-w-md space-y-3 overflow-y-auto rounded-t-3xl bg-neutral-900 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl sm:rounded-3xl">
         <div className="flex items-center justify-between"><h3 className="text-lg font-bold">🖼️ แก้ไขรูป: {girl.display_name}</h3><button onClick={onClose} className="rounded-full bg-white/10 px-3 py-1 text-sm">✕</button></div>
-        <p className="text-xs text-neutral-400">เพิ่มรูป ลบรูป หรือวางโมเสกใหม่ได้ ทุกการเปลี่ยนแปลงต้องส่งให้แอดมินอนุมัติก่อนจึงจะแสดง (เหมือนที่น้องส่งคำขอแก้รูป) ไม่เสียค่าใช้จ่าย</p>
+        <p className="text-xs text-neutral-400">🎨 เพิ่มโมเสกทับรูปเดิม: ฟรี มีผลทันที ไม่ต้องรออนุมัติ (ใช้ได้ทุกสังกัด) · เพิ่มรูป/ลบรูป/วางใหม่จากต้นฉบับ: สังกัดที่ชำระแพ็กเกจ ส่งคำขอให้แอดมินอนุมัติ คำขอแรกของน้องแต่ละคนฟรี ครั้งต่อไป 20 บาท หักจาก Wallet</p>
         {pending && (
           <div className="space-y-1 rounded-xl bg-amber-400/10 p-3 text-sm text-amber-100">
             <p className="font-semibold">⏳ ส่งคำขอแล้ว รอแอดมินตรวจสอบ</p>
@@ -118,12 +130,15 @@ export default function AgencyPhotos({ girl, onClose, flash, onChanged }) {
                       {gone && <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-red-300">จะถูกลบ</span>}
                       {swap && <span className="absolute inset-0 flex items-center justify-center text-center text-[11px] font-bold text-amber-200">จะถูกแทนที่</span>}
                     </div>
-                    {!pending && (
-                      <div className="grid gap-1">
-                        <button disabled={busy || swap || gone} onClick={() => setEditing(p)} className="rounded-lg bg-pink-500/80 py-1 text-[11px] font-semibold active:scale-95 disabled:opacity-40">🎨 แก้โมเสก</button>
-                        <button disabled={busy || swap} onClick={() => toggle(p.id)} className="rounded-lg bg-white/10 py-1 text-[11px] active:scale-95 disabled:opacity-40">{gone ? '↩ ไม่ลบ' : '🗑 ลบ'}</button>
-                      </div>
-                    )}
+                    <div className="grid gap-1">
+                      <button disabled={busy || swap || gone} onClick={() => setDirect(p)} className="rounded-lg bg-pink-500/80 py-1 text-[11px] font-semibold active:scale-95 disabled:opacity-40">🎨 เพิ่มโมเสกทับ</button>
+                      {!pending && paid && (
+                        <>
+                          <button disabled={busy || swap || gone} onClick={() => setEditing(p)} className="rounded-lg bg-white/10 py-1 text-[11px] active:scale-95 disabled:opacity-40">วางใหม่จากต้นฉบับ</button>
+                          <button disabled={busy || swap} onClick={() => toggle(p.id)} className="rounded-lg bg-white/10 py-1 text-[11px] active:scale-95 disabled:opacity-40">{gone ? '↩ ไม่ลบ' : '🗑 ลบ'}</button>
+                        </>
+                      )}
+                    </div>
                   </li>
                 )
               })}
@@ -142,7 +157,8 @@ export default function AgencyPhotos({ girl, onClose, flash, onChanged }) {
                 </ul>
               </>
             )}
-            {!pending && (
+            {!pending && !paid && <p className="rounded-xl bg-white/5 p-3 text-xs text-neutral-300">เพิ่มรูป / ลบรูป / วางโมเสกใหม่จากรูปต้นฉบับ ต้องชำระแพ็กเกจสังกัดก่อน (ส่วนการเพิ่มจุดโมเสกทับรูปเดิม ทำได้เลยโดยไม่ต้องรออนุมัติ)</p>}
+            {!pending && paid && (
               <>
                 {adding ? (
                   <div className="space-y-2 rounded-2xl bg-white/5 p-3">
@@ -152,6 +168,7 @@ export default function AgencyPhotos({ girl, onClose, flash, onChanged }) {
                 ) : (
                   <button disabled={!canAdd || busy} onClick={() => setAdding(true)} className="w-full rounded-xl bg-white/10 py-2.5 text-sm font-semibold active:scale-95 disabled:opacity-40">➕ เพิ่มรูป {canAdd ? '' : '(เต็ม 5 รูป)'}</button>
                 )}
+                {fee && changed && <p className={`rounded-xl p-2 text-xs ${fee.is_free ? 'bg-green-500/10 text-green-200' : 'bg-amber-400/10 text-amber-100'}`}>{fee.is_free ? 'คำขอแรกของน้องคนนี้ ฟรี' : `ค่าบริการส่งคำขอ ${fee.fee} บาท หักจาก Wallet สังกัด (คืนถ้าไม่ผ่านอนุมัติ) · Wallet ของคุณ ${Number(fee.wallet).toFixed(0)} บาท`}</p>}
                 <button disabled={!changed || busy} onClick={submit} className="w-full rounded-xl bg-line py-3 text-sm font-bold text-black active:scale-95 disabled:opacity-40">
                   {busy ? '…' : `ส่งคำขอให้แอดมินอนุมัติ${changed ? ` (เพิ่ม ${plainAdds} · แทน ${staged.length - plainAdds} · ลบ ${marks.size})` : ''}`}
                 </button>
@@ -160,6 +177,7 @@ export default function AgencyPhotos({ girl, onClose, flash, onChanged }) {
           </>
         )}
       </div>
+      {direct && <MosaicEditor title={girl.display_name} sourceUrl={direct.public_url} toast={flash} saveLabel="ยืนยัน (มีผลทันที)" onClose={() => setDirect(null)} onSave={(blob) => saveDirect(direct, blob)} />}
       {editing && (
         <MosaicEditor title={girl.display_name} originalPath={editing.original_path} toast={flash} saveLabel="ยืนยัน (รอส่งคำขอ)" onClose={() => setEditing(null)}
           onSave={async (blob) => { if (await stage(null, blob, editing.id, editing.original_path)) { flash('บันทึกโมเสกใหม่แล้ว (ยังไม่ส่งคำขอ)'); setEditing(null); load() } }} />
