@@ -8,6 +8,8 @@ import { fileURLToPath } from 'node:url'
 // Two pages: the customer/provider app (index.html) and the separate back office (admin.html).
 export default defineConfig({
   base: process.env.VITE_BASE || '/',
+  // shown in the admin header so you can see which version of the site your phone really loaded
+  define: { __BUILD_ID__: JSON.stringify(`${(process.env.GITHUB_SHA ?? 'local').slice(0, 7)} · ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC`) },
   plugins: [react()],
   build: {
     rollupOptions: {

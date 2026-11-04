@@ -148,7 +148,7 @@ export default function AdminApp() {
       <header className="sticky top-0 z-30 border-b border-white/10 bg-neutral-950/95 px-4 py-3 backdrop-blur">
         <div className="flex items-center justify-between">
           <h1 className="text-lg font-bold">🛠️ Admin</h1>
-          <span className="text-xs text-neutral-400">{adminName}</span>
+          <span className="text-xs text-neutral-400">{adminName} <span className="text-[10px] text-neutral-600">· เวอร์ชัน {typeof __BUILD_ID__ === 'string' ? __BUILD_ID__ : '-'}</span></span>
         </div>
         <nav className="mt-2 flex gap-2 overflow-x-auto">
           {tabs.map(([id, label]) => (
