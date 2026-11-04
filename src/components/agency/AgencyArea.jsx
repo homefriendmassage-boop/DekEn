@@ -6,6 +6,7 @@ import { useI18n } from '../../i18n'
 import ChatModal from '../ChatModal'
 import ShareModal from '../ShareModal'
 import WorkerDetail from '../WorkerDetail'
+import AgencyPhotos from './AgencyPhotos'
 
 const ERRORS = {
   INSUFFICIENT_BALANCE: 'ยอด Wallet ไม่พอ กรุณาเติมเงินก่อน',
@@ -170,6 +171,10 @@ function Girls({ flash, reload, paid }) {
     flash('นำออกจากสังกัดแล้ว'); load(); reload()
   }
   const [ordering, setOrdering] = useState(false)
+  const [photoGirl, setPhotoGirl] = useState(null)       // the girl whose pictures the agency is editing
+  const [photoReqs, setPhotoReqs] = useState({})
+  const loadPhotoReqs = useCallback(() => supabase.rpc('agency_photo_requests').then(({ data }) => { const m = {}; (data ?? []).forEach((r) => { if (!m[r.worker_id]) m[r.worker_id] = r }); setPhotoReqs(m) }, () => {}), [])
+  useEffect(() => { loadPhotoReqs() }, [loadPhotoReqs])
   const [flagged, setFlagged] = useState({})
   useEffect(() => { supabase.rpc('agency_flagged_girls').then(({ data }) => setFlagged(Object.fromEntries((data ?? []).map((r) => [r.worker_id, r.note || true]))), () => {}) }, [])
   if (rows === null) return <p className="py-8 text-center text-neutral-500">กำลังโหลด…</p>
@@ -177,6 +182,7 @@ function Girls({ flash, reload, paid }) {
   return (
     <>
     {detail && <WorkerDetail worker={detail} agencyView onClose={() => setDetail(null)} />}
+    {photoGirl && <AgencyPhotos girl={photoGirl} flash={flash} onChanged={loadPhotoReqs} onClose={() => { setPhotoGirl(null); loadPhotoReqs() }} />}
     {ordering && <OrderSheet flash={flash} onClose={() => setOrdering(false)} />}
     <button onClick={() => (paid ? setOrdering(true) : flash('ชำระแพ็กเกจสังกัดก่อน จึงจะจัดอันดับน้องได้'))} className={`mb-2 w-full rounded-xl py-2.5 text-sm font-bold active:scale-95 ${paid ? 'bg-pink-500' : 'bg-white/10 text-neutral-400'}`}>{paid ? '↕️ จัดอันดับน้อง (เรียงโชว์ในหน้าสังกัด)' : '🔒 จัดอันดับน้อง (ต้องชำระแพ็กเกจ)'}</button>
     <ul className="space-y-2">
@@ -189,10 +195,13 @@ function Girls({ flash, reload, paid }) {
             </div>
             <span className={`rounded-full px-2 py-0.5 text-[11px] ${g.listed ? 'bg-green-500/20 text-green-300' : 'bg-neutral-600/40 text-neutral-300'}`}>{g.listed ? 'แสดงอยู่' : 'ไม่แสดง'}</span>
           </div>
+          {photoReqs[g.user_id]?.status === 'pending' && <p className="mt-1 rounded-lg bg-amber-400/15 px-2 py-1 text-xs text-amber-200">⏳ คำขอแก้ไขรูปรอแอดมินตรวจสอบ</p>}
+          {photoReqs[g.user_id]?.status === 'rejected' && <p className="mt-1 rounded-lg bg-red-500/15 px-2 py-1 text-xs text-red-200">❌ แอดมินไม่อนุมัติรูป{photoReqs[g.user_id].reject_reason ? `: ${photoReqs[g.user_id].reject_reason}` : ''}</p>}
           {flagged[g.user_id] && <p className="mt-1 rounded-lg bg-amber-400/15 px-2 py-1 text-xs text-amber-200">🖼️ แอดมินขอให้แก้โมเสกรูปตัวอย่าง{typeof flagged[g.user_id] === 'string' ? `: ${flagged[g.user_id]}` : ''}</p>}
           <p className="mt-1 text-xs text-neutral-400">จองเดือนนี้ {g.jobs_month} ครั้ง · ส่วนแบ่งสะสม {baht(g.earned)}</p>
           <div className="mt-2 flex gap-2">
             <button onClick={() => openDetail(g)} className={`rounded-lg px-3 py-1 text-xs font-semibold active:scale-95 ${paid ? 'bg-pink-500' : 'bg-white/10 text-neutral-400'}`}>{paid ? 'ดูรูปและรายละเอียด' : '🔒 ดูรูปและรายละเอียด'}</button>
+            <button onClick={() => (paid ? setPhotoGirl(g) : flash('ชำระแพ็กเกจสังกัดก่อน จึงจะแก้รูปน้องได้'))} className={`rounded-lg px-3 py-1 text-xs font-semibold active:scale-95 ${paid ? 'bg-sky-500/80' : 'bg-white/10 text-neutral-400'}`}>{paid ? '🖼️ แก้ไขรูป' : '🔒 แก้ไขรูป'}</button>
             <button onClick={() => remove(g)} className="rounded-lg bg-white/10 px-3 py-1 text-xs active:scale-95">นำออกจากสังกัด</button>
           </div>
         </li>

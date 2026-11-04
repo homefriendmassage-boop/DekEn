@@ -711,3 +711,13 @@ Run `supabase/migration_075.sql` and **redeploy `notify-chat`** at the same time
 - Flex: cancel reasons, refunds, strikes / blocks, disputes (to the admins), reschedule request with accept / decline buttons (`?job=<id>&act=rs_yes|rs_no`), "did not come" with an objection button (`act=obj`).
 - Admin: **⚖️ ข้อพิพาท** (decide: for the reporter / against / nobody at fault) and **🚫 ค่าปรับ/กติกาจอง** (strike counters, unblock, "do not count this event" with a reason, compensation → credit the provider's Wallet, all the numbers of the rules).
 - `supabase/migration_check_056_075.sql` checks which migrations have been run.
+
+## migration_076 — the agency edits its girls' pictures (approved by an admin first)
+
+Run `supabase/migration_076.sql` once, after migration_075. **Redeploy `notify-chat`** (Flex to the agency when its request is approved / rejected).
+
+- Girls tab → **🖼️ แก้ไขรูป** (paid agency, own girls only): add a picture (with the mosaic), delete a picture, or **🎨 place the mosaic again** from the private original (a new public picture that replaces the old one and keeps its place, the card photo stays the card photo).
+- Everything is staged and sent as one request (`profile_edit_requests.requested_by`, free of charge) to the admin tab **แก้ไข/ลบโปรไฟล์** (marked "🏢 ส่งโดยสังกัด …"); nothing is live before approval. The girl gets her usual notice; the agency gets a Flex.
+- One pending request per girl (shared with her own edit requests); she cannot cancel the agency's request; the agency can cancel its own. A rejected request removes the staged pictures.
+- The mosaic editor is shared: `src/components/MosaicEditor.jsx` (also used by the admin "🖼️ ตรวจรูปตัวอย่าง").
+- `supabase/migration_check_056_076.sql` checks which migrations have been run.

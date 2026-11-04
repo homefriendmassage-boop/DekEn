@@ -89,6 +89,7 @@ export default function ProfileEdits({ onChanged, toast }) {
                   <li key={r.id} className="space-y-3 rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
                     <div className="flex items-center justify-between gap-2">
                       <p className="font-bold">{r.current?.display_name ?? r.user_name} <span className="text-xs font-normal text-neutral-400">({r.user_name})</span></p>
+                      {r.by_agency && <p className="text-xs font-semibold text-sky-300">🏢 ส่งโดยสังกัด {r.by_agency}</p>}
                       {r.fee > 0 && <span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-[11px] text-amber-200">ชำระ {baht(r.fee)}</span>}
                     </div>
                     <p className="text-[11px] text-neutral-500">ส่งเมื่อ {fmtDateTime(r.created_at)}{r.reject_reason ? ` · เหตุผลที่ไม่ผ่าน: ${r.reject_reason}` : ''}</p>

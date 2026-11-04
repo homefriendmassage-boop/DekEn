@@ -1,4 +1,4 @@
--- ตรวจว่ารัน migration ถึงไหนแล้ว (056 → 075)
+-- ตรวจว่ารัน migration ถึงไหนแล้ว (056 → 076)
 -- Supabase → SQL Editor → New query → วาง → Run  (อ่านอย่างเดียว ไม่แก้ข้อมูล)
 -- ผลลัพธ์: คอลัมน์ ok = true แปลว่ารันแล้ว, false = ยังไม่ได้รัน (ให้รันตัวที่ false ตามลำดับเลขจากน้อยไปมาก)
 with c(mig, what, ok) as (values
@@ -41,7 +41,9 @@ with c(mig, what, ok) as (values
   ('074', 'ตรวจรูปตัวอย่าง (ตาราง teaser_flags)',
     to_regclass('public.teaser_flags') is not null),
   ('075', 'กติกาการจองใหม่ (ตาราง job_events)',
-    to_regclass('public.job_events') is not null)
+    to_regclass('public.job_events') is not null),
+  ('076', 'สังกัดแก้รูปน้อง (คอลัมน์ requested_by)',
+    exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profile_edit_requests' and column_name = 'requested_by'))
 )
 select mig as migration, what as ตรวจอะไร, ok
   from c
