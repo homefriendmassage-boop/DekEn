@@ -202,6 +202,7 @@ const ADMIN_EVENTS: Record<string, { head: string; text: string; tab: string; co
 export function buildAdminFlex(o: { event: string; detail?: string; liffId: string; logo?: string }) {
   const e = ADMIN_EVENTS[o.event]
   if (!e) return null
+  if (o.event === 'flag' && o.detail !== '4') return null      // only a RED flag (room suspended) is pushed to the admins; yellow / orange wait in the queue
   const detail = o.event === 'flag' ? `ระดับธง ${o.detail === '4' ? '🔴 แดง (ห้องถูกระงับ)' : '🟠 ส้ม'}` : o.detail
   const uri = `https://liff.line.me/${o.liffId}/admin.html?tab=${e.tab}`
   return {
