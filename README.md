@@ -730,3 +730,13 @@ Run `supabase/migration_077.sql` once, after migration_076 (no Edge Function cha
 - **Add / delete / re-place the mosaic from the private original**: paid agencies only, as a request an admin approves (migration_076). The **first** request per girl is free (shared with the girl's own requests), later ones cost `profile_edit_fee` (20 THB) from the **agency Wallet**, refunded to the agency when the request is rejected / cancelled. Mosaics on the public picture are not counted.
 - Unpaid agencies see the public pictures of their girls (never the private originals) and cannot add / delete pictures.
 - `supabase/migration_check_056_077.sql` checks which migrations have been run.
+
+## migration_078 — admin writes to members, appeals, re-opening closed chat rooms
+
+Run `supabase/migration_078.sql` once, after migration_077. **Redeploy `notify-chat`** (Flex "📢 ข้อความจากแอดมิน" and the admin event "⚖️ มีคำขออุทธรณ์ห้องแชต").
+
+- **✉️ ทักแชต**: the admin can write to ANY member at any time (Members → manage, chat-room cards, disputes, fines): a message in the member's "แชทกับแอดมิน" + a LINE Flex (opens `?support=open`); presets for warnings / notices; "เปิดแชต" continues the conversation. `admin_message_user`, `admin_support_open`.
+- Suspending or closing a room tells **both sides why** in their support chat (with a Flex) and how to appeal / answer.
+- **♻️ Reopen** a room that was closed for good (`admin_chat_action(..., 'reopen')`) after the admin and the member agreed; the room is cleared and both can chat again.
+- **⚖️ Appeal**: a member of a suspended / closed room sees "ขออุทธรณ์ / ขอให้เปิดห้องนี้" in the room; the admin gets it in the chat queue (new filter "⚖️ อุทธรณ์", first in the list and in the badge) and in the member's support chat; he reopens / unblocks (the member is told) or declines with a reason (`decline_appeal`).
+- `supabase/migration_check_056_078.sql` checks which migrations have been run.

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { ago, fmtDateTime } from './format'
+import Compose from './Compose'
 
 // Flag colours: 1 noted, 2 yellow, 3 orange, 4 red (the room is suspended automatically)
 const FLAG = [
@@ -32,6 +33,7 @@ export default function Chats({ onChanged, toast }) {
   const [reason, setReason] = useState('')
   const [view, setView] = useState(null)          // opened chat (admin_open_chat result)
   const [note, setNote] = useState('')
+  const [compose, setCompose] = useState(null)      // { id, name } of the member the admin writes to
 
   const load = useCallback(async () => {
     const { data } = await supabase.rpc('admin_chat_queue', { p_filter: filter })
@@ -50,7 +52,8 @@ export default function Chats({ onChanged, toast }) {
     if (!window.confirm(confirmText)) return
     const { error } = await supabase.rpc('admin_chat_action', { p_thread: view.thread.id, p_action: action, p_note: note, p_settle: settle })
     if (error) return toast('ทำรายการไม่สำเร็จ: ' + error.message.slice(0, 80))
-    toast(action === 'unblock' ? 'ปลดบล็อกแล้ว ห้องแชตใช้งานได้ตามปกติ (แจ้งในห้องแชตแล้ว)' : action === 'close' ? (settle === 'pay_worker' ? 'ปิดห้องถาวรแล้ว จ่ายเงินที่ค้างให้น้อง' : 'ปิดห้องถาวรแล้ว คืนเงินที่ค้างให้ลูกค้า') : 'ระงับห้องแล้ว (แจ้งในห้องแชตแล้ว)')
+    if (action === 'reopen' || action === 'decline_appeal') toast(action === 'reopen' ? 'เปิดห้องใหม่แล้ว แจ้งสมาชิกแล้ว' : 'ปฏิเสธอุทธรณ์แล้ว แจ้งสมาชิกแล้ว')
+    else toast(action === 'unblock' ? 'ปลดบล็อกแล้ว ห้องแชตใช้งานได้ตามปกติ (แจ้งในห้องแชตแล้ว)' : action === 'close' ? (settle === 'pay_worker' ? 'ปิดห้องถาวรแล้ว จ่ายเงินที่ค้างให้น้อง' : 'ปิดห้องถาวรแล้ว คืนเงินที่ค้างให้ลูกค้า') : 'ระงับห้องแล้ว (แจ้งในห้องแชตแล้ว)')
     setView(null); load(); onChanged?.()
   }
 
@@ -65,7 +68,7 @@ export default function Chats({ onChanged, toast }) {
     <div className="space-y-4">
       <PartTabs part={part} setPart={setPart} />
       <div className="flex flex-wrap gap-2">
-        {[['pending', 'รอตรวจสอบ'], ['closed', 'ปิดถาวรแล้ว'], ['all', 'ทั้งหมดที่เคยติดธง']].map(([k, label]) => (
+        {[['pending', 'รอตรวจสอบ'], ['appeals', '⚖️ อุทธรณ์'], ['closed', 'ปิดถาวรแล้ว'], ['all', 'ทั้งหมดที่เคยติดธง']].map(([k, label]) => (
           <button key={k} onClick={() => setFilter(k)} className={`rounded-full px-3 py-1.5 text-sm font-semibold ${filter === k ? 'bg-line text-black' : 'bg-white/10'}`}>{label}</button>
         ))}
       </div>
@@ -85,6 +88,11 @@ export default function Chats({ onChanged, toast }) {
               <p className="text-sm font-semibold">{r.customer_name} ↔ {r.worker_name}</p>
               <p className="text-xs text-neutral-400">พยายามส่ง {r.attempts} ครั้ง{r.last_event_at ? ` · ล่าสุด ${ago(r.last_event_at)}` : ''}</p>
               {r.review_note && <p className="text-xs text-neutral-500">หมายเหตุแอดมิน: {r.review_note}</p>}
+              {r.appeal_text && <p className="rounded-lg bg-amber-400/10 p-2 text-xs text-amber-100">⚖️ {r.appeal_by === 'worker' ? 'น้อง' : 'ลูกค้า'}ขออุทธรณ์ {r.appeal_at ? ago(r.appeal_at) : ''}: “{r.appeal_text}”</p>}
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={() => setCompose({ id: r.worker_id, name: r.worker_name })} className="rounded-xl bg-sky-500/80 py-2 text-xs font-bold active:scale-95">✉️ ทักหาน้อง</button>
+                <button onClick={() => setCompose({ id: r.customer_id, name: r.customer_name })} className="rounded-xl bg-sky-500/50 py-2 text-xs font-bold active:scale-95">✉️ ทักหาลูกค้า</button>
+              </div>
               <button onClick={() => { setAsking(r); setReason('') }} className="w-full rounded-xl bg-white/10 py-2 text-sm font-semibold active:scale-95">เปิดอ่านห้องนี้</button>
             </li>
           ))}
@@ -110,9 +118,14 @@ export default function Chats({ onChanged, toast }) {
         </div>
       )}
 
+      {compose && <Compose userId={compose.id} name={compose.name} toast={toast} onClose={() => setCompose(null)} />}
       {view && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3" onClick={() => setView(null)}>
           <div onClick={(e) => e.stopPropagation()} className="flex max-h-[92vh] w-full max-w-2xl flex-col space-y-3 overflow-y-auto rounded-2xl bg-neutral-900 p-4">
+            <div className="flex gap-2">
+              <button onClick={() => setCompose({ id: view.row.worker_id, name: view.row.worker_name })} className="flex-1 rounded-xl bg-sky-500/80 py-1.5 text-xs font-bold">✉️ ทักหาน้อง</button>
+              <button onClick={() => setCompose({ id: view.row.customer_id, name: view.row.customer_name })} className="flex-1 rounded-xl bg-sky-500/50 py-1.5 text-xs font-bold">✉️ ทักหาลูกค้า</button>
+            </div>
             <div className="flex items-start justify-between gap-2">
               <div>
                 <h3 className="font-bold">{view.row.customer_name} ↔ {view.row.worker_name}</h3>
@@ -154,12 +167,22 @@ export default function Chats({ onChanged, toast }) {
                 {view.thread.culprit && <p className="text-xs text-neutral-400">ฝั่งที่ถูกบล็อกบ่อยกว่า: <b className="text-white">{WHO[view.thread.culprit]}</b>{view.thread.held ? ` · เงินค่าแชตที่ค้าง ${view.thread.held.amount} บาท (น้องได้ ${view.thread.held.worker_amount})` : ''}</p>}
                 <div className="grid gap-2 sm:grid-cols-2">
                   {view.thread.status === 'open' && <button onClick={() => act('suspend', 'ระงับห้องแชตนี้ชั่วคราว?')} className="rounded-xl bg-orange-500 py-2 text-sm font-bold text-black active:scale-95">🚫 ระงับห้อง</button>}
+                  {view.row.appeal_text && <button onClick={() => act('decline_appeal', 'ปฏิเสธคำขออุทธรณ์ของห้องนี้? (ห้องยังคงสถานะเดิม สมาชิกจะได้รับแจ้ง)')} className="rounded-xl bg-white/10 py-2 text-sm font-semibold active:scale-95">❌ ปฏิเสธอุทธรณ์</button>}
                   <button onClick={() => act('unblock', 'ปลดบล็อก/ล้างธง ให้แชตต่อได้?')} className="rounded-xl bg-line py-2 text-sm font-bold text-black active:scale-95">✅ ปลดบล็อก / ล้างธง</button>
                   <button onClick={() => act('close', 'ปิดห้องนี้ถาวร และคืนเงินค่าแชตที่ค้างให้ลูกค้า? เปิดอีกไม่ได้', 'refund')} className="rounded-xl bg-red-500 py-2 text-sm font-bold active:scale-95">⛔ ปิดถาวร + คืนเงินลูกค้า</button>
                   {view.thread.culprit !== 'worker' && <button onClick={() => act('close', 'ปิดห้องนี้ถาวร และจ่ายเงินค่าแชตที่ค้างให้น้อง (ลูกค้าไม่ได้คืน)? เปิดอีกไม่ได้', 'pay_worker')} className="rounded-xl bg-red-700 py-2 text-sm font-bold active:scale-95">⛔ ปิดถาวร + จ่ายน้อง</button>}
                 </div>
               </section>
-            ) : <p className="text-sm text-neutral-400">ห้องนี้ปิดถาวรแล้ว</p>}
+            ) : (
+              <section className="space-y-2">
+                <p className="text-sm text-neutral-400">ห้องนี้ปิดถาวรแล้ว ถ้าคุยตกลงกับสมาชิกแล้ว เปิดให้ใช้งานใหม่ได้</p>
+                <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} placeholder="หมายเหตุ (สมาชิกเห็นในข้อความแจ้ง)" className="w-full rounded-xl bg-white/10 px-3 py-2 text-sm" />
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <button onClick={() => act('reopen', 'เปิดห้องนี้ให้ใช้งานใหม่? (ล้างธงทั้งหมด สมาชิกจะได้รับแจ้ง)')} className="rounded-xl bg-line py-2 text-sm font-bold text-black active:scale-95">♻️ เปิดห้องใหม่ (หลังตกลงกันแล้ว)</button>
+                  <button onClick={() => act('decline_appeal', 'ปฏิเสธคำขออุทธรณ์ของห้องนี้?')} className="rounded-xl bg-white/10 py-2 text-sm font-semibold active:scale-95">❌ ปฏิเสธอุทธรณ์</button>
+                </div>
+              </section>
+            )}
           </div>
         </div>
       )}

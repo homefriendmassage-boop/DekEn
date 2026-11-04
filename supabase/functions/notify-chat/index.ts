@@ -195,6 +195,7 @@ const ADMIN_EVENTS: Record<string, { head: string; text: string; tab: string; co
   report: { head: '🚩 มีรายงานจากผู้ใช้', text: 'ตรวจรายงานแล้วดำเนินการ', tab: 'chats', color: '#EF4444', button: 'เปิดหน้าธง/รายงาน' },
   identity: { head: '🪪 ขอยืนยันตัวตนเพื่อถอนเงิน', text: 'ตรวจข้อมูลและยืนยันตัวตนทาง LINE แล้วกดอนุมัติ', tab: 'withdrawals', color: '#F59E0B', button: 'เปิดหน้าถอนเงิน' },
   withdraw: { head: '💸 มีคำขอถอนเงิน', text: 'โอนเงินตามยอดสุทธิ แล้วบันทึกเลขอ้างอิงสลิป', tab: 'withdrawals', color: '#F59E0B', button: 'เปิดหน้าถอนเงิน' },
+  appeal: { head: '⚖️ มีคำขออุทธรณ์ห้องแชต', text: 'สมาชิกขอให้เปิดห้องแชตที่ถูกระงับ/ปิด ตรวจแล้วเปิดห้องให้หรือปฏิเสธพร้อมเหตุผล', tab: 'chats', color: '#F59E0B', button: 'เปิดหน้าห้องแชต' },
   dispute: { head: '⚖️ มีข้อพิพาทการจอง', text: 'มีคนแจ้งปัญหาเรื่องงาน รอแอดมินตัดสิน (ระบบพักเงินไว้ ไม่คืนอัตโนมัติ)', tab: 'disputes', color: '#F59E0B', button: 'เปิดหน้าข้อพิพาท' },
   slip: { head: '🔎 มีสลิปรอตรวจ', text: 'ระบบตรวจสลิปอัตโนมัติไม่ผ่าน ต้องให้แอดมินตัดสิน', tab: 'reviews', color: '#F59E0B', button: 'เปิดหน้าตรวจสลิป' },
 }
@@ -303,6 +304,25 @@ export function buildApprovalFlex(o: { kind: string; event: string; detail?: str
         ...(o.event === 'paid' && o.detail ? [{ type: 'text', text: `ยอดโอนสุทธิ ${o.detail} บาท`, weight: 'bold', size: 'md', color: '#FFFFFF', wrap: true }] : []),
       ] },
       footer: { type: 'box', layout: 'vertical', paddingAll: 'lg', contents: [{ type: 'button', style: 'primary', color: ok ? '#06C755' : '#EC4899', height: 'md', action: { type: 'uri', label: w.button, uri } }] },
+    },
+  }
+}
+// A message the admin wrote to a member (warning / notice): the button opens "แชทกับแอดมิน" so he can read all of it and answer
+export function buildAdminMsgFlex(o: { text?: string; liffId: string; logo?: string }) {
+  return {
+    type: 'flex', altText: '📢 ข้อความจากแอดมิน',
+    contents: {
+      type: 'bubble', size: 'kilo',
+      styles: { body: { backgroundColor: '#161616' }, footer: { backgroundColor: '#161616' } },
+      body: { type: 'box', layout: 'vertical', spacing: 'md', paddingAll: 'xl', contents: [
+        { type: 'box', layout: 'horizontal', spacing: 'md', alignItems: 'center', contents: [
+          ...(o.logo ? [{ type: 'image', url: o.logo, size: '40px', aspectMode: 'cover', aspectRatio: '1:1', flex: 0 }] : []),
+          { type: 'text', text: '📢 ข้อความจากแอดมิน', weight: 'bold', size: 'md', color: '#F59E0B', gravity: 'center', wrap: true },
+        ] },
+        ...(o.text ? [{ type: 'text', text: o.text, size: 'sm', color: '#FFFFFF', wrap: true }] : []),
+        { type: 'text', text: 'กดปุ่มเพื่ออ่านข้อความเต็มและตอบกลับแอดมิน', size: 'xs', color: '#9CA3AF', wrap: true },
+      ] },
+      footer: { type: 'box', layout: 'vertical', paddingAll: 'lg', contents: [{ type: 'button', style: 'primary', color: '#F59E0B', height: 'md', action: { type: 'uri', label: 'อ่านและตอบกลับ', uri: `https://liff.line.me/${o.liffId}?support=open` } }] },
     },
   }
 }
@@ -433,8 +453,9 @@ Deno.serve(async (req) => {
   const isPayment = input.type === 'payment'
   const isSeat = input.type === 'seat'
   const isStrike = input.type === 'strike'
+  const isAdminMsg = input.type === 'admin_msg'
   const isSeller = input.type === 'seller' || input.type === 'agency'     // plan Flex (seller / agency): input.type tells which
-  if (!isBooking && !isSupport && !isSeller && !isAdminPush && !isApproval && !isPayment && !isSeat && !isStrike && (!thread_id || !recipient_id || !sender_id)) return json({ ok: false, code: 'BAD_INPUT' }, 400)
+  if (!isBooking && !isSupport && !isSeller && !isAdminPush && !isApproval && !isPayment && !isSeat && !isStrike && !isAdminMsg && (!thread_id || !recipient_id || !sender_id)) return json({ ok: false, code: 'BAD_INPUT' }, 400)
   if (isSupport && !input.thread_id) return json({ ok: false, code: 'BAD_INPUT' }, 400)
   if (isSeller && !input.user_id) return json({ ok: false, code: 'BAD_INPUT' }, 400)
   if (isBooking && (!input.job_id || !input.event)) return json({ ok: false, code: 'BAD_INPUT' }, 400)
@@ -442,6 +463,18 @@ Deno.serve(async (req) => {
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
   const central = { token, liffId }
+  if (isAdminMsg) {
+    const rs = await recipient(admin, input.user_id, central)
+    if (!rs || !/^U[0-9a-f]{32}$/.test(rs.lineId)) return json({ ok: true, status: 'NO_LINE_ID' })
+    const appUrl = Deno.env.get('APP_URL')?.replace(/\/$/, '')
+    const message = buildAdminMsgFlex({ text: input.detail ? String(input.detail) : undefined, liffId: rs.liffId, logo: appUrl ? `${appUrl}/dekn-logo.jpg?v=2` : undefined })
+    const r = await fetch('https://api.line.me/v2/bot/message/push', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${rs.token}`, 'Content-Type': 'application/json', 'X-Line-Retry-Key': crypto.randomUUID() },
+      body: JSON.stringify({ to: rs.lineId, messages: [message] }),
+    })
+    return json({ ok: r.ok, status: r.ok ? 'SENT' : 'FAILED' })
+  }
   if (isStrike) {
     const rs = await recipient(admin, input.user_id, central)
     if (!rs || !/^U[0-9a-f]{32}$/.test(rs.lineId)) return json({ ok: true, status: 'NO_LINE_ID' })

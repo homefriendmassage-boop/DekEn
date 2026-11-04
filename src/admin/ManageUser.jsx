@@ -1,3 +1,4 @@
+import Compose from './Compose'
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { PLAN_META } from '../config'
@@ -18,6 +19,7 @@ const toLocalDate = (iso) => new Date(iso).toLocaleDateString('en-CA') // yyyy-m
 
 // Per-user controls. Every action needs a reason and is written to the audit trail (membership_events).
 export default function ManageUser({ userId, onClose, onChanged, toast }) {
+  const [composing, setComposing] = useState(false)
   const [u, setU] = useState(null)
   const [busy, setBusy] = useState(false)
   const [tier, setTier] = useState(1)
@@ -66,6 +68,7 @@ export default function ManageUser({ userId, onClose, onChanged, toast }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center sm:p-4" onClick={onClose} role="dialog" aria-modal="true">
+      {composing && <Compose userId={userId} name={u.display_name} toast={toast} onClose={() => setComposing(false)} />}
       <div onClick={(e) => e.stopPropagation()} className="max-h-[92vh] w-full max-w-md space-y-4 overflow-y-auto rounded-t-3xl bg-neutral-900 p-5 shadow-2xl sm:rounded-3xl">
         <div>
           <h2 className="text-lg font-bold">{u.display_name ?? '—'}{vendorName && <span className="ml-2 rounded-full bg-amber-400/20 px-2 py-0.5 text-xs font-semibold text-amber-300">🏪 {vendorName}</span>}</h2>
@@ -135,6 +138,7 @@ export default function ManageUser({ userId, onClose, onChanged, toast }) {
           </section>
         )}
 
+        <button onClick={() => setComposing(true)} className="w-full rounded-xl bg-sky-500/80 py-2.5 text-sm font-bold active:scale-95">✉️ ทักแชตสมาชิกคนนี้ (ตักเตือน/แจ้งให้ทราบ)</button>
         <button onClick={onClose} className="w-full rounded-xl bg-white/10 py-3 font-semibold active:scale-95">ปิด</button>
       </div>
     </div>

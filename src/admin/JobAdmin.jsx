@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { fmtDateTime } from './format'
+import Compose from './Compose'
 
 const SETTINGS = [
   ['response_minutes', 'job_response_minutes', 'เวลาที่น้องต้องตอบ (นาที) 5–180 · แนะนำ 15/30/60'],
@@ -42,6 +43,7 @@ function Strikes({ toast }) {
   const [events, setEvents] = useState(null)       // { worker, list }
   const [q, setQ] = useState('')
   const [found, setFound] = useState([])
+  const [compose, setCompose] = useState(null)
   const load = useCallback(async () => { const { data } = await supabase.rpc('admin_strikes'); setRows(data ?? []) }, [])
   useEffect(() => { load() }, [load])
   async function show(w) { const { data } = await supabase.rpc('admin_job_events', { p_worker: w.worker_id ?? w.id }); setEvents({ worker: { id: w.worker_id ?? w.id, name: w.name ?? w.display_name }, list: data ?? [] }) }
@@ -80,7 +82,8 @@ function Strikes({ toast }) {
               <div className="flex items-center justify-between gap-2"><p className="font-bold">{w.name}</p>
                 {w.blocked && <span className="rounded-full bg-red-500/20 px-2 py-0.5 text-[11px] text-red-300">🚫 บล็อก{w.block_kind === 'imposter' ? ' (คนอื่นแทน)' : ` · ค่าปรับ ${w.fine_due}`}</span>}</div>
               <p className="text-xs text-neutral-400">ผิดนัดสะสม {w.strikes} ครั้ง</p>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2">
+                <button onClick={() => setCompose({ id: w.worker_id, name: w.name })} className="rounded-lg bg-sky-500/70 py-1.5 text-xs font-bold active:scale-95">✉️ ทัก</button>
                 <button onClick={() => show(w)} className="rounded-lg bg-white/10 py-1.5 text-xs active:scale-95">ดูรายการ</button>
                 <button onClick={() => setCount(w)} className="rounded-lg bg-amber-400 py-1.5 text-xs font-bold text-black active:scale-95">ปรับตัวนับ</button>
                 {w.blocked && <button onClick={() => unblock(w)} className="rounded-lg bg-line py-1.5 text-xs font-bold text-black active:scale-95">ปลดบล็อก</button>}
@@ -94,6 +97,7 @@ function Strikes({ toast }) {
         <div className="flex gap-2"><input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && search()} placeholder="ชื่อน้อง" className="min-w-0 flex-1 rounded-xl bg-white/10 px-3 py-2 text-base outline-none ring-1 ring-white/10 focus:ring-line" /><button onClick={search} className="rounded-xl bg-white/10 px-4 text-sm">ค้นหา</button></div>
         {found.map((f) => <button key={f.id} onClick={() => show(f)} className="block w-full rounded-lg bg-white/5 px-3 py-2 text-left text-sm">{f.display_name}</button>)}
       </div>
+      {compose && <Compose userId={compose.id} name={compose.name} toast={toast} onClose={() => setCompose(null)} />}
       {events && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center" onClick={() => setEvents(null)}>
           <div onClick={(e) => e.stopPropagation()} className="max-h-[85vh] w-full max-w-md space-y-2 overflow-y-auto rounded-t-3xl bg-neutral-900 p-5 sm:rounded-3xl">

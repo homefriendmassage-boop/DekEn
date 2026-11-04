@@ -19,6 +19,9 @@ export default function ChatModal({ threadId, title, meId, onClose, onTopUp, onR
   const [needTopup, setNeedTopup] = useState(false)
   const [room, setRoom] = useState('open')    // open | suspended | closed (an admin can stop a room)
   const [reporting, setReporting] = useState(false)
+  const [appeal, setAppeal] = useState(null)       // my latest appeal of this room: { status, text, note }
+  const [appealing, setAppealing] = useState(false)
+  const [appealText, setAppealText] = useState('')
   const [rep, setRep] = useState({ reason: 'contact', note: '' })
   const [repMsg, setRepMsg] = useState(null)
 
@@ -30,7 +33,13 @@ export default function ChatModal({ threadId, title, meId, onClose, onTopUp, onR
   const loadRoom = useCallback(async () => {
     const { data } = await supabase.from('chat_threads').select('status').eq('id', threadId).maybeSingle()
     if (data) setRoom(data.status)
+    if (data && data.status !== 'open') supabase.rpc('chat_appeal_status', { p_thread: threadId }).then(({ data: a }) => setAppeal(a?.[0] ?? null), () => {})
   }, [threadId])
+  async function sendAppeal() {
+    const { error } = await supabase.rpc('chat_appeal', { p_thread: threadId, p_text: appealText })
+    if (error) return setError(error.message.includes('ALREADY') ? 'ส่งอุทธรณ์ไปแล้ว รอแอดมินตรวจสอบ' : 'ส่งอุทธรณ์ไม่สำเร็จ')
+    setAppealing(false); setAppealText(''); loadRoom()
+  }
 
   const load = useCallback(async () => {
     const { data } = await supabase.from('chat_messages')
@@ -109,7 +118,18 @@ export default function ChatModal({ threadId, title, meId, onClose, onTopUp, onR
 
         <p className="px-4 pt-2 text-[11px] text-neutral-500">{t('chatNote')} {t('chatReviewNote')}</p>
         {room !== 'open' && (
-          <p className="mx-4 mt-2 rounded-lg bg-red-500/15 p-2 text-sm font-semibold text-red-200">🚫 {t(room === 'closed' ? 'roomClosed' : 'roomSuspended')}</p>
+          <div className="mx-4 mt-2 space-y-2 rounded-lg bg-red-500/15 p-2 text-sm text-red-200">
+            <p className="font-semibold">🚫 {t(room === 'closed' ? 'roomClosed' : 'roomSuspended')}</p>
+            {appeal?.status === 'open' && <p className="rounded-lg bg-amber-400/15 p-2 text-xs text-amber-100">⏳ ส่งคำขออุทธรณ์แล้ว รอแอดมินตรวจสอบ (แอดมินอาจทักแชตหาคุณทาง "แชทกับแอดมิน")</p>}
+            {appeal?.status === 'declined' && <p className="rounded-lg bg-white/10 p-2 text-xs text-neutral-200">คำขอครั้งก่อนไม่ได้รับการเปิดห้อง{appeal.note ? `: ${appeal.note}` : ''}</p>}
+            {appeal?.status !== 'open' && !appealing && <button onClick={() => setAppealing(true)} className="w-full rounded-lg bg-white/10 py-1.5 text-xs font-bold text-white active:scale-95">⚖️ ขออุทธรณ์ / ขอให้เปิดห้องนี้</button>}
+            {appealing && (
+              <div className="space-y-1">
+                <textarea rows={3} maxLength={500} value={appealText} onChange={(e) => setAppealText(e.target.value)} placeholder="ชี้แจงเหตุผล (แอดมินจะพิจารณาและอาจติดต่อกลับ)" className="w-full rounded-lg bg-black/30 px-2 py-1.5 text-sm text-white outline-none" />
+                <div className="grid grid-cols-2 gap-2"><button onClick={() => setAppealing(false)} className="rounded-lg bg-white/10 py-1.5 text-xs">ยกเลิก</button><button disabled={appealText.trim().length < 3} onClick={sendAppeal} className="rounded-lg bg-amber-400 py-1.5 text-xs font-bold text-black disabled:opacity-40">ส่งคำขอ</button></div>
+              </div>
+            )}
+          </div>
         )}
         {banner && (
           <p className="mx-4 mt-2 rounded-lg bg-amber-400/10 p-2 text-xs text-amber-200">

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { fmtDateTime } from './format'
+import Compose from './Compose'
 
 const KIND = { worker_noshow: 'น้องไม่มาตามนัด (น้องกดถึงแล้วไว้)', imposter: 'คนอื่นมาแทน / ไม่ใช่คนในโปรไฟล์', mismatch: 'ไม่ตรงปกมาก', other: 'ปัญหาอื่น', customer_noshow_claim: 'น้องแจ้งว่าลูกค้าไม่มา (ลูกค้าคัดค้าน)' }
 const RES = { customer: 'เห็นด้วยกับผู้แจ้ง', worker: 'ไม่เห็นด้วย (ฝ่ายตรงข้ามถูก)', none: 'ไม่ผิดใคร' }
@@ -12,6 +13,7 @@ export default function Disputes({ toast, onChanged }) {
   const [dec, setDec] = useState(null)        // { job, decision }
   const [note, setNote] = useState('')
   const [strike, setStrike] = useState(true)
+  const [compose, setCompose] = useState(null)
   const load = useCallback(async () => {
     setRows(null)
     const { data, error } = await supabase.rpc('admin_disputes', { p_open: open })
@@ -48,6 +50,10 @@ export default function Disputes({ toast, onChanged }) {
               <p className="text-xs text-neutral-300">ลูกค้า: <b>{j.customer_name}</b> · น้อง: <b>{j.worker_name}</b> · ค่าจอง {j.booking_fee} บาท</p>
               <p className="text-xs text-neutral-400">นัด {j.scheduled_at ? fmtDateTime(j.scheduled_at) : '—'}{j.arrived_at ? ` · น้องกดถึงแล้ว ${fmtDateTime(j.arrived_at)}` : ' · น้องไม่ได้กดถึงแล้ว'}{j.customer_noshow_at ? ` · น้องรายงานลูกค้าไม่มา ${fmtDateTime(j.customer_noshow_at)}` : ''}</p>
               {j.dispute_note && <p className="rounded-lg bg-black/30 p-2 text-xs">💬 ผู้แจ้ง: {j.dispute_note}</p>}
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={() => setCompose({ id: j.worker_id, name: j.worker_name })} className="rounded-lg bg-sky-500/70 py-1.5 text-xs font-bold active:scale-95">✉️ ทักหาน้อง</button>
+                <button onClick={() => setCompose({ id: j.customer_id, name: j.customer_name })} className="rounded-lg bg-sky-500/40 py-1.5 text-xs font-bold active:scale-95">✉️ ทักหาลูกค้า</button>
+              </div>
               <p className="text-[11px] text-neutral-500">สถิติน้อง 90 วัน: {w90(j.worker_90d)} · ลูกค้าผิดนัด/ยกเลิก 90 วัน: {j.customer_90d}</p>
               {open ? (
                 <div className="grid grid-cols-3 gap-2">
@@ -60,6 +66,7 @@ export default function Disputes({ toast, onChanged }) {
           ))}
         </ul>
       )}
+      {compose && <Compose userId={compose.id} name={compose.name} toast={toast} onClose={() => setCompose(null)} />}
       {dec && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center" onClick={() => setDec(null)}>
           <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md space-y-3 rounded-t-3xl bg-neutral-900 p-5 sm:rounded-3xl">
