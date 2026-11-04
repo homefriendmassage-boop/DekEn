@@ -7,7 +7,7 @@ import { inviteBubble } from '../lib/flex'
 import { DRAFT_STATUS, draftLink } from '../lib/drafts'
 import { ago, fmtDateTime } from '../admin/format'
 
-const GROUP = { night: '🍸 ชงเหล้า/ENT', spa: '💆 หมอนวด/สปา VIP' }
+const GROUP = { night: '🍸 ชงเหล้า/ENT/PR ร้าน', spa: '💆 หมอนวด/สปา VIP' }
 const ERR = { TOO_MANY_DRAFTS: 'มีแบบร่างที่ใช้งานอยู่ครบ 40 ใบแล้ว ลบหรือซ่อนบางใบก่อน', PLAN_INACTIVE: 'แพ็กเกจสังกัดยังไม่เปิด/หมดอายุ', NOT_APPROVED: 'แอดมินยังไม่อนุมัติแบบร่างนี้', NO_PHOTO: 'ต้องมีรูปอย่างน้อย 1 ภาพ', LOCKED: 'ทำรายการนี้ไม่ได้ในสถานะปัจจุบัน' }
 const errText = (m = '') => ERR[Object.keys(ERR).find((k) => m.includes(k))] ?? 'ทำรายการไม่สำเร็จ'
 

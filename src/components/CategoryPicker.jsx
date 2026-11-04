@@ -1,7 +1,7 @@
 import { CATEGORIES, MIN_TIER, PLAN_META } from '../config'
 import { useI18n } from '../i18n'
 
-const EMOJI = { bartender: '🍸', ent: '🎤', masseuse: '💆', spa: '🧖' }
+const EMOJI = { bartender: '🍸', ent: '🎤', pr: '📣', masseuse: '💆', spa: '🧖' }
 
 // Category tiles. Every tile opens its list: in the paid groups (massage / spa) a visitor without the package sees the girls with
 // the face covered and cannot open the details until he subscribes (HomeFeed). The lock label tells which package is needed.

@@ -750,3 +750,14 @@ Run `supabase/migration_079.sql` once, after migration_078 (no Edge Function cha
 - Admin chat cards of a **closed** room show **♻️ เปิดห้องใหม่** directly (and **❌ ปฏิเสธอุทธรณ์** when there is an appeal); no need to open the room first.
 - Admin → application cards: **✉️ ทักแชตผู้สมัคร** (advise, or send the preset "ให้ทัก LINE DekEn โดยตรง").
 - `supabase/migration_check_056_079.sql` checks which migrations have been run.
+
+## migration_080 + the "PR ร้าน" category
+
+Run `supabase/migration_080.sql` once, after migration_079 (no Edge Function change). Then deploy the website (push to `main`).
+
+- New category `pr` ("PR ร้าน") inside the night group, separate from bartender / ENT: free viewers see 4 clear faces a day, a package opens the rest (same rules as bartender / ENT); link sharing and joining a modelling agency work as for them.
+- The night group now has the optional "รูปแบบการให้บริการ" (shop / outcall / both): shown on the profile only, the booking flow does not use it.
+- PR girls can keep a regular venue name and a venue map pin (`set_my_venue`), changed by herself at any time without admin approval; customers who can open her profile see it (`worker_venue`).
+- New "introduce yourself" choices for PR: table care, menu & promotions, lively atmosphere, regular at this venue, venue events.
+- `supabase/migration_check_056_080.sql` checks which migrations have been run.
+

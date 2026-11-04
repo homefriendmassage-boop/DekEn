@@ -18,7 +18,7 @@ export const BANK = {
   holder: import.meta.env.VITE_BANK_ACCOUNT_NAME // account holder name
 }
 
-export const CATEGORIES = ['bartender', 'ent', 'masseuse', 'spa']
+export const CATEGORIES = ['bartender', 'ent', 'pr', 'masseuse', 'spa']
 
 // ---- Membership (mirrors public.can_view_category in migration_002.sql) ----
 // The database is the authority; this copy only drives UI locks and demo data.
@@ -36,7 +36,7 @@ export const PLANS = [
   { tier: 3, price: 300 },
 ]
 // Lowest tier that can open each category at all.
-export const MIN_TIER = { bartender: 0, ent: 0, masseuse: 2, spa: 3 }
+export const MIN_TIER = { bartender: 0, ent: 0, pr: 0, masseuse: 2, spa: 3 }
 
 export const canViewWorker = (category, rank, tier) =>
   tier >= (MIN_TIER[category] ?? 3) && (tier > 0 || rank <= FREE_RANK_LIMIT)

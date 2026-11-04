@@ -146,7 +146,7 @@ export default function App() {
         if (openIntent === 'plans') { setView('categories'); setMembershipMin(0); setShowMembership(true) } // opened from a renewal reminder
         if (openIntent === 'share') { setView('categories'); setShowShare(true) }       // opened from the new seller's Flex
         if (openIntent === 'seller') { setView('categories'); setShowSeller(true) }     // seller plan reminder
-        if (['bartender', 'ent', 'masseuse', 'spa'].includes(openIntent)) openCategory(openIntent)     // payment Flex: straight to that group
+        if (['bartender', 'ent', 'pr', 'masseuse', 'spa'].includes(openIntent)) openCategory(openIntent)     // payment Flex: straight to that group
         if (openIntent === 'wallet') { setView('categories'); setShowWallet(true) }              // withdrawal / identity Flex
         if (openIntent === 'alive') { setView('worker'); setWorkerTab('self'); showToast('ยืนยันแล้ว ขอบคุณค่ะ โปรไฟล์ของคุณแสดงตามปกติ') }   // "still working?" Flex: opening the app is the confirmation
         if (openIntent === 'worker') { setView('worker'); setWorkerTab('self') }     // approval Flex

@@ -4,6 +4,7 @@ import { useI18n } from '../i18n'
 import WorkerFields, { groupOf, profileFromRow, profileToPayload, validateProfile } from './WorkerFields'
 import { getPosition } from '../lib/geo'
 import { feeFor } from '../lib/booking'
+import { VenueEditor } from './Venue'
 import PhotoManager from './PhotoManager'
 import { LocBadge, ratesOf } from './WorkerDetail'
 
@@ -159,6 +160,8 @@ export default function ProfileSection({ worker, userId, onChanged, onTopUp }) {
       )}
       {msg && <p className="text-sm text-green-400">{msg}</p>}
       {error && <p className="rounded-lg bg-red-500/10 p-2 text-sm text-red-300">{error}</p>}
+
+      <VenueEditor worker={worker} />
 
       <div className="space-y-3 rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
         <div className="flex flex-wrap items-center gap-2">

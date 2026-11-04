@@ -1,5 +1,6 @@
 import ImageViewer from './ImageViewer'
 import LinkSheet from './LinkSheet'
+import { VenueView } from './Venue'
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useI18n } from '../i18n'
@@ -157,6 +158,8 @@ export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlo
           </div>
           {!w.canView && <p className="rounded-xl bg-amber-400/10 p-3 text-xs text-amber-200">{t('blurredNote')}</p>}
           {w.claimed === false && <p className="rounded-xl bg-amber-400/10 p-3 text-xs text-amber-200">⏳ {t('unclaimedNote')}</p>}
+
+          <VenueView worker={w} />
 
           {facts.length > 0 && (
             <dl className="grid grid-cols-2 gap-2">

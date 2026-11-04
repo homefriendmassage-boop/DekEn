@@ -11,7 +11,7 @@ import { inviteBubble } from '../lib/flex'
 import { applyLink } from '../lib/drafts'
 import WorkerFields, { GROUP_CATEGORIES, groupOf, profileFromRow, profileToPayload, validateProfile } from '../components/WorkerFields'
 
-const CAT = { bartender: 'ชงเหล้า', ent: 'ENT', masseuse: 'หมอนวด', spa: 'สปา VIP' }
+const CAT = { bartender: 'ชงเหล้า', ent: 'ENT', pr: 'PR ร้าน', masseuse: 'หมอนวด', spa: 'สปา VIP' }
 const FILTERS = [['pending', 'รอตรวจ'], ['approved', 'อนุมัติแล้ว'], ['rejected', 'ไม่ผ่าน']]
 
 export default function Applications({ onChanged, toast }) {
@@ -112,7 +112,7 @@ function Card({ a, linePic, onReview, onChanged, toast }) {
         {a.gender && <><dt className="text-neutral-400">ข้อมูล</dt><dd>{{ female: 'หญิง', male: 'ชาย', lgbt: 'LGBT' }[a.gender]} · อายุ {a.age ?? '—'} · สูง {a.height_cm ?? '—'} ซม. · หนัก {a.weight_kg ?? '—'} กก. · สัดส่วน {a.measurements ?? '—'}</dd></>}
         {a.tags?.length > 0 && <><dt className="text-neutral-400">บุคลิก</dt><dd>{a.tags.map((k) => (t(`tag_${k}`) === `tag_${k}` ? k : t(`tag_${k}`))).join(', ')}</dd></>}
         {a.about && <><dt className="text-neutral-400">แนะนำตัว</dt><dd className="whitespace-pre-wrap break-words">{a.about}</dd></>}
-        <dt className="text-neutral-400">กลุ่มงาน</dt><dd>{a.grp === 'spa' ? '💆 หมอนวด/สปา VIP' : '🍸 ชงเหล้า/ENT'}{a.service_mode ? ` · ${{ shop: 'ที่ร้าน', outcall: 'ไปหาลูกค้า', both: 'ทั้งสองแบบ' }[a.service_mode]}` : ''}</dd>
+        <dt className="text-neutral-400">กลุ่มงาน</dt><dd>{a.grp === 'spa' ? '💆 หมอนวด/สปา VIP' : '🍸 ชงเหล้า/ENT/PR ร้าน'}{a.service_mode ? ` · ${{ shop: 'ที่ร้าน', outcall: 'ไปหาลูกค้า', both: 'ทั้งสองแบบ' }[a.service_mode]}` : ''}</dd>
         <dt className="text-neutral-400">ราคาเริ่มต้นครั้งแรก</dt><dd>{a.start_rate === '@60' ? '60 นาที' : a.start_rate === '@90' ? '90 นาที' : a.start_rate === '@120' ? '120 นาที' : a.start_rate === '1h' ? '1 ชม.' : a.start_rate === '@4h' ? '4 ชม.' : a.start_rate === '@6h' ? '6 ชม.' : a.start_rate}</dd>
         {a.price_options?.length > 0 && <><dt className="text-neutral-400">ราคาทั้งหมด</dt><dd>{a.price_options.map((o) => `${o.label === '@60' ? '60 นาที' : o.label === '@90' ? '90 นาที' : o.label === '@120' ? '120 นาที' : o.label === '1h' ? '1 ชม.' : o.label === '@4h' ? '4 ชม.' : o.label === '@6h' ? '6 ชม.' : o.label} ${baht(o.price)}`).join(' · ')}</dd></>}
         <dt className="text-neutral-400">พิกัด</dt><dd className={a.loc_verified ? 'text-green-300' : 'text-amber-300'}>{a.loc_verified ? 'ยืนยันพิกัดจากโทรศัพท์แล้ว' : 'ไม่ได้ยืนยันพิกัด (เลือกจังหวัดเอง)'}</dd>

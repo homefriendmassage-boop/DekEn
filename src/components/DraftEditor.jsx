@@ -70,7 +70,7 @@ export default function DraftEditor({ draft, mode, onClose, onSaved }) {
     return (
       <Shell onClose={onClose} title="สร้างแบบร่างใบสมัครให้น้อง">
         <p className="text-sm text-neutral-400">เลือกประเภทงานของน้อง (ฟอร์มต่างกัน)</p>
-        {[['night', '🍸', 'ชงเหล้า / ENT'], ['spa', '💆', 'หมอนวด / สปา VIP']].map(([g, icon, label]) => (
+        {[['night', '🍸', 'ชงเหล้า / ENT / PR ร้าน'], ['spa', '💆', 'หมอนวด / สปา VIP']].map(([g, icon, label]) => (
           <button key={g} onClick={() => setGrp(g)} className="flex w-full items-center gap-4 rounded-3xl bg-white/5 p-4 text-left text-lg font-bold ring-1 ring-white/10 active:scale-[0.98]"><span className="text-3xl">{icon}</span>{label}</button>
         ))}
       </Shell>

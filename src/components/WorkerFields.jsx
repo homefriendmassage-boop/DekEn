@@ -7,6 +7,7 @@ import { useI18n } from '../i18n'
 // "แนะนำตัว" choices, one list per category. A profile that picks both categories of its group gets the two lists together.
 export const TAGS_BY_CAT = {
   bartender: ['banquet', 'ordination', 'wedding', 'auspicious', 'no_shameful_jobs', 'no_illegal_jobs'],
+  pr: ['pr_table_care', 'pr_menu', 'pr_cheer', 'pr_regular', 'pr_events', 'friendly', 'fun_talk'],
   ent: ['playful', 'fun_talk', 'not_picky', 'sing', 'dance', 'drinks', 'friendly'],
   masseuse: ['thai_massage', 'oil', 'foot', 'aroma', 'sports', 'scrub', 'polite', 'punctual', 'experienced'],
   spa: ['girlfriend_feel', 'fun_talk', 'playful', 'sweet', 'attentive', 'relax_massage', 'drinks', 'no_drink', 'not_picky', 'anything'],
@@ -17,8 +18,8 @@ export const tagOptions = (cats = [], grp = 'night') => {
   const use = chosen.length ? chosen : GROUP_CATEGORIES[grp]
   return [...new Set(use.flatMap((c) => TAGS_BY_CAT[c]))]
 }
-// Two application forms: night = bartender + ENT, spa = masseuse + spa (one profile never mixes them)
-export const GROUP_CATEGORIES = { night: ['bartender', 'ent'], spa: ['masseuse', 'spa'] }
+// Two application forms: night = bartender + ENT + PR, spa = masseuse + spa (one profile never mixes them)
+export const GROUP_CATEGORIES = { night: ['bartender', 'ent', 'pr'], spa: ['masseuse', 'spa'] }
 export const groupOf = (cats = []) => (cats.some((c) => GROUP_CATEGORIES.spa.includes(c)) && !cats.some((c) => GROUP_CATEGORIES.night.includes(c)) ? 'spa' : 'night')
 const FIXED = { night: ['@4h', '@6h', '1h'], spa: ['@60', '@90', '@120'] }        // default starting rate: the first one filled, in this order
 const FIELD = { '@4h': 'p4', '@6h': 'p6', '1h': 'hourly', '@60': 'p60', '@90': 'p90', '@120': 'p120' }
@@ -79,7 +80,7 @@ export function profileToPayload(v, grp = 'night', cats = []) {
     gender: v.gender || null, age: v.age === '' ? null : Number(v.age),
     height_cm: v.height_cm === '' ? null : Number(v.height_cm), weight_kg: v.weight_kg === '' ? null : Number(v.weight_kg),
     measurements: v.measurements.trim() || null, tags: v.tags.filter((k) => tagOptions(cats, grp).includes(k)), about: v.about.trim() || null, price_options: rows, start_rate: startLbl,
-    service_mode: grp === 'spa' ? v.serviceMode || null : null,
+    service_mode: v.serviceMode || null,      // night: shown on the profile only; spa: required
   }
   if (v.locNew && v.loc) { out.loc_lat = v.loc.lat; out.loc_lng = v.loc.lng }
   if (v.province) out.province = v.province
@@ -166,17 +167,15 @@ export default function WorkerFields({ v, set, grp = 'night', cats = [], hideLoc
         </>
       )}
 
-      {spa && (
-        <fieldset>
-          <legend className="text-sm">{t('fServiceMode')}</legend>
+      <fieldset>
+          <legend className="text-sm">{t('fServiceMode')}{!spa && <span className="text-neutral-500"> ({t('optional')})</span>}</legend>
           <div className="mt-2 grid grid-cols-3 gap-2">
             {SERVICE_MODES.map((m) => (
               <button type="button" key={m} aria-pressed={v.serviceMode === m} onClick={() => set({ serviceMode: m })}
                 className={`rounded-xl px-1 py-2 text-xs font-semibold ring-1 active:scale-95 ${v.serviceMode === m ? 'bg-line text-black ring-line' : 'bg-white/10 ring-white/15'}`}>{t(`serviceMode_${m}`)}</button>
             ))}
           </div>
-        </fieldset>
-      )}
+      </fieldset>
 
       <fieldset>
         <legend className="text-sm">{t('fTags')}</legend>
