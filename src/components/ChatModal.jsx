@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useI18n } from '../i18n'
+import { LINE_OA_ID, LINE_OA_URL } from '../config'
 
 // Maps the exceptions raised by send_message() to translated text keys.
 const ERROR_KEYS = { MEMBERS_ONLY: 'errMembersOnly', RATE_LIMIT: 'errRate', BAD_MESSAGE: 'errBadMessage', CONTACT_BLOCKED: 'errContact', WORKER_INACTIVE: 'errInactive' }
@@ -21,6 +22,7 @@ export default function ChatModal({ threadId, title, meId, onClose, onTopUp, onR
   const [reporting, setReporting] = useState(false)
   const [appeal, setAppeal] = useState(null)       // my latest appeal of this room: { status, text, note }
   const [appealing, setAppealing] = useState(false)
+  const [blockedHint, setBlockedHint] = useState(false)   // the last message was refused for contact details: show the official LINE
   const [appealText, setAppealText] = useState('')
   const [rep, setRep] = useState({ reason: 'contact', note: '' })
   const [repMsg, setRepMsg] = useState(null)
@@ -73,6 +75,7 @@ export default function ChatModal({ threadId, title, meId, onClose, onTopUp, onR
     if (!accepted && fee?.role === 'customer' && fee.state === 'need_fee') return setConsent(true)
     setBusy(true)
     setError(null)
+    setBlockedHint(false)
     setNeedTopup(false)
     const { data, error } = await supabase.rpc('send_message', { p_thread: threadId, p_body: body, p_accept_fee: accepted })
     setBusy(false)
@@ -80,6 +83,7 @@ export default function ChatModal({ threadId, title, meId, onClose, onTopUp, onR
       // refused for contact details: the attempt is recorded and the flag rises; the 4th one suspends the room
       if (data === 'THREAD_SUSPENDED') { setRoom('suspended'); setText(''); return setError(t('roomSuspendedNow')) }
       const n = Number(data.split(':')[1] ?? 1)
+      setBlockedHint(true)
       return setError(`${t('errContact')} ${n >= 3 ? t('errContactLast') : n === 2 ? t('errContactWarn') : ''}`)
     }
     if (error) {
@@ -157,6 +161,12 @@ export default function ChatModal({ threadId, title, meId, onClose, onTopUp, onR
           <div className="mx-4 mb-2 rounded-lg bg-red-500/10 p-2 text-xs text-red-300">
             {error}
             {needTopup && onTopUp && <button onClick={onTopUp} className="ml-2 rounded-full bg-line px-3 py-1 font-bold text-black">{t('chatTopUp')}</button>}
+            {blockedHint && (
+              <div className="mt-2 space-y-1 rounded-lg bg-white/10 p-2 text-neutral-100">
+                <p className="font-semibold">💬 ต้องการติดต่อจริง ๆ? โปรดแชตกับแอดมินที่ LINE DekEn: <span className="font-mono text-green-300">{LINE_OA_ID}</span></p>
+                {LINE_OA_URL && <a href={LINE_OA_URL} target="_blank" rel="noreferrer" className="block rounded-lg bg-line py-1.5 text-center font-bold text-black">เปิด LINE DekEn</a>}
+              </div>
+            )}
           </div>
         )}
         {room === 'open' && (

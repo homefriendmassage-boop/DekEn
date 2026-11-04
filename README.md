@@ -740,3 +740,13 @@ Run `supabase/migration_078.sql` once, after migration_077. **Redeploy `notify-c
 - **♻️ Reopen** a room that was closed for good (`admin_chat_action(..., 'reopen')`) after the admin and the member agreed; the room is cleared and both can chat again.
 - **⚖️ Appeal**: a member of a suspended / closed room sees "ขออุทธรณ์ / ขอให้เปิดห้องนี้" in the room; the admin gets it in the chat queue (new filter "⚖️ อุทธรณ์", first in the list and in the badge) and in the member's support chat; he reopens / unblocks (the member is told) or declines with a reason (`decline_appeal`).
 - `supabase/migration_check_056_078.sql` checks which migrations have been run.
+
+## migration_079 + chat helpers
+
+Run `supabase/migration_079.sql` once, after migration_078 (no Edge Function change).
+
+- Chat filter: new code words are blocked and counted like any contact attempt — บ้านฟ้า / บ้านเขียว / บ้านดำ / บ้านแดง, ช่องเขียว / ช่องฟ้า / ช่องแดง / ช่องดำ, แอดลาย (spaces and tone marks between the letters do not help).
+- When a message is refused, the sender is told to use the official LINE: `@deken` (config `VITE_LINE_OA_ID`, default `@deken`) with a button to `VITE_LINE_OA_URL`.
+- Admin chat cards of a **closed** room show **♻️ เปิดห้องใหม่** directly (and **❌ ปฏิเสธอุทธรณ์** when there is an appeal); no need to open the room first.
+- Admin → application cards: **✉️ ทักแชตผู้สมัคร** (advise, or send the preset "ให้ทัก LINE DekEn โดยตรง").
+- `supabase/migration_check_056_079.sql` checks which migrations have been run.

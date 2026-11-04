@@ -1,3 +1,4 @@
+import Compose from './Compose'
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { CATEGORIES } from '../config'
@@ -82,8 +83,10 @@ function Card({ a, linePic, onReview, onChanged, toast }) {
     if (urls.length) setViewer({ urls, index: Math.min(index, urls.length - 1) })
   }
 
+  const [composing, setComposing] = useState(false)
   return (
     <li className="space-y-3 rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
+      {composing && <Compose userId={a.user_id} name={a.display_name} toast={toast} onClose={() => setComposing(false)} />}
       <div className="flex gap-3">
         {a.profile_image
           ? <img src={a.profile_image} alt="" className="h-24 w-20 shrink-0 rounded-xl object-cover" />
@@ -134,6 +137,7 @@ function Card({ a, linePic, onReview, onChanged, toast }) {
       ) : a.original_path ? (
         <button onClick={() => openViewer(0)} className="w-full rounded-xl bg-white/10 py-2 text-sm font-semibold active:scale-95">🔍 ขยายดูรูปจริง (ไม่โมเสก)</button>
       ) : <p className="rounded-xl bg-red-500/10 p-2 text-xs text-red-300">ผู้สมัครยังไม่ได้แนบรูป</p>}
+      <button onClick={() => setComposing(true)} className="w-full rounded-xl bg-sky-500/70 py-2 text-xs font-bold active:scale-95">✉️ ทักแชตผู้สมัคร (แนะนำเบื้องต้น / ให้ทัก LINE DekEn)</button>
       {viewer && <ImageViewer images={viewer.urls} index={viewer.index} alt={a.display_name} onClose={() => setViewer(null)} />}
 
       {editing && <EditModal a={a} toast={toast} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); onChanged() }} />}

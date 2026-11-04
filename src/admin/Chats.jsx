@@ -48,6 +48,15 @@ export default function Chats({ onChanged, toast }) {
     setAsking(null); setReason(''); setNote('')
   }
 
+  // reopen / decline an appeal straight from the card (no need to read the room)
+  async function quick(r, action, confirmText) {
+    if (!window.confirm(confirmText)) return
+    const note = window.prompt('หมายเหตุถึงสมาชิก (ไม่บังคับ)', '')
+    if (note === null) return
+    const { error } = await supabase.rpc('admin_chat_action', { p_thread: r.id, p_action: action, p_note: note, p_settle: null })
+    if (error) return toast('ทำรายการไม่สำเร็จ: ' + error.message.slice(0, 80))
+    toast(action === 'reopen' ? 'เปิดห้องใหม่แล้ว แจ้งสมาชิกแล้ว' : 'ปฏิเสธอุทธรณ์แล้ว แจ้งสมาชิกแล้ว'); load(); onChanged?.()
+  }
   async function act(action, confirmText, settle = null) {
     if (!window.confirm(confirmText)) return
     const { error } = await supabase.rpc('admin_chat_action', { p_thread: view.thread.id, p_action: action, p_note: note, p_settle: settle })
@@ -89,6 +98,10 @@ export default function Chats({ onChanged, toast }) {
               <p className="text-xs text-neutral-400">พยายามส่ง {r.attempts} ครั้ง{r.last_event_at ? ` · ล่าสุด ${ago(r.last_event_at)}` : ''}</p>
               {r.review_note && <p className="text-xs text-neutral-500">หมายเหตุแอดมิน: {r.review_note}</p>}
               {r.appeal_text && <p className="rounded-lg bg-amber-400/10 p-2 text-xs text-amber-100">⚖️ {r.appeal_by === 'worker' ? 'น้อง' : 'ลูกค้า'}ขออุทธรณ์ {r.appeal_at ? ago(r.appeal_at) : ''}: “{r.appeal_text}”</p>}
+              {r.status === 'closed' && (
+                <button onClick={() => quick(r, 'reopen', 'เปิดห้องนี้ให้ใช้งานใหม่? (ล้างธงทั้งหมด สมาชิกจะได้รับแจ้ง)')} className="w-full rounded-xl bg-line py-2 text-sm font-bold text-black active:scale-95">♻️ เปิดห้องใหม่ (หลังตกลงกันแล้ว)</button>
+              )}
+              {r.appeal_text && <button onClick={() => quick(r, 'decline_appeal', 'ปฏิเสธคำขออุทธรณ์ของห้องนี้?')} className="w-full rounded-xl bg-white/10 py-2 text-xs font-semibold active:scale-95">❌ ปฏิเสธอุทธรณ์</button>}
               <div className="grid grid-cols-2 gap-2">
                 <button onClick={() => setCompose({ id: r.worker_id, name: r.worker_name })} className="rounded-xl bg-sky-500/80 py-2 text-xs font-bold active:scale-95">✉️ ทักหาน้อง</button>
                 <button onClick={() => setCompose({ id: r.customer_id, name: r.customer_name })} className="rounded-xl bg-sky-500/50 py-2 text-xs font-bold active:scale-95">✉️ ทักหาลูกค้า</button>
