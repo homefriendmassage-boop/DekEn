@@ -59,9 +59,12 @@ export default function WorkerApply({ userId, defaultName }) {
   }, [lookupCode, app?.agency_code])
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
-  const toggleCat = (c) => setForm((f) => ({
+  const toggleCat = (c) => {
+    if (c === 'pr' && !form.categories.includes('pr')) setProf((x) => (x.serviceMode ? x : { ...x, serviceMode: 'shop' }))    // PR starts at "at the venue"
+    setForm((f) => ({
     ...f, categories: f.categories.includes(c) ? f.categories.filter((x) => x !== c) : [...f.categories, c],
-  }))
+    }))
+  }
 
   async function submit(e) {
     e.preventDefault()

@@ -7,7 +7,7 @@ import { useI18n } from '../i18n'
 // "แนะนำตัว" choices, one list per category. A profile that picks both categories of its group gets the two lists together.
 export const TAGS_BY_CAT = {
   bartender: ['banquet', 'ordination', 'wedding', 'auspicious', 'no_shameful_jobs', 'no_illegal_jobs'],
-  pr: ['pr_table_care', 'pr_menu', 'pr_cheer', 'pr_regular', 'pr_events', 'friendly', 'fun_talk'],
+  pr: ['fun_talk', 'sing', 'dance', 'drinks', 'friendly', 'not_picky', 'speak_zh', 'speak_en', 'no_shameful_jobs', 'no_illegal_jobs'],
   ent: ['playful', 'fun_talk', 'not_picky', 'sing', 'dance', 'drinks', 'friendly'],
   masseuse: ['thai_massage', 'oil', 'foot', 'aroma', 'sports', 'scrub', 'polite', 'punctual', 'experienced'],
   spa: ['girlfriend_feel', 'fun_talk', 'playful', 'sweet', 'attentive', 'relax_massage', 'drinks', 'no_drink', 'not_picky', 'anything'],

@@ -761,3 +761,7 @@ Run `supabase/migration_080.sql` once, after migration_079 (no Edge Function cha
 - New "introduce yourself" choices for PR: table care, menu & promotions, lively atmosphere, regular at this venue, venue events.
 - `supabase/migration_check_056_080.sql` checks which migrations have been run.
 
+
+## migration_081 + PR layout
+
+Run `supabase/migration_081.sql` once, after migration_080 (adds the choices speaks Chinese / English). Home: the PR tile is a wide tile between the night and day categories, seller/agency buttons sit in one row. New PR applicants start with service mode "at the venue". `supabase/migration_check_056_081.sql` checks which migrations have been run.
