@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { logoUrl } from '../lib/logo'
 import { fmtDate, fmtDateTime } from './format'
+import Compose from './Compose'
 
 const FILTERS = [['pending', 'รอตรวจ'], ['edits', '✏️ ขอแก้ชื่อ/โลโก้'], ['approved', 'อนุมัติแล้ว'], ['rejected', 'ไม่ผ่าน']]
 
@@ -51,6 +52,9 @@ export default function Agencies({ onChanged, toast }) {
   const [rows, setRows] = useState(null)
   const [rejecting, setRejecting] = useState(null)
   const [reason, setReason] = useState('')
+  const [composing, setComposing] = useState(null)
+  const [deleting, setDeleting] = useState(null)
+  const [note, setNote] = useState('')
 
   const load = useCallback(async () => {
     setRows(null)
@@ -70,6 +74,18 @@ export default function Agencies({ onChanged, toast }) {
     setRejecting(null); setReason(''); load(); onChanged?.()
   }
 
+  async function setDisplay(a, patch) {
+    const { error } = await supabase.rpc('admin_set_agency_display', { p_user: a.user_id, p_hide_strip: patch.strip ?? null, p_hide_badge: patch.badge ?? null })
+    if (error) return toast('ทำรายการไม่สำเร็จ')
+    toast('บันทึกแล้ว'); load()
+  }
+  async function remove(a) {
+    const { data, error } = await supabase.rpc('admin_delete_agency', { p_user: a.user_id, p_note: note })
+    if (error) return toast('ลบไม่สำเร็จ')
+    toast(`ลบสังกัดแล้ว · น้อง ${data ?? 0} คนกลับเป็นอิสระ`)
+    setDeleting(null); setNote(''); load(); onChanged?.()
+  }
+
   async function decideEdit(r, approve) {
     const { error } = await supabase.rpc('admin_agency_edit_decide', { p_id: r.id, p_approve: approve, p_reason: approve ? null : reason })
     if (error) return toast('ทำรายการไม่สำเร็จ')
@@ -79,6 +95,7 @@ export default function Agencies({ onChanged, toast }) {
 
   return (
     <div className="space-y-4">
+      {composing && <Compose userId={composing.user_id} name={composing.name} toast={toast} onClose={() => setComposing(null)} />}
       <AgencyRules toast={toast} />
       <div className="flex flex-wrap gap-2">
         {FILTERS.map(([id, label]) => (
@@ -131,6 +148,36 @@ export default function Agencies({ onChanged, toast }) {
                 </div>
                 {a.status === 'approved' && (
                   <p className="text-xs text-neutral-300">น้องในสังกัด {a.girls} คน · แพ็กเกจ {a.plan_expires_at ? `หมด ${fmtDate(a.plan_expires_at)}` : 'ยังไม่ชำระ'}</p>
+                )}
+                {a.status === 'approved' && (
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <button onClick={() => setDisplay(a, { strip: !a.hide_strip })} aria-pressed={!a.hide_strip}
+                        className={`rounded-xl px-2 py-2 font-semibold ring-1 active:scale-95 ${a.hide_strip ? 'bg-white/5 text-neutral-400 ring-white/10' : 'bg-line/20 text-line ring-line/40'}`}>
+                        แท็บโชว์สังกัด: {a.hide_strip ? '🙈 ซ่อนอยู่' : '👁 แสดง'}
+                      </button>
+                      <button onClick={() => setDisplay(a, { badge: !a.hide_badge })} aria-pressed={!a.hide_badge}
+                        className={`rounded-xl px-2 py-2 font-semibold ring-1 active:scale-95 ${a.hide_badge ? 'bg-white/5 text-neutral-400 ring-white/10' : 'bg-line/20 text-line ring-line/40'}`}>
+                        ป้ายบนรูปน้อง: {a.hide_badge ? '🙈 ซ่อนอยู่' : '👁 แสดง'}
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-neutral-500">ป้ายบนรูปน้องใช้กับสังกัดทั้งที่จ่ายและไม่จ่ายแพ็กเกจ · แท็บโชว์มีเฉพาะสังกัดที่จ่ายแพ็กเกจ</p>
+                    {deleting === a.user_id ? (
+                      <div className="space-y-2 rounded-xl bg-red-500/10 p-2">
+                        <p className="text-xs text-red-200">ลบสังกัดนี้ถาวร: น้องในสังกัดจะกลับเป็นน้องอิสระ ที่นั่ง/คำเชิญของสังกัดหายทั้งหมด</p>
+                        <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="ข้อความแจ้งเจ้าของสังกัด (ไม่บังคับ)" className="w-full rounded-xl bg-white/10 px-3 py-2 text-sm" />
+                        <div className="grid grid-cols-2 gap-2">
+                          <button onClick={() => remove(a)} className="rounded-xl bg-red-500/40 py-2 text-sm font-bold">ยืนยันลบ</button>
+                          <button onClick={() => setDeleting(null)} className="rounded-xl bg-white/10 py-2 text-sm">ยกเลิก</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2">
+                        <button onClick={() => setComposing(a)} className="rounded-xl bg-sky-500/70 py-2 text-xs font-bold active:scale-95">✉️ ทักแชตสังกัด</button>
+                        <button onClick={() => setDeleting(a.user_id)} className="rounded-xl bg-red-500/20 py-2 text-xs font-bold text-red-200 active:scale-95">🗑 ลบสังกัด</button>
+                      </div>
+                    )}
+                  </div>
                 )}
                 {a.status === 'rejected' && <p className="text-xs text-red-300">ไม่ผ่าน{a.reject_reason ? ` — ${a.reject_reason}` : ''}</p>}
                 {a.status === 'pending' && (
