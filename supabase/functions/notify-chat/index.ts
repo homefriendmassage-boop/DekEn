@@ -465,8 +465,12 @@ Deno.serve(async (req) => {
 
   const central = { token, liffId }
   if (isAdminMsg) {
+    // the result is written on the message so the admin can see whether the Flex really reached LINE (OA Manager never lists API pushes)
+    const mark = async (status: string, detail?: string) => {
+      if (/^[0-9a-f-]{36}$/i.test(String(input.message_id ?? ''))) await admin.from('support_messages').update({ push_status: status, push_detail: detail ? detail.slice(0, 200) : null }).eq('id', input.message_id)
+    }
     const rs = await recipient(admin, input.user_id, central)
-    if (!rs || !/^U[0-9a-f]{32}$/.test(rs.lineId)) return json({ ok: true, status: 'NO_LINE_ID' })
+    if (!rs || !/^U[0-9a-f]{32}$/.test(rs.lineId)) { await mark('NO_LINE_ID', 'สมาชิกคนนี้ไม่มี LINE id ที่ส่งหาได้'); return json({ ok: true, status: 'NO_LINE_ID' }) }
     const appUrl = Deno.env.get('APP_URL')?.replace(/\/$/, '')
     const message = buildAdminMsgFlex({ text: input.detail ? String(input.detail) : undefined, liffId: rs.liffId, logo: appUrl ? `${appUrl}/dekn-logo.jpg?v=2` : undefined })
     const r = await fetch('https://api.line.me/v2/bot/message/push', {
@@ -474,6 +478,8 @@ Deno.serve(async (req) => {
       headers: { Authorization: `Bearer ${rs.token}`, 'Content-Type': 'application/json', 'X-Line-Retry-Key': crypto.randomUUID() },
       body: JSON.stringify({ to: rs.lineId, messages: [message] }),
     })
+    if (r.ok) await mark('SENT')
+    else await mark('FAILED', `LINE ${r.status}: ${(await r.text().catch(() => '')).replace(/\s+/g, ' ')}`)
     return json({ ok: r.ok, status: r.ok ? 'SENT' : 'FAILED' })
   }
   if (isStrike) {

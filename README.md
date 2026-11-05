@@ -769,3 +769,7 @@ Run `supabase/migration_081.sql` once, after migration_080 (adds the choices spe
 ## migration_082 + admin controls for agencies
 
 Run `supabase/migration_082.sql` once, after migration_081 (no Edge Function change). Admin -> สังกัด -> อนุมัติแล้ว: each agency card has two separate switches (show / hide in the agency "show" tab, show / hide the badge on the girls' pictures for paid and unpaid agencies), a chat button and a delete button (girls are released as independent providers). `supabase/migration_check_056_082.sql` checks which migrations have been run.
+
+## migration_083 + Flex delivery result for admin messages
+
+Run `supabase/migration_083.sql` once, after migration_082, then deploy the Edge Function `notify-chat` again. Admin messages (to a girl, a customer or an agency owner) always send the LINE Flex when "แจ้งเตือนทาง LINE (Flex)" is ticked; the Compose window now shows whether LINE accepted it (push_status: SENT / FAILED / NO_LINE_ID). Messages sent through the API are not listed in LINE OA Manager chat, which is why they cannot be checked there. `supabase/migration_check_056_083.sql` checks which migrations have been run.

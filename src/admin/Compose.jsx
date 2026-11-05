@@ -17,13 +17,24 @@ export default function Compose({ userId, name, onClose, toast }) {
   const [push, setPush] = useState(true)
   const [busy, setBusy] = useState(false)
   const [thread, setThread] = useState(null)
+  const [result, setResult] = useState(null)      // did the Flex reach LINE? (read back from the message)
 
   async function send() {
     setBusy(true)
     const { error } = await supabase.rpc('admin_message_user', { p_user: userId, p_body: text.trim(), p_push: push })
     setBusy(false)
     if (error) return toast(error.message.includes('BAD_MESSAGE') ? 'ข้อความต้องยาว 1–1000 ตัวอักษร' : 'ส่งไม่สำเร็จ')
-    toast(push ? 'ส่งแล้ว (แจ้งเตือนทาง LINE)' : 'ส่งแล้ว'); setText(''); await openChat()
+    setText('')
+    if (!push) { toast('ส่งแล้ว (ไม่ส่ง Flex)'); return openChat() }
+    // the Flex goes out a moment later through the Edge Function: ask the message how it ended
+    setResult({ s: 'wait' })
+    for (let i = 0; i < 8; i += 1) {
+      await new Promise((r) => setTimeout(r, 1200))
+      const { data } = await supabase.rpc('admin_last_push', { p_user: userId })
+      const row = data?.[0]
+      if (row && row.push_status && row.push_status !== 'pending' && Date.now() - new Date(row.created_at).getTime() < 60000) return setResult({ s: row.push_status, d: row.push_detail })
+    }
+    setResult({ s: 'timeout' })
   }
   async function openChat() {
     const { data, error } = await supabase.rpc('admin_support_open', { p_user: userId })
@@ -40,6 +51,15 @@ export default function Compose({ userId, name, onClose, toast }) {
         <div className="flex flex-wrap gap-1.5">{PRESETS.map(([label, body]) => <button key={label} onClick={() => setText(body)} className="rounded-full bg-white/10 px-2.5 py-1 text-xs active:scale-95">{label}</button>)}</div>
         <textarea rows={5} maxLength={1000} value={text} onChange={(e) => setText(e.target.value)} placeholder="พิมพ์ข้อความถึงสมาชิก" className="w-full rounded-xl bg-white/10 px-3 py-2 text-base outline-none ring-1 ring-white/10 focus:ring-line" />
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={push} onChange={(e) => setPush(e.target.checked)} /> แจ้งเตือนทาง LINE (Flex)</label>
+        {result && (
+          <p className={`rounded-xl p-2.5 text-xs ${result.s === 'SENT' ? 'bg-green-500/15 text-green-200' : result.s === 'wait' ? 'bg-white/5 text-neutral-300' : 'bg-red-500/15 text-red-200'}`}>
+            {result.s === 'wait' && '⏳ ส่งข้อความแล้ว กำลังเช็กว่า Flex ถึง LINE หรือยัง…'}
+            {result.s === 'SENT' && '✅ ส่ง Flex ถึง LINE ของสมาชิกแล้ว (ข้อความที่ส่งผ่านระบบจะไม่โชว์ในแชต LINE OA Manager แต่สมาชิกได้รับจริง)'}
+            {result.s === 'NO_LINE_ID' && '❌ Flex ไม่ถูกส่ง: สมาชิกคนนี้ไม่มี LINE id ที่ส่งหาได้ — ข้อความยังอยู่ใน "แชทกับแอดมิน" ในแอป'}
+            {result.s === 'FAILED' && `❌ LINE ปฏิเสธการส่ง Flex (อาจบล็อก/เลิกเป็นเพื่อนกับ OA): ${result.d ?? ''}`}
+            {result.s === 'timeout' && '⚠️ ยังไม่ได้ผลการส่ง — ตรวจว่า deploy notify-chat ตัวล่าสุดแล้ว และตั้งค่า chat_notify_url ครบ (ข้อความยังอยู่ในแอป)'}
+          </p>
+        )}
         <div className="grid grid-cols-2 gap-2">
           <button onClick={openChat} className="rounded-xl bg-white/10 py-2.5 text-sm">เปิดแชต (อ่านประวัติ)</button>
           <button onClick={send} disabled={!text.trim() || busy} className="rounded-xl bg-line py-2.5 text-sm font-bold text-black disabled:opacity-40">{busy ? '…' : 'ส่งข้อความ'}</button>
