@@ -378,11 +378,11 @@ export function buildSeatFlex(o: { agency: string; requestId: string; liffId: st
 }
 // To the customer after a payment: the package he got (with a button for every group it opens) or the Wallet top-up
 const PLANS: Record<number, { name: string; icon: string; color: string; groups: [string, string][] }> = {
-  1: { name: 'Gold', icon: '🥇', color: '#F5B301', groups: [['bartender', 'ดูน้องชงเหล้า'], ['ent', 'ดูน้อง ENT']] },
-  2: { name: 'Platinum', icon: '💠', color: '#C9D1DB', groups: [['bartender', 'ดูน้องชงเหล้า'], ['ent', 'ดูน้อง ENT'], ['masseuse', 'ดูน้องหมอนวด']] },
-  3: { name: 'Diamond', icon: '💎', color: '#7DD3FC', groups: [['bartender', 'ดูน้องชงเหล้า'], ['ent', 'ดูน้อง ENT'], ['masseuse', 'ดูน้องหมอนวด'], ['spa', 'ดูน้องสปา VIP']] },
+  1: { name: 'Gold', icon: '🥇', color: '#F5B301', groups: [['bartender', 'ดูน้องชงเหล้า'], ['ent', 'ดูน้อง ENT'], ['pr', 'ดูน้อง PR ร้าน']] },
+  2: { name: 'Platinum', icon: '💠', color: '#C9D1DB', groups: [['bartender', 'ดูน้องชงเหล้า'], ['ent', 'ดูน้อง ENT'], ['pr', 'ดูน้อง PR ร้าน'], ['masseuse', 'ดูน้องหมอนวด']] },
+  3: { name: 'Diamond', icon: '💎', color: '#7DD3FC', groups: [['bartender', 'ดูน้องชงเหล้า'], ['ent', 'ดูน้อง ENT'], ['pr', 'ดูน้อง PR ร้าน'], ['masseuse', 'ดูน้องหมอนวด'], ['spa', 'ดูน้องสปา VIP']] },
 }
-const ALL_GROUPS: [string, string, number][] = [['bartender', 'ดูน้องชงเหล้า', 1], ['ent', 'ดูน้อง ENT', 1], ['masseuse', 'ดูน้องหมอนวด', 2], ['spa', 'ดูน้องสปา VIP', 3]]
+const ALL_GROUPS: [string, string, number][] = [['bartender', 'ดูน้องชงเหล้า', 1], ['ent', 'ดูน้อง ENT', 1], ['pr', 'ดูน้อง PR ร้าน', 1], ['masseuse', 'ดูน้องหมอนวด', 2], ['spa', 'ดูน้องสปา VIP', 3]]
 export function buildPaymentFlex(o: { kind: string; tier?: number; until?: string; amount?: number; liffId: string; logo?: string }) {
   const base = `https://liff.line.me/${o.liffId}`
   const head = (t: string) => ({ type: 'box', layout: 'horizontal', spacing: 'md', alignItems: 'center', contents: [
