@@ -190,7 +190,7 @@ function Girls({ flash, reload, paid }) {
         <li key={g.user_id} className="rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
           <div className="flex items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2">
-              <div className="h-12 w-10 shrink-0 overflow-hidden rounded-lg bg-neutral-800">{g.profile_image && <img src={g.profile_image} alt="" className="h-full w-full object-cover" />}</div>
+              <div className="h-12 w-10 shrink-0 overflow-hidden rounded-lg bg-neutral-800">{g.profile_image && <img loading="lazy" decoding="async" src={g.profile_image} alt="" className="h-full w-full object-cover" />}</div>
               <p className="truncate font-semibold">{g.display_name}</p>
             </div>
             <span className={`rounded-full px-2 py-0.5 text-[11px] ${g.listed ? 'bg-green-500/20 text-green-300' : 'bg-neutral-600/40 text-neutral-300'}`}>{g.listed ? 'แสดงอยู่' : 'ไม่แสดง'}</span>

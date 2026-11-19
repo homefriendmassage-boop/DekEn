@@ -55,7 +55,7 @@ export default function PhotoManager({ userId, state, photos = [], local, setLoc
           const marked = removeIds.includes(p.id)
           return (
             <li key={p.id} className={`${thumb} ${marked ? 'opacity-40' : ''}`}>
-              <img src={p.public_url} alt="" className="h-full w-full object-cover" />
+              <img loading="lazy" decoding="async" src={p.public_url} alt="" className="h-full w-full object-cover" />
               {i === 0 && !marked && <span className="absolute left-1 top-1 rounded-full bg-amber-400 px-1.5 text-[10px] font-bold text-black">{t('photoMain')}</span>}
               {setRemoveIds && (
                 <button type="button" onClick={() => setRemoveIds((r) => (marked ? r.filter((x) => x !== p.id) : [...r, p.id]))} className={btn}>
@@ -68,14 +68,14 @@ export default function PhotoManager({ userId, state, photos = [], local, setLoc
         })}
         {staged.map((p) => (
           <li key={p.id} className={thumb}>
-            <img src={p.public_url} alt="" className="h-full w-full object-cover" />
+            <img loading="lazy" decoding="async" src={p.public_url} alt="" className="h-full w-full object-cover" />
             <span className="absolute inset-x-0 bottom-0 bg-amber-500/90 py-0.5 text-center text-[10px] font-semibold text-black">{t('photoNew')}</span>
             <button type="button" disabled={busy} onClick={() => dropStaged(p)} className={btn}>✕</button>
           </li>
         ))}
         {localList.map((p) => (
           <li key={p.key} className={thumb}>
-            <img src={p.url} alt="" className="h-full w-full object-cover" />
+            <img loading="lazy" decoding="async" src={p.url} alt="" className="h-full w-full object-cover" />
             <span className="absolute inset-x-0 bottom-0 bg-amber-500/90 py-0.5 text-center text-[10px] font-semibold text-black">{t('photoNew')}</span>
             <button type="button" onClick={() => setLocal((l) => l.filter((x) => x.key !== p.key))} className={btn}>✕</button>
           </li>

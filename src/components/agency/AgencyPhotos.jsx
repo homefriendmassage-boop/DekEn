@@ -47,8 +47,8 @@ export default function AgencyPhotos({ girl, paid, onClose, flash, onChanged }) 
   async function uploadPair(folder, orig, pub) {
     const ts = Date.now()
     const out = { origPath: null, pubPath: `${folder}/${ts}-public.jpg` }
-    if (orig) { out.origPath = `${folder}/${ts}.jpg`; const u1 = await supabase.storage.from('worker-originals').upload(out.origPath, orig, { contentType: 'image/jpeg' }); if (u1.error) throw u1.error }
-    const u2 = await supabase.storage.from('worker-public').upload(out.pubPath, pub, { contentType: 'image/jpeg' })
+    if (orig) { out.origPath = `${folder}/${ts}.jpg`; const u1 = await supabase.storage.from('worker-originals').upload(out.origPath, orig, { contentType: 'image/jpeg', cacheControl: '31536000' }); if (u1.error) throw u1.error }
+    const u2 = await supabase.storage.from('worker-public').upload(out.pubPath, pub, { contentType: 'image/jpeg', cacheControl: '31536000' })
     if (u2.error) { if (out.origPath) supabase.storage.from('worker-originals').remove([out.origPath]).catch(() => {}); throw u2.error }
     out.url = supabase.storage.from('worker-public').getPublicUrl(out.pubPath).data.publicUrl
     return out
@@ -125,7 +125,7 @@ export default function AgencyPhotos({ girl, paid, onClose, flash, onChanged }) 
                 return (
                   <li key={p.id} className="space-y-1">
                     <div className="relative overflow-hidden rounded-xl bg-black">
-                      <img src={p.public_url} alt="" className={`aspect-[3/4] w-full object-cover ${gone || swap ? 'opacity-30' : ''}`} />
+                      <img loading="lazy" decoding="async" src={p.public_url} alt="" className={`aspect-[3/4] w-full object-cover ${gone || swap ? 'opacity-30' : ''}`} />
                       {i === 0 && <span className="absolute left-1 top-1 rounded-full bg-black/70 px-1.5 text-[10px]">ปก</span>}
                       {gone && <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-red-300">จะถูกลบ</span>}
                       {swap && <span className="absolute inset-0 flex items-center justify-center text-center text-[11px] font-bold text-amber-200">จะถูกแทนที่</span>}
@@ -149,7 +149,7 @@ export default function AgencyPhotos({ girl, paid, onClose, flash, onChanged }) 
                 <ul className="grid grid-cols-3 gap-2">
                   {staged.map((p) => (
                     <li key={p.id} className="space-y-1">
-                      <div className="relative overflow-hidden rounded-xl bg-black ring-2 ring-green-400/60"><img src={p.public_url} alt="" className="aspect-[3/4] w-full object-cover" />
+                      <div className="relative overflow-hidden rounded-xl bg-black ring-2 ring-green-400/60"><img loading="lazy" decoding="async" src={p.public_url} alt="" className="aspect-[3/4] w-full object-cover" />
                         <span className="absolute left-1 top-1 rounded-full bg-green-500/80 px-1.5 text-[10px] text-black">{p.replaces ? 'โมเสกใหม่' : 'ใหม่'}</span></div>
                       {!pending && <button disabled={busy} onClick={() => unstage(p)} className="w-full rounded-lg bg-white/10 py-1 text-[11px] active:scale-95 disabled:opacity-40">ยกเลิกรูปนี้</button>}
                     </li>

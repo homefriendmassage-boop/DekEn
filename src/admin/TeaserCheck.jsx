@@ -6,7 +6,7 @@ import MosaicEditor from '../components/MosaicEditor'
 function Editor({ photo, toast, onClose, onDone }) {
   async function save(blob) {
     const path = `${photo.worker_id}/${Date.now()}-public-admin.jpg`
-    const up = await supabase.storage.from('worker-public').upload(path, blob, { contentType: 'image/jpeg' })
+    const up = await supabase.storage.from('worker-public').upload(path, blob, { contentType: 'image/jpeg', cacheControl: '31536000' })
     if (up.error) throw up.error
     const url = supabase.storage.from('worker-public').getPublicUrl(path).data.publicUrl
     const { error } = await supabase.rpc('admin_teaser_replace', { p_photo: photo.photo_id, p_public_url: url })

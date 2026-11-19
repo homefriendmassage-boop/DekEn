@@ -1,6 +1,7 @@
 import ImageViewer from './ImageViewer'
 import LinkSheet from './LinkSheet'
 import { VenueView } from './Venue'
+import { signedUrls } from '../lib/signed'
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useI18n } from '../i18n'
@@ -39,11 +40,7 @@ export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlo
       const { data } = await supabase.rpc('worker_photos', { p_worker: w.user_id })
       const rows = data ?? []
       const paths = rows.filter((r) => r.original_path).map((r) => r.original_path)
-      const signed = {}
-      if (paths.length) {
-        const { data: urls } = await supabase.storage.from('worker-originals').createSignedUrls(paths, 3600)
-        urls?.forEach((u) => { if (u.signedUrl) signed[u.path] = u.signedUrl })
-      }
+      const signed = paths.length ? await signedUrls(paths) : {}      // same URLs as the feed: no second download
       if (alive) setImgs(rows.map((r) => ({ id: r.id, url: (r.original_path && signed[r.original_path]) || r.public_url })))
     })()
     return () => { alive = false }
@@ -125,7 +122,7 @@ export default function WorkerDetail({ worker: w, onClose, onBook, onAsk, onUnlo
               {imgs.map((im, i) => (
                 <li key={im.id} className="shrink-0">
                   <button onClick={() => setIdx(i)} className={`block h-16 w-12 overflow-hidden rounded-lg ring-2 ${i === idx ? 'ring-pink-400' : 'ring-transparent'}`}>
-                    <img src={im.url} alt="" className="h-full w-full object-cover" />
+                    <img src={im.url} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                   </button>
                 </li>
               ))}

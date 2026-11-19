@@ -773,3 +773,7 @@ Run `supabase/migration_082.sql` once, after migration_081 (no Edge Function cha
 ## migration_083 + Flex delivery result for admin messages
 
 Run `supabase/migration_083.sql` once, after migration_082, then deploy the Edge Function `notify-chat` again. Admin messages (to a girl, a customer or an agency owner) always send the LINE Flex when "แจ้งเตือนทาง LINE (Flex)" is ticked; the Compose window now shows whether LINE accepted it (push_status: SENT / FAILED / NO_LINE_ID). Messages sent through the API are not listed in LINE OA Manager chat, which is why they cannot be checked there. `supabase/migration_check_056_083.sql` checks which migrations have been run.
+
+## Storage egress, round 1 (front-end only, no SQL)
+
+`src/lib/signed.js` keeps the signed URLs of the private originals in memory and reuses them until 10 minutes before they expire (2 h validity), so the browser cache serves the pictures instead of downloading them again for every feed load; the feed and the detail page share the same URLs. New uploads of photos get `cacheControl` of one year (file names are unique), list thumbnails use `loading="lazy"`. Not changed: the files already stored, the database, the logos (same path, upserted).

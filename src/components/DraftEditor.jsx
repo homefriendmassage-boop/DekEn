@@ -92,11 +92,11 @@ export default function DraftEditor({ draft, mode, onClose, onSaved }) {
         </div>
         <ul className="grid grid-cols-3 gap-2">
           {photos.filter((p) => !removed.includes(p.id)).map((p) => (
-            <li key={p.id} className="relative aspect-[3/4] overflow-hidden rounded-xl bg-neutral-800"><img src={p.public_url} alt="" className="h-full w-full object-cover" />
+            <li key={p.id} className="relative aspect-[3/4] overflow-hidden rounded-xl bg-neutral-800"><img loading="lazy" decoding="async" src={p.public_url} alt="" className="h-full w-full object-cover" />
               <button onClick={() => setRemoved((r) => [...r, p.id])} className="absolute right-1 top-1 rounded-full bg-black/70 px-2 py-0.5 text-xs">✕</button></li>
           ))}
           {local.map((p) => (
-            <li key={p.key} className="relative aspect-[3/4] overflow-hidden rounded-xl bg-neutral-800"><img src={p.url} alt="" className="h-full w-full object-cover" />
+            <li key={p.key} className="relative aspect-[3/4] overflow-hidden rounded-xl bg-neutral-800"><img loading="lazy" decoding="async" src={p.url} alt="" className="h-full w-full object-cover" />
               <span className="absolute inset-x-0 bottom-0 bg-amber-500/90 py-0.5 text-center text-[10px] font-semibold text-black">ใหม่</span>
               <button onClick={() => setLocal((l) => l.filter((x) => x.key !== p.key))} className="absolute right-1 top-1 rounded-full bg-black/70 px-2 py-0.5 text-xs">✕</button></li>
           ))}

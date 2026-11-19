@@ -6,9 +6,9 @@ export async function uploadPhoto(userId, { orig, pub }, state) {
   const ts = `${Date.now()}${Math.floor(Math.random() * 1000)}`
   const origPath = `${userId}/${ts}.jpg`
   const pubPath = `${userId}/${ts}-public.jpg`
-  const a = await supabase.storage.from('worker-originals').upload(origPath, orig, { contentType: 'image/jpeg' })
+  const a = await supabase.storage.from('worker-originals').upload(origPath, orig, { contentType: 'image/jpeg', cacheControl: '31536000' })
   if (a.error) throw a.error
-  const b = await supabase.storage.from('worker-public').upload(pubPath, pub, { contentType: 'image/jpeg' })
+  const b = await supabase.storage.from('worker-public').upload(pubPath, pub, { contentType: 'image/jpeg', cacheControl: '31536000' })
   if (b.error) throw b.error
   const url = supabase.storage.from('worker-public').getPublicUrl(pubPath).data.publicUrl
   const { data, error } = await supabase.rpc('attach_photo', { p_state: state, p_public_url: url, p_original_path: origPath })

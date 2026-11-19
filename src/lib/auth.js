@@ -1,5 +1,6 @@
 import liff from '@line/liff'
 import { supabase } from '../supabaseClient'
+import { clearSignedUrls } from './signed'
 import { LIFF_ID, USE_MOCK_LIFF } from '../config'
 import { getVendor, getActiveLiffId, resolveVendor, sessionMatches } from './vendor'
 
@@ -190,6 +191,7 @@ export function takeChatIntent() {
 // LINE login tickets expire (the app was left open for a long time): sign out of LIFF and log in again instead of failing.
 const isExpired = (e) => /expired|invalid.*token|token.*invalid|unauthorized/i.test(`${e?.message ?? ''} ${e?.code ?? ''} ${e?.error ?? ''}`)
 function relogin() {
+  clearSignedUrls()
   try { liff.logout() } catch { /* ignore */ }
   liff.login({ redirectUri: window.location.href })   // leaves the page
   return new Promise(() => {})
@@ -294,6 +296,7 @@ export async function signIn() {
     let { data: existing } = await supabase.auth.getSession()
     if (existing.session && !sessionMatches(existing.session)) {   // a session of another vendor / the central app: start fresh
       await supabase.auth.signOut()
+      clearSignedUrls()
       existing = { session: null }
     }
     if (!existing.session) {

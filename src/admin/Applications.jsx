@@ -89,7 +89,7 @@ function Card({ a, linePic, onReview, onChanged, toast }) {
       {composing && <Compose userId={a.user_id} name={a.display_name} toast={toast} onClose={() => setComposing(false)} />}
       <div className="flex gap-3">
         {a.profile_image
-          ? <img src={a.profile_image} alt="" className="h-24 w-20 shrink-0 rounded-xl object-cover" />
+          ? <img loading="lazy" decoding="async" src={a.profile_image} alt="" className="h-24 w-20 shrink-0 rounded-xl object-cover" />
           : linePic
             ? <div className="relative h-24 w-20 shrink-0 overflow-hidden rounded-xl bg-white/10"><img src={linePic} alt="" className="h-full w-full object-cover" /><span className="absolute inset-x-0 bottom-0 bg-black/60 text-center text-[9px]">โปรไฟล์ LINE</span></div>
             : <div className="flex h-24 w-20 shrink-0 items-center justify-center rounded-xl bg-white/10 text-xs text-neutral-500">ไม่มีรูป</div>}
@@ -128,7 +128,7 @@ function Card({ a, linePic, onReview, onChanged, toast }) {
           <ul className="grid grid-cols-3 gap-2">
             {a.photos.map((p) => (
               <li key={p.id} className="space-y-1">
-                <img src={p.public_url} alt="" onClick={() => openViewer(a.photos.indexOf(p))} className="aspect-[3/4] w-full cursor-zoom-in rounded-xl object-cover" />
+                <img loading="lazy" decoding="async" src={p.public_url} alt="" onClick={() => openViewer(a.photos.indexOf(p))} className="aspect-[3/4] w-full cursor-zoom-in rounded-xl object-cover" />
               </li>
             ))}
           </ul>

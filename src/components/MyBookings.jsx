@@ -61,7 +61,7 @@ export default function MyBookings({ onClose, highlightId }) {
             {rows.map((j) => (
               <li key={j.id} className={`space-y-2 rounded-2xl p-3 ring-1 ${j.id === highlightId ? 'bg-pink-500/10 ring-pink-400/60' : 'bg-white/5 ring-white/10'}`}>
                 <div className="flex items-center gap-3">
-                  <div className="h-12 w-10 shrink-0 overflow-hidden rounded-lg bg-neutral-800">{j.worker_image && <img src={j.worker_image} alt="" className="h-full w-full object-cover" />}</div>
+                  <div className="h-12 w-10 shrink-0 overflow-hidden rounded-lg bg-neutral-800">{j.worker_image && <img loading="lazy" decoding="async" src={j.worker_image} alt="" className="h-full w-full object-cover" />}</div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-bold">{j.worker_name}</p>
                     <p className="text-xs text-neutral-400">{fmtWhen(j.scheduled_at, lang)}</p>

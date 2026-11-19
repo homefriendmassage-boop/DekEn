@@ -190,7 +190,7 @@ export default function ProfileSection({ worker, userId, onChanged, onTopUp }) {
           <ul className="grid grid-cols-3 gap-2">
             {live.map((p, i) => (
               <li key={p.id} className="relative aspect-[3/4] overflow-hidden rounded-xl bg-neutral-800 ring-1 ring-white/10">
-                <img src={p.public_url} alt="" className="h-full w-full object-cover" />
+                <img loading="lazy" decoding="async" src={p.public_url} alt="" className="h-full w-full object-cover" />
                 {i === 0 && <span className="absolute left-1 top-1 rounded-full bg-amber-400 px-1.5 text-[10px] font-bold text-black">{t('photoMain')}</span>}
               </li>
             ))}

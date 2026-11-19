@@ -120,9 +120,9 @@ export default function PhotoUploader({ userId, previousOriginal, onUploaded, ta
       const origPath = `${userId}/${ts}.jpg`
       const pubPath = `${userId}/${ts}-public.jpg`
 
-      const up1 = await supabase.storage.from('worker-originals').upload(origPath, preview.orig, { contentType: 'image/jpeg' })
+      const up1 = await supabase.storage.from('worker-originals').upload(origPath, preview.orig, { contentType: 'image/jpeg', cacheControl: '31536000' })
       if (up1.error) throw up1.error
-      const up2 = await supabase.storage.from('worker-public').upload(pubPath, preview.pub, { contentType: 'image/jpeg' })
+      const up2 = await supabase.storage.from('worker-public').upload(pubPath, preview.pub, { contentType: 'image/jpeg', cacheControl: '31536000' })
       if (up2.error) throw up2.error
 
       const url = supabase.storage.from('worker-public').getPublicUrl(pubPath).data.publicUrl

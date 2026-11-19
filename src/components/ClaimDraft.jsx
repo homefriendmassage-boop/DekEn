@@ -118,10 +118,10 @@ export default function ClaimDraft({ token, onClose, onDone }) {
 
     {d.photos.length > 0 && (
       <div>
-        <div className="aspect-[3/4] max-h-[46vh] overflow-hidden rounded-2xl bg-neutral-800"><img src={d.photos[idx]} alt="" className="h-full w-full object-cover" /></div>
+        <div className="aspect-[3/4] max-h-[46vh] overflow-hidden rounded-2xl bg-neutral-800"><img loading="lazy" decoding="async" src={d.photos[idx]} alt="" className="h-full w-full object-cover" /></div>
         {d.photos.length > 1 && (
           <ul className="mt-2 flex gap-2 overflow-x-auto">
-            {d.photos.map((u, i) => <li key={u} className="shrink-0"><button onClick={() => setIdx(i)} className={`block h-14 w-11 overflow-hidden rounded-lg ring-2 ${i === idx ? 'ring-pink-400' : 'ring-transparent'}`}><img src={u} alt="" className="h-full w-full object-cover" /></button></li>)}
+            {d.photos.map((u, i) => <li key={u} className="shrink-0"><button onClick={() => setIdx(i)} className={`block h-14 w-11 overflow-hidden rounded-lg ring-2 ${i === idx ? 'ring-pink-400' : 'ring-transparent'}`}><img loading="lazy" decoding="async" src={u} alt="" className="h-full w-full object-cover" /></button></li>)}
           </ul>
         )}
         <p className="mt-1 text-[11px] text-neutral-500">{t('claimPhotoNote')}</p>

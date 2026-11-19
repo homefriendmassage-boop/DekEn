@@ -111,7 +111,7 @@ export default function ProfileEdits({ onChanged, toast }) {
                         <ul className="grid grid-cols-3 gap-2">
                           {r.add_photos.map((p) => (
                             <li key={p.id} className="space-y-1">
-                              <img src={origs[p.id] ?? p.public_url} alt="" className="aspect-[3/4] w-full rounded-xl object-cover" />
+                              <img loading="lazy" decoding="async" src={origs[p.id] ?? p.public_url} alt="" className="aspect-[3/4] w-full rounded-xl object-cover" />
                               {!origs[p.id] && <button onClick={() => original(p)} className="w-full rounded-lg bg-white/10 py-1 text-[11px]">🔍 ต้นฉบับ</button>}
                             </li>
                           ))}
@@ -121,7 +121,7 @@ export default function ProfileEdits({ onChanged, toast }) {
                     {r.remove_photos.length > 0 && (
                       <div>
                         <p className="mb-1 text-xs font-semibold text-red-300">รูปที่ขอลบ ({r.remove_photos.length})</p>
-                        <ul className="grid grid-cols-3 gap-2">{r.remove_photos.map((p) => <li key={p.id}><img src={p.public_url} alt="" className="aspect-[3/4] w-full rounded-xl object-cover opacity-60" /></li>)}</ul>
+                        <ul className="grid grid-cols-3 gap-2">{r.remove_photos.map((p) => <li key={p.id}><img loading="lazy" decoding="async" src={p.public_url} alt="" className="aspect-[3/4] w-full rounded-xl object-cover opacity-60" /></li>)}</ul>
                       </div>
                     )}
 

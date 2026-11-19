@@ -111,7 +111,7 @@ export default function DraftsPanel({ mode, toast }) {
               <li key={d.id} className="space-y-2 rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
                 <div className="flex gap-3">
                   <div className="h-24 w-[4.5rem] shrink-0 overflow-hidden rounded-xl bg-neutral-800">
-                    {d.photos[0] && <img src={d.photos[0].public_url} alt="" className="h-full w-full object-cover" />}
+                    {d.photos[0] && <img loading="lazy" decoding="async" src={d.photos[0].public_url} alt="" className="h-full w-full object-cover" />}
                   </div>
                   <div className="min-w-0 flex-1 space-y-1">
                     <p className="truncate font-bold">{d.display_name}</p>
@@ -130,7 +130,7 @@ export default function DraftsPanel({ mode, toast }) {
                 <button onClick={() => showClear(d)} className="text-xs text-neutral-400 underline">{open === d.id ? 'ซ่อนรายละเอียด' : 'ดูรายละเอียด'}</button>
                 {open === d.id && (
                   <div className="space-y-2 rounded-xl bg-black/30 p-2 text-xs">
-                    <ul className="grid grid-cols-3 gap-1.5">{d.photos.map((p) => <li key={p.id} className="aspect-[3/4] overflow-hidden rounded-lg bg-neutral-800"><img src={clear[p.id] ?? p.public_url} alt="" className="h-full w-full object-cover" /></li>)}</ul>
+                    <ul className="grid grid-cols-3 gap-1.5">{d.photos.map((p) => <li key={p.id} className="aspect-[3/4] overflow-hidden rounded-lg bg-neutral-800"><img loading="lazy" decoding="async" src={clear[p.id] ?? p.public_url} alt="" className="h-full w-full object-cover" /></li>)}</ul>
                     <p>{[d.gender, d.age && `${d.age} ปี`, d.height_cm && `${d.height_cm} ซม.`, d.weight_kg && `${d.weight_kg} กก.`, d.measurements, d.service_mode].filter(Boolean).join(' · ')}</p>
                     {d.tags?.length > 0 && <p className="text-pink-200">{d.tags.join(', ')}</p>}
                     {d.about && <p className="whitespace-pre-wrap break-words text-neutral-300">{d.about}</p>}
