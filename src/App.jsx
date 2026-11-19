@@ -26,7 +26,7 @@ import ClaimDraft from './components/ClaimDraft'
 import MyBookings from './components/MyBookings'
 import { answerResched } from './components/JobSheets'
 import VendorInbox from './components/VendorInbox'
-import { signedUrls } from './lib/signed'
+import { signedUrls as getSignedUrls } from './lib/signed'
 
 // Mock mode only, when the workers table is empty: lets you click through the UI
 // before running seed SQL. Rank within a category = order in this list.
@@ -219,7 +219,7 @@ export default function App() {
       if (!w) return setShared((x) => x && { ...x, worker: false })
       let full = null
       if (w.can_view && w.original_path) {
-        full = (await signedUrls([w.original_path]))[w.original_path] ?? null
+        full = (await getSignedUrls([w.original_path]))[w.original_path] ?? null
       }
       setShared((x) => x && { ...x, worker: { ...w, canView: w.can_view, image: full ?? w.profile_image } })
     })()
@@ -331,7 +331,7 @@ export default function App() {
       if (rows.length === 0 && session?.isMock && !pos) rows = DEMO_WORKERS.filter((w) => w.category === cat)
 
       const paths = rows.filter((w) => w.can_view && w.original_path).map((w) => w.original_path)
-      const signed = paths.length ? await signedUrls(paths) : {}      // reused while still valid: the browser keeps the pictures cached
+      const signed = paths.length ? await getSignedUrls(paths) : {}      // reused while still valid: the browser keeps the pictures cached
       setSignedUrls(signed)
       setWorkers(rows)
     } catch (e) {
